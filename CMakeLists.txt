@@ -1,6 +1,9 @@
-cmake_minimum_required(VERSION 2.6)
+cmake_minimum_required(VERSION 2.8.3)
 
-project(nes)
+set(project_name nes)
+project(${project_name})
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 find_path(GLEW_INCLUDE GL/glew.h PATHS NO_DEFAULT_PATH DOC "GLEW include path")
 find_path(GLEW_LIB glew32.dll PATHS NO_DEFAULT_PATH DOC "GLEW lib path")
@@ -14,7 +17,10 @@ include_directories(${GLFW_INCLUDE})
 include_directories(${GLFW_LIB})
 find_library(GLFW_LIBRARY "glfw3" HINTS ${GLFW_LIB})
 
-add_definitions(-std=c++11 -msse2 -mfpmath=sse -lglfw3 -lglew32 -lopengl32)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -msse2 -mfpmath=sse")
+add_definitions(-lglfw3 -lglew32 -lopengl32)
 
-add_executable(nes main.cpp)
+file(GLOB_RECURSE source_files "src/*.cpp")
+file(GLOB_RECURSE header_files "src/*.hpp")
+add_executable(${project_name} ${header_files} ${source_files})
 target_link_libraries(nes ${GLFW_LIBRARY} ${GLEW_LIBRARY} opengl32)
