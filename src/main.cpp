@@ -1,9 +1,6 @@
 // #define DEBUG
 // #define DUMP_VRAM
 
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
-
 #include <array>
 #include <bitset>
 #include <fstream>
@@ -12,6 +9,10 @@
 #include <string>
 #include <vector>
 
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+
+#include "main.hpp"
 
 using std::array;
 using std::bitset;
@@ -30,14 +31,6 @@ void glfwDoStuff();
 
 GLuint vao;
 GLFWwindow* window;
-
-
-void cpu_read();
-void cpu_write();
-void cpu_tick();
-void cpu_op_done();
-void ppu_tick();
-void ppu_render_fetches();
 
 
 array<uint8_t, 256*240*3> render;

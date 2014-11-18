@@ -20,7 +20,13 @@ find_library(GLFW_LIBRARY "glfw3" HINTS ${GLFW_LIB})
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -msse2 -mfpmath=sse")
 add_definitions(-lglfw3 -lglew32 -lopengl32)
 
-file(GLOB_RECURSE source_files "src/*.cpp")
-file(GLOB_RECURSE header_files "src/*.hpp")
+set(source_files
+	src/main.cpp
+	)
+
+set(header_files
+	src/main.hpp
+	)
+
 add_executable(${project_name} ${header_files} ${source_files})
 target_link_libraries(nes ${GLFW_LIBRARY} ${GLEW_LIBRARY} opengl32)
