@@ -1,16 +1,18 @@
 // #define DEBUG
 // #define DUMP_VRAM
 
+#include "gl_core_3_3.h"
+#include <GLFW/glfw3.h>
+
 #include <array>
 #include <bitset>
+// #include <chrono>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <string>
+// #include <thread>
 #include <vector>
-
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
 
 #include "main.hpp"
 
@@ -90,9 +92,9 @@ int main(int argc, char* argv[]) {
 
 	glfwMakeContextCurrent(window);
 
-	glewExperimental = GL_TRUE;
-	if(glewInit() != GLEW_OK) {
-		std::cout << "glew died";
+	if(ogl_LoadFunctions() == ogl_LOAD_FAILED)
+	{
+		std::cout << "blopp";
 		glfwTerminate();
 		exit(1);
 	}
@@ -137,6 +139,8 @@ int main(int argc, char* argv[]) {
 
 
 	while (!glfwWindowShouldClose(window)) {
+		// std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+
 		bool alu = false;
 
 		uint8_t opcode = cpu_mem[PC];
@@ -1153,6 +1157,13 @@ int main(int argc, char* argv[]) {
 		if(controller_update) {
 			controller_reg = controller_reg2;
 		}
+
+		//one while loop isn't a frame!
+		// std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+		// std::chrono::microseconds tus = std::chrono::duration_cast<std::chrono::microseconds>(t2-t1);
+		// if(tus < std::chrono::microseconds(16667)) {
+			// std::this_thread::sleep_for(std::chrono::microseconds(16667) - tus);
+		// }
 	}
 
 	glfwTerminate();
