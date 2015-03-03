@@ -1067,7 +1067,7 @@ int main(int argc, char* argv[]) {
 					{
 					uint8_t prevrA = rA;
 					rA += content + rP[0];
-					rP[0] = (prevrA + content + rP[0]) >> 8;
+					rP[0] = (prevrA + content + rP[0]) & 0x100;
 					rP[1] = !rA;
 					rP[6] = (prevrA ^ rA) & (content ^ rA) & 0x80;
 					}
