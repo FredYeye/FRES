@@ -38,6 +38,7 @@ class nes
 		std::array<uint8_t, 0x10000> cpu_mem;
 		std::array<uint8_t, 0x4000> vram;
 		std::array<uint8_t, 0x100> ppu_oam;
+		std::array<uint8_t, 0x20> ppu_secondary_oam;
 
 		uint16_t PC;
 		uint8_t rA = 0, rX = 0, rY = 0;

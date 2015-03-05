@@ -101,7 +101,8 @@ void nes::runOpcode()
 		 << " SL:" << std::setw(3) << std::dec << scanline_v << std::endl;
 	#endif
 	#ifdef DUMP_VRAM
-	if(scanline_v == 261) {
+	if(scanline_v == 261)
+	{
 		std::string outfile = "vram.txt";
 		std::ofstream result(outfile.c_str(), std::ios::out | std::ios::binary);
 		result.write((char*)&vram[0],0x4000);
@@ -1127,7 +1128,8 @@ void nes::cpu_read()
 			w_toggle = false;
 			break;
 		case 0x2007:
-			if((scanline_v >= 240 && scanline_v <= 260) || !(ppumask & 0x18)) {
+			if((scanline_v >= 240 && scanline_v <= 260) || !(ppumask & 0x18))
+			{
 				//if in palette range, reload latch(mirrored) but send palette byte immediately
 				//perform NT mirroring here
 				content = ppudata_latch;
@@ -1207,7 +1209,7 @@ void nes::cpu_write()
 			{
 				controller_update = true;
 			}
-			else /*if(!(content & 1))*/
+			else
 			{
 				controller_update = false;
 			}
@@ -1225,7 +1227,7 @@ void nes::cpu_tick()
 	ppu_tick();
 	ppu_tick();
 
-	address = 0; //really needed?
+	address = 0; //not entirely correct, but necessary right now
 
 	return;
 }
@@ -1262,8 +1264,8 @@ void nes::cpu_op_done()
 
 void nes::ppu_tick()
 {
-	if(scanline_v < 240)
-	{ //visible scanlines
+	if(scanline_v < 240) //visible scanlines
+	{
 		if(scanline_v != 261 && scanline_h && scanline_h <= 256)
 		{
 			uint8_t ppu_pixel = (ppu_bg_low >> (15 - fine_x)) & 1;
@@ -1279,35 +1281,50 @@ void nes::ppu_tick()
 
 		ppu_render_fetches();
 
-	} else if(scanline_v == 241) { //vblank scanlines
-		if(scanline_h == 1) {
+	}
+	else if(scanline_v == 241) //vblank scanlines
+	{
+		if(scanline_h == 1)
+		{
 			ppustatus |= 0x80;
 			nmi_line = cpu_mem[0x2000] & ppustatus & 0x80;
 		}
-	} else if(scanline_v == 261) { //prerender scanline
-		if(scanline_h == 1) {
+	}
+	else if(scanline_v == 261) //prerender scanline
+	{
+		if(scanline_h == 1)
+		{
 			ppustatus &= 0x1F; //clear sprite overflow, sprite 0 hit and vblank
-		} else if(scanline_h >= 280 && scanline_h <= 304 && ppumask & 0x18) {
+		}
+		else if(scanline_h >= 280 && scanline_h <= 304 && ppumask & 0x18)
+		{
 			ppu_address = (ppu_address & 0x41F) | (ppu_address_latch & 0x7BE0);
 		}
 
 		ppu_render_fetches();
 
-		if(ppu_odd_frame && scanline_h == 339) {
+		if(ppu_odd_frame && scanline_h == 339)
+		{
 			++scanline_h;
 		}
 	}
 
-	if(scanline_h == 340) {
+	if(scanline_h == 340)
+	{
 		scanline_h = 0;
-		if(scanline_v == 261) {
+		if(scanline_v == 261)
+		{
 			scanline_v = 0;
 			ppu_odd_frame = !ppu_odd_frame;
 			renderFrame = true;
-		} else {
+		}
+		else
+		{
 			++scanline_v;
 		}
-	} else {
+	}
+	else
+	{
 		++scanline_h;
 	}
 
@@ -1315,41 +1332,59 @@ void nes::ppu_tick()
 }
 
 
-void nes::ppu_render_fetches()
-{ //things done during visible and prerender scanlines
-	if(ppumask & 0x18) { //if rendering is enabled
-		if(scanline_h == 256) { //Y increment
-			if(ppu_address < 0x7000) {
+void nes::ppu_render_fetches() //things done during visible and prerender scanlines
+{
+	if(ppumask & 0x18) //if rendering is enabled
+	{
+		if(scanline_h == 256) //Y increment
+		{
+			if(ppu_address < 0x7000)
+			{
 				ppu_address += 0x1000;
-			} else {
+			}
+			else
+			{
 				ppu_address &= 0xFFF;
-				if((ppu_address & 0x3E0) == 0x3A0) {
+				if((ppu_address & 0x3E0) == 0x3A0)
+				{
 					ppu_address &= 0xC1F;
 					ppu_address ^= 0x800;
-				} else if((ppu_address & 0x3E0) == 0x3E0) {
+				}
+				else if((ppu_address & 0x3E0) == 0x3E0)
+				{
 					ppu_address &= 0xC1F;
-				} else {
+				}
+				else
+				{
 					ppu_address += 0x20;
 				}
 			}
 		}
 
-		if(scanline_h == 257) {
+		if(scanline_h == 257)
+		{
 			ppu_address = (ppu_address & 0x7BE0) | (ppu_address_latch & 0x41F);
 		}
 
-		if((scanline_h >= 1 && scanline_h <= 257) || (scanline_h >= 321 && scanline_h <= 339)) {
-			if(!(scanline_h & 0x07)) { //coarse X increment
-				if((ppu_address & 0x1F) != 0x1F) {
+		if((scanline_h >= 1 && scanline_h <= 257) || (scanline_h >= 321 && scanline_h <= 339))
+		{
+			if(!(scanline_h & 0x07)) //coarse X increment
+			{
+				if((ppu_address & 0x1F) != 0x1F)
+				{
 					++ppu_address;
-				} else {
+				}
+				else
+				{
 					ppu_address = (ppu_address & 0x7FE0) ^ 0x400;
 				}
 			}
 
-			switch(scanline_h & 0x07) {
+			switch(scanline_h & 0x07)
+			{
 				case 1:
-					if(scanline_h != 1 && scanline_h != 321) {
+					if(scanline_h != 1 && scanline_h != 321) 
+					{
 						ppu_bg_low |= ppu_bg_low_latch;
 						ppu_bg_high |= ppu_bg_high_latch;
 						ppu_attribute |= (ppu_attribute_latch & 0x03) * 0x5555; //2-bit splat
@@ -1357,10 +1392,13 @@ void nes::ppu_render_fetches()
 					ppu_nametable = vram[0x2000 | (ppu_address & 0xFFF)];
 					break;
 				case 3:
-					if(scanline_h != 339) {
+					if(scanline_h != 339)
+					{
 						ppu_attribute_latch = vram[0x23C0 | (ppu_address & 0xC00) | (ppu_address >> 4 & 0x38) | (ppu_address >> 2 & 0x07)];
 						ppu_attribute_latch >>= (((ppu_address >> 1) & 0x01) | ((ppu_address >> 5) & 0x02)) * 2;
-					} else {
+					}
+					else
+					{
 						ppu_nametable = vram[0x2000 | (ppu_address & 0xFFF)];
 					}
 					break;
@@ -1374,15 +1412,16 @@ void nes::ppu_render_fetches()
 			}
 		}
 
-		if((scanline_h >= 1 && scanline_h <= 256) || (scanline_h >= 321 && scanline_h <= 336)) {
+		if((scanline_h >= 1 && scanline_h <= 256) || (scanline_h >= 321 && scanline_h <= 336))
+		{
 			ppu_bg_low <<= 1;
 			ppu_bg_high <<= 1;
 			ppu_attribute <<= 2;
 		}
-
 	}
 
-	if(scanline_h >= 257 && scanline_h <= 320) { //rendering enabled only?
+	if(scanline_h >= 257 && scanline_h <= 320) //rendering enabled only?
+	{
 		oamaddr = 0;
 	}
 

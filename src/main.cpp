@@ -50,6 +50,9 @@ int main(int argc, char* argv[])
 	initialize(vao, nes.GetPixelPtr());
 	glfwSetKeyCallback(window, key_callback);
 
+	uint32_t frameTime = 0;
+	uint16_t frames = 0;
+
 	while (!glfwWindowShouldClose(window)) {
 		std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
@@ -58,7 +61,7 @@ int main(int argc, char* argv[])
 		glClear(GL_COLOR_BUFFER_BIT);
 		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 240, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)nes.GetPixelPtr());
 		glBindVertexArray(vao);
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, 0);
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 
@@ -66,6 +69,16 @@ int main(int argc, char* argv[])
 		std::chrono::microseconds tus = std::chrono::duration_cast<std::chrono::microseconds>(t2-t1);
 		if(tus < std::chrono::microseconds(16667)) {
 			std::this_thread::sleep_for(std::chrono::microseconds(16667) - tus);
+		}
+
+		std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
+		frameTime += std::chrono::duration_cast<std::chrono::microseconds>(t3-t1).count();
+		++frames;
+		if(frameTime >= 1000000)
+		{
+			std::cout << frames << " fps" << std::endl;
+			frameTime = 0;
+			frames = 0;
 		}
 	}
 
@@ -126,24 +139,9 @@ void initialize(GLuint &vao, const std::array<uint8_t, 256*240*3> *pixelPtr) {
 	glBindVertexArray(vao);
 
 	// 1 square (made by 2 triangles) to be rendered
-	GLfloat vertices_position[8] = {
-		-1.0f, 1.0f,
-		1.0f, 1.0f,
-		1.0f, -1.0f,
-		-1.0f, -1.0f		
-	};
-
-	GLfloat texture_coord[8] = {
-		0.0f, 0.0f,
-		1.0f, 0.0f,
-		1.0f, 1.0f,
-		0.0f, 1.0f
-	};
-
-	GLuint indices[6] = {
-		0, 1, 2,
-		2, 3, 0
-	};
+	GLfloat vertices_position[8] = {-1.0f,1.0f,	1.0f,1.0f, 1.0f,-1.0f, -1.0f,-1.0f};
+	GLfloat texture_coord[8] = {0.0f,0.0f, 1.0f,0.0f, 1.0f,1.0f, 0.0f,1.0f};
+	uint8_t indices[6] = {0,1,2, 2,3,0};
 
 	std::string vertex = "#version 150\n in vec4 position; in vec2 texture_coord; out vec2 texture_coord_from_vshader; void main() {gl_Position = position; texture_coord_from_vshader = texture_coord;}";
 	std::string fragment = "#version 150\n in vec2 texture_coord_from_vshader; out vec4 out_color; uniform sampler2D texture_sampler; void main() {out_color = texture(texture_sampler, texture_coord_from_vshader);}";
