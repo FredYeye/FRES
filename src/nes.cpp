@@ -82,9 +82,9 @@ void nes::runOpcode()
 {
 	bool alu = false;
 
-	uint8_t opcode = cpu_mem[PC];
-	uint8_t op1 = cpu_mem[PC+1];
-	uint8_t op2 = cpu_mem[PC+2];
+	const uint8_t opcode = cpu_mem[PC];
+	const uint8_t op1 = cpu_mem[PC+1];
+	const uint8_t op2 = cpu_mem[PC+2];
 
 	#ifdef DEBUG
 	std::cout << std::uppercase << std::hex << std::setfill('0')
@@ -195,7 +195,7 @@ void nes::runOpcode()
 			cpu_read();
 			if(!rP.test(7))
 			{
-				uint8_t prevPCH = PC >> 8;
+				const uint8_t prevPCH = PC >> 8;
 				PC += int8_t(op1);
 				cpu_read();
 				if((PC >> 8) != prevPCH)
@@ -1266,7 +1266,7 @@ void nes::ppu_tick()
 {
 	if(scanline_v < 240) //visible scanlines
 	{
-		if(scanline_v != 261 && scanline_h && scanline_h <= 256)
+		if(scanline_h && scanline_h <= 256)
 		{
 			uint8_t ppu_pixel = (ppu_bg_low >> (15 - fine_x)) & 1;
 			ppu_pixel |= (ppu_bg_high >> (14 - fine_x)) & 2;
