@@ -124,13 +124,12 @@ void nes::runOpcode()
 		// 53 57 5B 5F
 		// 63 67 6B 6F
 		// 73 77 7B 7F
-		// 82 83 87 89 8B 8F
-		// 93 97 9B 9C 9E 9F
-		// A3 A7 AB AF
-		// B3 B7 BB BF
-		// C2 C3 C7 CB CF
-		// D3 D7 DB DF
-		// E2 E3 E7 EB EF
+		// 82 89 8B
+		// 93 9B 9C 9E 9F
+		// AB
+		// BB
+		// C2 CB
+		// E2 E3 E7 EF
 		// F3 F7 FB FF
 
 		case 0x00: //BRK
@@ -572,6 +571,17 @@ void nes::runOpcode()
 			cpu_mem[address] = rA;
 			cpu_write();
 			break;
+		case 0x83: //SAX
+			++PC;
+			cpu_read();
+			cpu_read();
+			cpu_read();
+			cpu_read();
+			address = cpu_mem[op1 + rX & 0xFF] + (cpu_mem[op1 + rX + 1 & 0xFF] << 8);
+			content = rA & rX;
+			cpu_mem[address] = rA & rX;
+			cpu_write();
+			break;
 		case 0x84: //STY
 			++PC;
 			cpu_read();
@@ -588,6 +598,12 @@ void nes::runOpcode()
 			++PC;
 			cpu_read();
 			cpu_mem[op1] = rX;
+			cpu_write();
+			break;
+		case 0x87: //SAX
+			++PC;
+			cpu_read();
+			cpu_mem[op1] = rA & rX;
 			cpu_write();
 			break;
 		case 0x88: //DEY
@@ -630,6 +646,16 @@ void nes::runOpcode()
 			address = op1 + (op2 << 8);
 			content = rX;
 			cpu_mem[op1 + (op2 << 8)] = rX;
+			cpu_write();
+			break;
+		case 0x8F: //SAX
+			++PC;
+			cpu_read();
+			++PC;
+			cpu_read();
+			address = op1 + (op2 << 8);
+			content = rA & rX;
+			cpu_mem[address] = rA & rX;
 			cpu_write();
 			break;
 		case 0x90: //BCC
@@ -676,6 +702,13 @@ void nes::runOpcode()
 			cpu_read();
 			cpu_read();
 			cpu_mem[op1 + rY & 0xFF] = rX;
+			cpu_write();
+			break;
+		case 0x97: //SAX
+			++PC;
+			cpu_read();
+			cpu_read();
+			cpu_mem[op1 + rY & 0xFF] = rA & rX;
 			cpu_write();
 			break;
 		case 0x98: //TYA
@@ -746,6 +779,24 @@ void nes::runOpcode()
 			rP[1] = !rX;
 			rP[7] = rX & 0x80;
 			break;
+		case 0xC3: //DCP
+			++PC;
+			cpu_read();
+			cpu_read();
+			cpu_read();
+			cpu_read();
+			// address = cpu_mem[op1 + rX & 0xFF] + (cpu_mem[op1 + rX + 1 & 0xFF] << 8);
+			// content = cpu_mem[address];
+			cpu_read();
+			//address the same here? research how address behaves
+			cpu_write();
+			address = cpu_mem[op1 + rX & 0xFF] + (cpu_mem[op1 + rX + 1 & 0xFF] << 8);
+			--cpu_mem[address];
+			rP[0] = (rA >= cpu_mem[address]) ? 1 : 0;
+			rP[1] = !(rA - cpu_mem[address]);
+			rP[7] = rA - cpu_mem[address] & 0x80;
+			cpu_write();
+			break;
 		case 0xC6: //DEC
 			++PC;
 			cpu_read();
@@ -754,6 +805,17 @@ void nes::runOpcode()
 			--cpu_mem[op1];
 			rP[1] = !cpu_mem[op1];
 			rP[7] = cpu_mem[op1] & 0x80;
+			cpu_write();
+			break;
+		case 0xC7: //DCP
+			++PC;
+			cpu_read();
+			cpu_read();
+			cpu_write();
+			--cpu_mem[op1];
+			rP[0] = (rA >= cpu_mem[op1]) ? 1 : 0;
+			rP[1] = !(rA - cpu_mem[op1]);
+			rP[7] = rA - cpu_mem[op1] & 0x80;
 			cpu_write();
 			break;
 		case 0xC8: //INY
@@ -780,6 +842,18 @@ void nes::runOpcode()
 			rP[7] = cpu_mem[op1 + (op2 << 8)] & 0x80;
 			cpu_write();
 			break;
+		case 0xCF: //DCP
+			++PC;
+			cpu_read();
+			++PC;
+			cpu_read();
+			cpu_read();
+			cpu_write();
+			--cpu_mem[op1 + (op2 << 8)];
+			rP[0] = (rA >= cpu_mem[op1 + (op2 << 8)]) ? 1 : 0;
+			rP[1] = !(rA - cpu_mem[op1 + (op2 << 8)]);
+			rP[7] = rA - cpu_mem[op1 + (op2 << 8)] & 0x80;
+			cpu_write();
 		case 0xD0: //BNE
 			++PC;
 			cpu_read();
@@ -794,6 +868,25 @@ void nes::runOpcode()
 				}
 			}
 			break;
+		case 0xD3: //DCP
+			++PC;
+			cpu_read();
+			cpu_read();
+			cpu_read();
+			//read from address without fixing high address bit
+			cpu_read();
+			// address = cpu_mem[op1] + (cpu_mem[op1 + 1 & 0xFF] << 8) + rY;
+			// content = cpu_mem[address];
+			cpu_read();
+			//address = ^
+			cpu_write();
+			address = cpu_mem[op1] + (cpu_mem[op1 + 1 & 0xFF] << 8) + rY;
+			content = --cpu_mem[address];
+			rP[0] = (rA >= cpu_mem[address]) ? 1 : 0;
+			rP[1] = !(rA - cpu_mem[address]);
+			rP[7] = rA - cpu_mem[address] & 0x80;
+			cpu_write();
+			break;
 		case 0xD6: //DEC
 			++PC;
 			cpu_read();
@@ -805,9 +898,35 @@ void nes::runOpcode()
 			rP[7] = cpu_mem[op1 + rX & 0xFF] & 0x80;
 			cpu_write();
 			break;
+		case 0xD7: //DCP
+			++PC;
+			cpu_read();
+			cpu_read();
+			cpu_read();
+			cpu_write();
+			--cpu_mem[op1 + rX & 0xFF];
+			rP[0] = (rA >= cpu_mem[op1 + rX & 0xFF]) ? 1 : 0;
+			rP[1] = !(rA - cpu_mem[op1 + rX & 0xFF]);
+			rP[7] = rA - cpu_mem[op1 + rX & 0xFF] & 0x80;
+			cpu_write();
+			break;
 		case 0xD8: //CLD
 			cpu_read();
 			rP.reset(3);
+			break;
+		case 0xDB: //DCP
+			++PC;
+			cpu_read();
+			++PC;
+			cpu_read();
+			cpu_read();
+			cpu_read();
+			cpu_write();
+			--cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF];
+			rP[0] = (rA >= cpu_mem[op1 + (op2 << 8) + rY & 0xFFFF]) ? 1 : 0;
+			rP[1] = !(rA - cpu_mem[op1 + (op2 << 8) + rY & 0xFFFF]);
+			rP[7] = rA - cpu_mem[op1 + (op2 << 8) + rY & 0xFFFF] & 0x80;
+			cpu_write();
 			break;
 		case 0xDE: //DEC
 			++PC;
@@ -820,6 +939,20 @@ void nes::runOpcode()
 			--cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF];
 			rP[1] = !cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF];
 			rP[7] = cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF] & 0x80;
+			cpu_write();
+			break;
+		case 0xDF: //DCP
+			++PC;
+			cpu_read();
+			++PC;
+			cpu_read();
+			cpu_read();
+			cpu_read();
+			cpu_write();
+			--cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF];
+			rP[0] = (rA >= cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF]) ? 1 : 0;
+			rP[1] = !(rA - cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF]);
+			rP[7] = rA - cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF] & 0x80;
 			cpu_write();
 			break;
 		case 0xE6: //INC
@@ -897,7 +1030,7 @@ void nes::runOpcode()
 			break;
 
 		case 0x01: case 0x21: case 0x41: case 0x61:
-		case 0xA1: case 0xC1: case 0xE1: //(indirect,x) / indexed indirect
+		case 0xA1: case 0xC1: case 0xE1: case 0xA3: //(indirect,x) / indexed indirect
 			++PC;
 			cpu_read();
 			cpu_read();
@@ -912,6 +1045,7 @@ void nes::runOpcode()
 		case 0x04: case 0x05: case 0x24: case 0x25: case 0x44: //zero page
 		case 0x45: case 0x64: case 0x65: case 0xA4: case 0xA5:
 		case 0xA6: case 0xC4: case 0xC5: case 0xE4: case 0xE5:
+		case 0xA7:
 			++PC;
 			cpu_read();
 			content = cpu_mem[op1];
@@ -920,7 +1054,7 @@ void nes::runOpcode()
 			break;
 
 		case 0x09: case 0x29: case 0x49: case 0x69: case 0x80: case 0xA0: //immediate
-		case 0xA2: case 0xA9: case 0xC0: case 0xC9: case 0xE0: case 0xE9:
+		case 0xA2: case 0xA9: case 0xC0: case 0xC9: case 0xE0: case 0xE9: case 0xEB:
 			++PC;
 			cpu_read();
 			content = op1;
@@ -929,6 +1063,7 @@ void nes::runOpcode()
 
 		case 0x0C: case 0x0D: case 0x2C: case 0x2D: case 0x4D: case 0x6D: //absolute
 		case 0xAC: case 0xAD: case 0xAE: case 0xCC: case 0xCD: case 0xEC: case 0xED:
+		case 0xAF:
 			++PC;
 			cpu_read();
 			++PC;
@@ -940,7 +1075,7 @@ void nes::runOpcode()
 			break;
 
 		case 0x11: case 0x31: case 0x51: //(indirect),y / indirect indexed
-		case 0x71: case 0xB1: case 0xD1: case 0xF1:
+		case 0x71: case 0xB1: case 0xD1: case 0xF1: case 0xB3:
 			++PC;
 			cpu_read();
 			cpu_read();
@@ -950,7 +1085,7 @@ void nes::runOpcode()
 			cpu_read();
 			if((cpu_mem[op1] + rY) > 0xFF)
 			{
-				address = cpu_mem[op1] + (cpu_mem[op1 + 1 & 0xFF] << 8) + rY; // address = address + 0x100 & 0xFFFF; //address gets reset. recalculate
+				address = cpu_mem[op1] + (cpu_mem[op1 + 1 & 0xFF] << 8) + rY; // address = address + 0x100 & 0xFFFF; address gets reset. recalculate
 				content = cpu_mem[address];
 				cpu_read();
 			}
@@ -969,7 +1104,7 @@ void nes::runOpcode()
 			break;
 
 		case 0x19: case 0x39: case 0x59: case 0x79: //absolute,Y
-		case 0xB9: case 0xBE: case 0xD9: case 0xF9:
+		case 0xB9: case 0xBE: case 0xD9: case 0xF9: case 0xBF:
 			++PC;
 			cpu_read();
 			++PC;
@@ -1005,7 +1140,7 @@ void nes::runOpcode()
 			alu = true;
 			break;
 
-		case 0xB6: //zero page,Y
+		case 0xB6: case 0xB7: //zero page,Y
 			++PC;
 			cpu_read();
 			cpu_read();
@@ -1072,6 +1207,7 @@ void nes::runOpcode()
 
 			case 0xE1: case 0xE5: case 0xE9: case 0xED:
 			case 0xF1: case 0xF5: case 0xF9: case 0xFD: //sbc
+			case 0xEB:
 				{
 				uint8_t prevrA = rA;
 				rA = (rA - content) - !rP[0];
@@ -1110,6 +1246,13 @@ void nes::runOpcode()
 				rP[1] = !(content & rA);
 				rP[6] = content & 0x40;
 				rP[7] = content & 0x80;
+				break;
+
+			case 0xA3: case 0xA7: case 0xAF: case 0xB3: case 0xB7: case 0xBF: //lax
+				rA = content;
+				rX = content;
+				rP[1] = !rX;
+				rP[7] = rX & 0x80;
 				break;
 		}
 	}
@@ -1280,6 +1423,7 @@ void nes::ppu_tick()
 		}
 
 		ppu_render_fetches();
+		// ppu_oam_scan(); //order?
 
 	}
 	else if(scanline_v == 241) //vblank scanlines
@@ -1302,6 +1446,7 @@ void nes::ppu_tick()
 		}
 
 		ppu_render_fetches();
+		// ppu_oam_scan(); //order?
 
 		if(ppu_odd_frame && scanline_h == 339)
 		{
@@ -1426,4 +1571,62 @@ void nes::ppu_render_fetches() //things done during visible and prerender scanli
 	}
 
 	return;
+}
+
+
+void nes::ppu_oam_scan()
+{
+	if(scanline_h && scanline_h <= 64)
+	{
+		if(!(scanline_h & 1))
+		{
+			ppu_secondary_oam[scanline_h / 2] = 0xFF;
+		}
+	}
+	else if(scanline_h && scanline_h <= 256)
+	{
+		if(!(scanline_h & 1))
+		{
+			switch(oam_eval_pattern)
+			{
+				case 0:
+					ppu_secondary_oam[secondary_oam_index] = ppu_oam[oam_spritenum];
+					if(scanline_v >= ppu_oam[oam_spritenum] && scanline_v < ppu_oam[oam_spritenum] + (8 << (ppuctrl >> 5 & 1)))
+					{
+						++oam_eval_pattern;
+					}
+					else
+					{
+						ppu_oam_update_index();
+					}
+					break;
+				case 1: case 2: case 3:
+					ppu_secondary_oam[secondary_oam_index + oam_eval_pattern] = ppu_oam[oam_spritenum + oam_eval_pattern];
+					if(oam_eval_pattern == 3)
+					{
+						++secondary_oam_index;
+						ppu_oam_update_index();						
+					}
+					break;
+			}
+		}
+	}
+}
+
+
+void nes::ppu_oam_update_index()
+{
+	oam_spritenum += 4;
+	if(!oam_spritenum)
+	{
+		oam_eval_pattern = 4;
+	}
+	else if(secondary_oam_index < 8)
+	{
+		oam_eval_pattern = 0;
+	}
+	else if(secondary_oam_index == 8)
+	{
+		oam_block_writes = false;
+	}
 }

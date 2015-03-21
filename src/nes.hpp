@@ -21,6 +21,8 @@ class nes
 		void cpu_op_done();
 		void ppu_tick();
 		void ppu_render_fetches();
+		void ppu_oam_scan();
+		void ppu_oam_update_index();
 
 		std::array<uint8_t, 256*240*3> render;
 		const std::array<uint8_t, 64*3> palette
@@ -68,6 +70,10 @@ class nes
 		uint16_t ppu_bg_address;
 		uint8_t ppudata_latch;
 		uint16_t ppu_nt_mirroring;
+		uint8_t secondary_oam_index = 0;
+		uint8_t oam_eval_pattern = 0;
+		uint8_t oam_spritenum = 0;
+		bool oam_block_writes = false;
 
 		bool renderFrame;
 };
