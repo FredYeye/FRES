@@ -37,7 +37,7 @@ class nes
 			204,210,120,  180,222,120,  168,226,144,  152,226,180,  160,214,228,  160,162,160,    0,  0,  0,    0,  0,  0
 		}};
 
-		std::array<uint8_t, 0x10000> cpu_mem;
+		std::array<uint8_t, 0x10000> cpuMem;
 		std::array<uint8_t, 0x4000> vram;
 		std::array<uint8_t, 0x100> ppu_oam;
 		std::array<uint8_t, 0x20> ppu_secondary_oam;

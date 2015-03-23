@@ -13,8 +13,7 @@
 nes::nes(std::string inFile)
 {
 	LoadRom(inFile);
-	PC = cpu_mem[0xFFFC] + (cpu_mem[0xFFFD] << 8);
-	// PC = 0xC000;
+	PC = cpuMem[0xFFFC] | (cpuMem[0xFFFD] << 8);
 	rS = 0xFD;
 	rP = 0x34;
 }
@@ -67,9 +66,9 @@ void nes::LoadRom(std::string inFile)
 //-----
 
 
-	std::copy_n(contentVec.begin() + 0x10, 0x4000, cpu_mem.begin() + 0x8000);
+	std::copy_n(contentVec.begin() + 0x10, 0x4000, cpuMem.begin() + 0x8000);
 	std::copy_n(contentVec.begin() + 0x4010, 0x2000, vram.begin());
-	std::copy(cpu_mem.begin()+0x8000, cpu_mem.begin()+0xC000, cpu_mem.begin()+0xC000);
+	std::copy(cpuMem.begin()+0x8000, cpuMem.begin()+0xC000, cpuMem.begin()+0xC000);
 }
 
 
@@ -81,9 +80,9 @@ const std::array<uint8_t, 256*240*3>* const nes::GetPixelPtr() const
 
 void nes::runOpcode()
 {
-	const uint8_t opcode = cpu_mem[PC];
-	const uint8_t op1 = cpu_mem[PC+1];
-	const uint8_t op2 = cpu_mem[PC+2];
+	const uint8_t opcode = cpuMem[PC];
+	const uint8_t op1 = cpuMem[PC+1];
+	const uint8_t op2 = cpuMem[PC+2];
 
 
 	#ifdef DEBUG
@@ -111,73 +110,16 @@ void nes::runOpcode()
 	#endif
 
 
-	// addressBus = PC;
-	// cpuRead();
+	addressBus = PC;
+	cpuRead();
 
-	// ++PC;
-	// ++addressBus;
-	// cpuRead();
+	++PC;
+	++addressBus;
+	cpuRead();
 
 	switch(opcode)
 	{
-		case 0x88: //DEY
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-			
-			--rY; //actually set one cycle later
-			rP[1] = !rY;
-			rP[7] = rY & 0x80;
-			break;
-		case 0xCA: //DEX
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-			
-			--rX; //actually set one cycle later
-			rP[1] = !rX;
-			rP[7] = rX & 0x80;
-			break;
-
-		case 0xC8: //INY
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-			
-			++rY; //actually set one cycle later
-			rP[1] = !rY;
-			rP[7] = rY & 0x80;
-			break;
-		case 0xE8: //INX
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-			
-			++rX; //actually set one cycle later
-			rP[1] = !rX;
-			rP[7] = rX & 0x80;
-			break;
-
 		case 0x00: //BRK
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
 			++PC;
 			addressBus = 0x0100 | rS;
 			dataBus = PC >> 8;
@@ -198,17 +140,243 @@ void nes::runOpcode()
 			++addressBus;
 			cpuRead();
 
-			PC = cpu_mem[0xFFFE] | (dataBus << 8);
+			PC = cpuMem[0xFFFE] | (dataBus << 8);
+			break;
+
+		case 0x02: case 0x12: case 0x22: case 0x32: case 0x42: case 0x52: //KIL
+		case 0x62: case 0x72: case 0x92: case 0xB2: case 0xD2: case 0xF2:
+			std::cout << "CRASH" << std::endl;
+			exit(0);
+			break;
+
+		case 0x08: //PHP
+			addressBus = 0x0100 | rS;
+			dataBus = rP.to_ulong();
+			cpuWrite();
+
+			--rS;
+			break;
+		case 0x28: //PLP
+			addressBus = 0x0100 | rS;
+			cpuRead();
+
+			++rS;
+			addressBus = 0x0100 | rS;
+			cpuRead();
+
+			rP = dataBus | 0x20;
+			break;
+		case 0x48: //PHA
+			addressBus = 0x0100 | rS;
+			dataBus = rA;
+			cpuWrite();
+
+			--rS;
+			break;
+		case 0x68: //PLA
+			addressBus = 0x0100 | rS;
+			cpuRead();
+
+			++rS;
+			addressBus = 0x0100 | rS;
+			cpuRead();
+
+			rA = dataBus;
+			rP[1] = !rA;
+			rP[7] = rA & 0x80;
+			break;
+
+		case 0x0A: //ASL acc
+			rP[0] = rA & 0x80;
+			rA <<= 1;
+			rP[1] = !rA;
+			rP[7] = rA & 0x80;
+			break;
+		case 0x2A: //ROL acc
+			{
+			const bool newCarry = rA & 0x80;
+			rA = (rA << 1) | rP[0];
+			rP[0] = newCarry;
+			}
+			rP[1] = !rA;
+			rP[7] = rA & 0x80;
+			break;
+		case 0x4A: //LSR acc
+			rP[0] = rA & 0x01;
+			rA >>= 1;
+			rP[1] = !rA;
+			rP.reset(7);
+			break;
+		case 0x6A: //ROR acc
+			{
+			const bool newCarry = rA & 0x01;
+			rA = (rA >> 1) | (rP[0] << 7);
+			rP[0] = newCarry;
+			}
+			rP[1] = !rA;
+			rP[7] = rA & 0x80;
+			break;
+
+		case 0x10: //BPL
+			++PC;
+			++addressBus;
+			if(!rP.test(7))
+			{
+				const uint16_t pagePC = PC + int8_t(op1);
+				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
+				addressBus = PC;
+				cpuRead();
+				if(PC != pagePC)
+				{
+					PC = pagePC;
+					addressBus = PC;
+					cpuRead();
+				}
+			}
+			break;
+		case 0x30: //BMI
+			++PC;
+			++addressBus;
+			if(rP.test(7))
+			{
+				const uint16_t pagePC = PC + int8_t(op1);
+				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
+				addressBus = PC;
+				cpuRead();
+				if(PC != pagePC)
+				{
+					PC = pagePC;
+					addressBus = PC;
+					cpuRead();
+				}
+			}
+			break;
+		case 0x50: //BVC
+			++PC;
+			++addressBus;
+			if(!rP.test(6))
+			{
+				const uint16_t pagePC = PC + int8_t(op1);
+				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
+				addressBus = PC;
+				cpuRead();
+				if(PC != pagePC)
+				{
+					PC = pagePC;
+					addressBus = PC;
+					cpuRead();
+				}
+			}
+			break;
+		case 0x70: //BVS
+			++PC;
+			++addressBus;
+			if(rP.test(6))
+			{
+				const uint16_t pagePC = PC + int8_t(op1);
+				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
+				addressBus = PC;
+				cpuRead();
+				if(PC != pagePC)
+				{
+					PC = pagePC;
+					addressBus = PC;
+					cpuRead();
+				}
+			}
+			break;
+		case 0x90: //BCC
+			++PC;
+			++addressBus;
+			if(!rP.test(0))
+			{
+				const uint16_t pagePC = PC + int8_t(op1);
+				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
+				addressBus = PC;
+				cpuRead();
+				if(PC != pagePC)
+				{
+					PC = pagePC;
+					addressBus = PC;
+					cpuRead();
+				}
+			}
+			break;
+		case 0xB0: //BCS
+			++PC;
+			++addressBus;
+			if(rP.test(0))
+			{
+				const uint16_t pagePC = PC + int8_t(op1);
+				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
+				addressBus = PC;
+				cpuRead();
+				if(PC != pagePC)
+				{
+					PC = pagePC;
+					addressBus = PC;
+					cpuRead();
+				}
+			}
+			break;
+		case 0xD0: //BNE
+			++PC;
+			++addressBus;
+			if(!rP.test(1))
+			{
+				const uint16_t pagePC = PC + int8_t(op1);
+				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
+				addressBus = PC;
+				cpuRead();
+				if(PC != pagePC)
+				{
+					PC = pagePC;
+					addressBus = PC;
+					cpuRead();
+				}
+			}
+			break;
+		case 0xF0: //BEQ
+			++PC;
+			++addressBus;
+			if(rP.test(1))
+			{
+				const uint16_t pagePC = PC + int8_t(op1);
+				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
+				addressBus = PC;
+				cpuRead();
+				if(PC != pagePC)
+				{
+					PC = pagePC;
+					addressBus = PC;
+					cpuRead();
+				}
+			}
+			break;
+
+		case 0x18: //CLC
+			rP.reset(0);
+			break;
+		case 0x38: //SEC
+			rP.set(0);
+			break;
+		case 0x58: //CLI
+			rP.reset(2);
+			break;
+		case 0x78: //SEI
+			rP.set(2);
+			break;
+		case 0xB8: //CLV
+			rP.reset(6);
+			break;
+		case 0xD8: //CLD
+			rP.reset(3);
+			break;
+		case 0xF8: //SED
+			rP.set(3);
 			break;
 
 		case 0x20: //JSR
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
 			++PC;
 			addressBus = 0x0100 | rS;
 			// rS = op1; //wtf
@@ -228,13 +396,6 @@ void nes::runOpcode()
 			PC = op1 + (op2 << 8);
 			break;
 		case 0x40: //RTI
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
 			++PC;
 			addressBus = 0x0100 | rS;
 			cpuRead();
@@ -250,16 +411,9 @@ void nes::runOpcode()
 			addressBus = 0x0100 | uint8_t(addressBus + 1);
 			cpuRead();
 
-			PC = cpu_mem[0x0100 | uint8_t(addressBus - 1)] | (dataBus << 8);
+			PC = cpuMem[0x0100 | uint8_t(addressBus - 1)] | (dataBus << 8);
 			break;
 		case 0x60: //RTS
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
 			++PC;
 			addressBus = 0x0100 | rS;
 			cpuRead();
@@ -271,7 +425,7 @@ void nes::runOpcode()
 			addressBus = 0x0100 | uint8_t(addressBus + 1);
 			cpuRead();
 
-			PC = cpu_mem[0x0100 | addressBus - 1] | (dataBus << 8);
+			PC = cpuMem[0x0100 | addressBus - 1] | (dataBus << 8);
 			addressBus = PC;
 			cpuRead();
 
@@ -279,144 +433,147 @@ void nes::runOpcode()
 			break;
 
 		case 0x4C: //JMP abs
-			addressBus = PC;
-			cpuRead();
-
 			++PC;
 			++addressBus;
 			cpuRead();
 
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			PC = op1 + (op2 << 8);
+			PC = op1 | (op2 << 8);
 			break;
 		case 0x6C: //JMP ind
-			addressBus = PC;
-			cpuRead();
-
 			++PC;
 			++addressBus;
 			cpuRead();
 
 			++PC;
-			++addressBus;
+			addressBus = op1 | (op2 << 8);
 			cpuRead();
 
-			++PC;
-			addressBus = op1 + (op2 << 8);
+			addressBus = uint8_t(op1 + 1) | (op2 << 8);
 			cpuRead();
 
-			addressBus = uint8_t(op1 + 1) + (op2 << 8);
-			cpuRead();
-
-			PC = cpu_mem[op1 + (op2 << 8)] + (dataBus << 8);
+			PC = cpuMem[op1 | (op2 << 8)] | (dataBus << 8);
 			break;
 
-		case 0x28: //PLP
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			addressBus = 0x0100 + rS;
-			cpuRead();
-
-			++rS;
-			addressBus = 0x0100 + rS;
-			cpuRead();
-
-			rP = dataBus | 0x20;
+		case 0x88: //DEY
+			--rY; //actually set one cycle later
+			rP[1] = !rY;
+			rP[7] = rY & 0x80;
 			break;
-		case 0x68: //PLA
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			addressBus = 0x0100 + rS;
-			cpuRead();
-
-			++rS;
-			addressBus = 0x0100 + rS;
-			cpuRead();
-
-			rA = dataBus;
-			rP[1] = !rA;
-			rP[7] = rA & 0x80;
+		case 0xC8: //INY
+			++rY; //actually set one cycle later
+			rP[1] = !rY;
+			rP[7] = rY & 0x80;
 			break;
-		case 0x08: //PHP
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			addressBus = 0x0100 + rS;
-			dataBus = rP.to_ulong();
-			cpuWrite();
-
-			--rS;
+		case 0xCA: //DEX
+			--rX; //actually set one cycle later
+			rP[1] = !rX;
+			rP[7] = rX & 0x80;
 			break;
-		case 0x48: //PHA
-			addressBus = PC;
-			cpuRead();
+		case 0xE8: //INX
+			++rX; //actually set one cycle later
+			rP[1] = !rX;
+			rP[7] = rX & 0x80;
+			break;
 
+		case 0x81: //STA (ind,x)
 			++PC;
-			++addressBus;
+			addressBus = op1;
 			cpuRead();
 
-			addressBus = 0x0100 + rS;
+			addressBus = uint8_t(addressBus + rX);
+			cpuRead();
+
+			addressBus = uint8_t(addressBus + 1);
+			cpuRead();
+
+			addressBus = cpuMem[uint8_t(addressBus - 1)] | (cpuMem[addressBus] << 8);
 			dataBus = rA;
 			cpuWrite();
+			break;
+		case 0x85: //STA zp
+			++PC;
+			addressBus = op1;
+			dataBus = rA;
+			cpuWrite();
+			break;
+		case 0x8D: //STA abs
+			++PC;
+			++addressBus;
+			cpuRead();
 
-			--rS;
+			++PC;
+			addressBus = op1 | (op2 << 8);
+			dataBus = rA;
+			cpuWrite();
+			break;
+		case 0x91: //STA (ind),y
+			++PC;
+			addressBus = op1;
+			cpuRead();
+
+			addressBus = uint8_t(addressBus + 1);
+			cpuRead();
+
+			addressBus = uint8_t(cpuMem[uint8_t(addressBus - 1)] + rY) | (cpuMem[addressBus] << 8);
+			cpuRead();
+
+			addressBus += cpuMem[op1] + rY & 0x0100;
+			dataBus = rA;
+			cpuWrite();
+			break;
+		case 0x95: //STA zp,x
+			++PC;
+			addressBus = op1;
+			cpuRead();
+
+			addressBus = uint8_t(addressBus + rX);
+			dataBus = rA;
+			cpuWrite();
+			break;
+		case 0x99: //STA abs,y
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = uint8_t(op1 + rY) | (op2 << 8);
+			cpuRead();
+
+			addressBus += op1 + rY & 0x0100;
+			dataBus = rA;
+			cpuWrite();
+			break;
+		case 0x9D: //STA abs,x
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = uint8_t(op1 + rX) | (op2 << 8);
+			cpuRead();
+
+			addressBus += op1 + rX & 0x0100;
+			dataBus = rA;
+			cpuWrite();
 			break;
 
 		case 0x84: //STY zp
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
 			++PC;
 			addressBus = op1;
 			dataBus = rY;
 			cpuWrite();
 			break;
 		case 0x8C: //STY abs
-			addressBus = PC;
-			cpuRead();
-
 			++PC;
 			++addressBus;
 			cpuRead();
 
 			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			addressBus = op1 + (op2 << 8);
+			addressBus = op1 | (op2 << 8);
 			dataBus = rY;
 			cpuWrite();
 			break;
 		case 0x94: //STY zp,x
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
 			++PC;
 			addressBus = op1;
 			cpuRead();
@@ -427,43 +584,22 @@ void nes::runOpcode()
 			break;
 
 		case 0x86: //STX zp
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
 			++PC;
 			addressBus = op1;
 			dataBus = rX;
 			cpuWrite();
 			break;
 		case 0x8E: //STX abs
-			addressBus = PC;
-			cpuRead();
-
 			++PC;
 			++addressBus;
 			cpuRead();
 
 			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			addressBus = op1 + (op2 << 8);
+			addressBus = op1 | (op2 << 8);
 			dataBus = rX;
 			cpuWrite();
 			break;
 		case 0x96: //STX zp,y
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
 			++PC;
 			addressBus = op1;
 			cpuRead();
@@ -473,548 +609,39 @@ void nes::runOpcode()
 			cpuWrite();
 			break;
 
-		case 0x81: //STA (ind,x)
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			addressBus = op1;
-			cpuRead();
-
-			addressBus = uint8_t(addressBus + rX);
-			cpuRead();
-
-			addressBus = uint8_t(addressBus + 1);
-			cpuRead();
-
-			addressBus = cpu_mem[uint8_t(addressBus - 1)] + (cpu_mem[addressBus] << 8);
-			dataBus = rA;
-			cpuWrite();
-			break;
-		case 0x85: //STA zp
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			addressBus = op1;
-			dataBus = rA;
-			cpuWrite();
-			break;
-		case 0x8D: //STA abs
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			addressBus = op1 + (op2 << 8);
-			dataBus = rA;
-			cpuWrite();
-			break;
-		case 0x91: //STA (ind),y
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			addressBus = op1;
-			cpuRead();
-
-			addressBus = uint8_t(addressBus + 1);
-			cpuRead();
-
-			addressBus = uint8_t(cpu_mem[uint8_t(addressBus - 1)] + rY) + (cpu_mem[addressBus] << 8);
-			cpuRead();
-
-			addressBus += cpu_mem[op1] + rY & 0x0100;
-			dataBus = rA;
-			cpuWrite();
-			break;
-		case 0x95: //STA zp,x
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			addressBus = op1;
-			cpuRead();
-
-			addressBus = uint8_t(addressBus + rX);
-			dataBus = rA;
-			cpuWrite();
-			break;
-		case 0x99: //STA abs,y
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			addressBus = uint8_t(op1 + rY) + (op2 << 8);
-			cpuRead();
-
-			addressBus += op1 + rY & 0x0100;
-			dataBus = rA;
-			cpuWrite();
-			break;
-		case 0x9D: //STA abs,x
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			addressBus = uint8_t(op1 + rX) + (op2 << 8);
-			cpuRead();
-
-			addressBus += op1 + rX & 0x0100;
-			dataBus = rA;
-			cpuWrite();
-			break;
-
-		case 0xAA: //TAX
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			rX = rA;
-			rP[1] = !rX;
-			rP[7] = rX & 0x80;
-			break;
-		case 0xA8: //TAY
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			rY = rA;
-			rP[1] = !rY;
-			rP[7] = rY & 0x80;
-			break;
-		case 0xBA: //TSX
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			rX = rS;
-			rP[1] = !rX;
-			rP[7] = rX & 0x80;
-			break;
 		case 0x8A: //TXA
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
 			rA = rX;
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
 			break;
-		case 0x9A: //TXS
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			rS = rX;
-			break;
 		case 0x98: //TYA
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
 			rA = rY;
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
 			break;
-
-		case 0xEA: //NOP
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
+		case 0x9A: //TXS
+			rS = rX;
+			break;
+		case 0xA8: //TAY
+			rY = rA;
+			rP[1] = !rY;
+			rP[7] = rY & 0x80;
+			break;
+		case 0xAA: //TAX
+			rX = rA;
+			rP[1] = !rX;
+			rP[7] = rX & 0x80;
+			break;
+		case 0xBA: //TSX
+			rX = rS;
+			rP[1] = !rX;
+			rP[7] = rX & 0x80;
 			break;
 
-		case 0x18: //CLC
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			rP.reset(0);
-			break;
-		case 0x38: //SEC
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			rP.set(0);
-			break;
-		case 0x58: //CLI
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			rP.reset(2);
-			break;
-		case 0x78: //SEI
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			rP.set(2);
-			break;
-		case 0xB8: //CLV
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			rP.reset(6);
-			break;
-		case 0xD8: //CLD
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			rP.reset(3);
-			break;
-		case 0xF8: //SED
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			rP.set(3);
-			break;
-
-		case 0x10: //BPL
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			if(!rP.test(7))
-			{
-				const uint16_t pagePC = PC + int8_t(op1);
-				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
-				addressBus = PC;
-				cpuRead();
-				if(PC != pagePC)
-				{
-					PC = pagePC;
-					addressBus = PC;
-					cpuRead();
-				}
-			}
-			break;
-		case 0x30: //BMI
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			if(rP.test(7))
-			{
-				const uint16_t pagePC = PC + int8_t(op1);
-				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
-				addressBus = PC;
-				cpuRead();
-				if(PC != pagePC)
-				{
-					PC = pagePC;
-					addressBus = PC;
-					cpuRead();
-				}
-			}
-			break;
-		case 0x50: //BVC
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			if(!rP.test(6))
-			{
-				const uint16_t pagePC = PC + int8_t(op1);
-				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
-				addressBus = PC;
-				cpuRead();
-				if(PC != pagePC)
-				{
-					PC = pagePC;
-					addressBus = PC;
-					cpuRead();
-				}
-			}
-			break;
-		case 0x70: //BVS
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			if(rP.test(6))
-			{
-				const uint16_t pagePC = PC + int8_t(op1);
-				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
-				addressBus = PC;
-				cpuRead();
-				if(PC != pagePC)
-				{
-					PC = pagePC;
-					addressBus = PC;
-					cpuRead();
-				}
-			}
-			break;
-		case 0x90: //BCC
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			if(!rP.test(0))
-			{
-				const uint16_t pagePC = PC + int8_t(op1);
-				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
-				addressBus = PC;
-				cpuRead();
-				if(PC != pagePC)
-				{
-					PC = pagePC;
-					addressBus = PC;
-					cpuRead();
-				}
-			}
-			break;
-		case 0xB0: //BCS
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			if(rP.test(0))
-			{
-				const uint16_t pagePC = PC + int8_t(op1);
-				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
-				addressBus = PC;
-				cpuRead();
-				if(PC != pagePC)
-				{
-					PC = pagePC;
-					addressBus = PC;
-					cpuRead();
-				}
-			}
-			break;
-		case 0xD0: //BNE
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			if(!rP.test(1))
-			{
-				const uint16_t pagePC = PC + int8_t(op1);
-				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
-				addressBus = PC;
-				cpuRead();
-				if(PC != pagePC)
-				{
-					PC = pagePC;
-					addressBus = PC;
-					cpuRead();
-				}
-			}
-			break;
-		case 0xF0: //BEQ
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			if(rP.test(1))
-			{
-				const uint16_t pagePC = PC + int8_t(op1);
-				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
-				addressBus = PC;
-				cpuRead();
-				if(PC != pagePC)
-				{
-					PC = pagePC;
-					addressBus = PC;
-					cpuRead();
-				}
-			}
-			break;
-
-		case 0x0A: //ASL acc
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			rP[0] = rA & 0x80;
-			rA <<= 1;
-			rP[1] = !rA;
-			rP[7] = rA & 0x80;
-			break;
-		case 0x2A: //ROL acc
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			{
-			const bool newCarry = rA & 0x80;
-			rA = (rA << 1) | rP[0];
-			rP[0] = newCarry;
-			}
-			rP[1] = !rA;
-			rP[7] = rA & 0x80;
-			break;
-		case 0x4A: //LSR acc
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			rP[0] = rA & 0x01;
-			rA >>= 1;
-			rP[1] = !rA;
-			rP.reset(7);
-			break;
-		case 0x6A: //ROR acc
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
-			{
-			const bool newCarry = rA & 0x01;
-			rA = (rA >> 1) | (rP[0] << 7);
-			rP[0] = newCarry;
-			}
-			rP[1] = !rA;
-			rP[7] = rA & 0x80;
-			break;
+		// case 0x1A: case 0x3A: case 0x5A: case 0x7A: case 0xDA: case 0xEA: case 0xFA: //NOP
+			// break;
 
 		case 0x06: case 0x26: case 0x46: case 0x66: case 0xC6: case 0xE6: //z RW
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
 			++PC;
 			addressBus = op1;
 			cpuRead();
@@ -1022,13 +649,6 @@ void nes::runOpcode()
 			cpuWrite();
 			break;
 		case 0x0E: case 0x2E: case 0x4E: case 0x6E: case 0xCE: case 0xEE: //abs RW
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
 			++PC;
 			++addressBus;
 			cpuRead();
@@ -1040,13 +660,6 @@ void nes::runOpcode()
 			cpuWrite();
 			break;
 		case 0x16: case 0x36: case 0x56: case 0x76: case 0xD6: case 0xF6: //z,x RW
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
 			++PC;
 			addressBus = op1;
 			cpuRead();
@@ -1057,19 +670,12 @@ void nes::runOpcode()
 			cpuWrite();
 			break;
 		case 0x1E: case 0x3E: case 0x5E: case 0x7E: case 0xDE: case 0xFE: //abs,x RW
-			addressBus = PC;
-			cpuRead();
-
 			++PC;
 			++addressBus;
 			cpuRead();
 
 			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			addressBus = uint8_t(op1 + rX) + (op2 << 8);
+			addressBus = uint8_t(op1 + rX) | (op2 << 8);
 			cpuRead();
 
 			addressBus = op1 + rX + (op2 << 8);
@@ -1078,15 +684,8 @@ void nes::runOpcode()
 			cpuWrite();
 			break;
 
-		case 0x01: case 0x21: case 0x41: case 0x61:
-		case 0xA1: case 0xC1: case 0xE1: case 0xA3: //(indirect,x) / indexed indirect
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
+		case 0x01: case 0x21: case 0x41: case 0x61: //(indirect,x) / indexed indirect R
+		case 0xA1: case 0xC1: case 0xE1: case 0xA3:
 			++PC;
 			addressBus = op1;
 			cpuRead();
@@ -1097,62 +696,34 @@ void nes::runOpcode()
 			addressBus = uint8_t(addressBus + 1);
 			cpuRead();
 
-			addressBus = cpu_mem[uint8_t(addressBus - 1)] + (cpu_mem[addressBus] << 8);
+			addressBus = cpuMem[uint8_t(addressBus - 1)] | (cpuMem[addressBus] << 8);
 			cpuRead();
 			break;
-		case 0x04: case 0x05: case 0x24: case 0x25: case 0x44: //zero page
+		case 0x04: case 0x05: case 0x24: case 0x25: case 0x44: //zero page R
 		case 0x45: case 0x64: case 0x65: case 0xA4: case 0xA5:
 		case 0xA6: case 0xC4: case 0xC5: case 0xE4: case 0xE5:
 		case 0xA7:
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
 			++PC;
 			addressBus = op1;
 			cpuRead();
 			break;
-		case 0x09: case 0x29: case 0x49: case 0x69: case 0x80: case 0xA0: //immediate
+		case 0x09: case 0x29: case 0x49: case 0x69: case 0x80: case 0xA0: //immediate R
 		case 0xA2: case 0xA9: case 0xC0: case 0xC9: case 0xE0: case 0xE9: case 0xEB:
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
 			++PC;
 			break;
-		case 0x0C: case 0x0D: case 0x2C: case 0x2D: case 0x4D: case 0x6D: //absolute
+		case 0x0C: case 0x0D: case 0x2C: case 0x2D: case 0x4D: case 0x6D: //absolute R
 		case 0xAC: case 0xAD: case 0xAE: case 0xCC: case 0xCD: case 0xEC: case 0xED:
 		case 0xAF:
-			addressBus = PC;
-			cpuRead();
-
 			++PC;
 			++addressBus;
 			cpuRead();
 
 			++PC;
-			++addressBus;
-			cpuRead();
-
-			++PC;
-			addressBus = op1 + (op2 << 8);
+			addressBus = op1 | (op2 << 8);
 			cpuRead();
 			break;
-		case 0x11: case 0x31: case 0x51: //(indirect),y / indirect indexed
+		case 0x11: case 0x31: case 0x51: //(indirect),y / indirect indexed R
 		case 0x71: case 0xB1: case 0xD1: case 0xF1: case 0xB3:
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
 			++PC;
 			addressBus = op1;
 			cpuRead();
@@ -1160,25 +731,18 @@ void nes::runOpcode()
 			addressBus = uint8_t(addressBus + 1);
 			cpuRead();
 
-			addressBus = uint8_t(cpu_mem[uint8_t(addressBus - 1)] + rY) + (cpu_mem[addressBus] << 8);
+			addressBus = uint8_t(cpuMem[uint8_t(addressBus - 1)] + rY) | (cpuMem[addressBus] << 8);
 			cpuRead();
 
-			if(cpu_mem[op1] + rY > 0xFF)
+			if(cpuMem[op1] + rY > 0xFF)
 			{
 				addressBus += 0x0100;
 				cpuRead();
 			}
 			break;
-		case 0x14: case 0x15: case 0x34: case 0x35: //zero page,X
+		case 0x14: case 0x15: case 0x34: case 0x35: //zero page,X R
 		case 0x54: case 0x55: case 0x74: case 0x75: case 0xB4:
 		case 0xB5: case 0xD4: case 0xD5: case 0xF4: case 0xF5:
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
 			++PC;
 			addressBus = op1;
 			cpuRead();
@@ -1186,15 +750,8 @@ void nes::runOpcode()
 			addressBus = uint8_t(addressBus + rX);
 			cpuRead();
 			break;
-		case 0x19: case 0x39: case 0x59: case 0x79: //absolute,Y
+		case 0x19: case 0x39: case 0x59: case 0x79: //absolute,Y R
 		case 0xB9: case 0xBE: case 0xD9: case 0xF9: case 0xBF:
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
 			++PC;
 			++addressBus;
 			cpuRead();
@@ -1209,16 +766,9 @@ void nes::runOpcode()
 				cpuRead();
 			}
 			break;
-		case 0x1C: case 0x1D: case 0x3C: case 0x3D: //absolute,X
+		case 0x1C: case 0x1D: case 0x3C: case 0x3D: //absolute,X R
 		case 0x5C: case 0x5D: case 0x7C: case 0x7D: case 0xBC:
 		case 0xBD: case 0xDC: case 0xDD: case 0xFC: case 0xFD:
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
 			++PC;
 			++addressBus;
 			cpuRead();
@@ -1233,14 +783,7 @@ void nes::runOpcode()
 				cpuRead();
 			}
 			break;
-		case 0xB6: case 0xB7: //zero page,Y
-			addressBus = PC;
-			cpuRead();
-
-			++PC;
-			++addressBus;
-			cpuRead();
-
+		case 0xB6: case 0xB7: //zero page,Y R
 			++PC;
 			addressBus = op1;
 			cpuRead();
@@ -1252,10 +795,10 @@ void nes::runOpcode()
 
 	switch(opcode)
 	{
-		case 0x61: case 0x65: case 0x69: case 0x6D:
-		case 0x71: case 0x75: case 0x79: case 0x7D: //adc
+		case 0x61: case 0x65: case 0x69: case 0x6D: //adc
+		case 0x71: case 0x75: case 0x79: case 0x7D:
 			{
-			uint8_t prevrA = rA;
+			const uint8_t prevrA = rA;
 			rA += dataBus + rP[0];
 			rP[0] = (prevrA + dataBus + rP[0]) & 0x100;
 			rP[1] = !rA;
@@ -1264,48 +807,47 @@ void nes::runOpcode()
 			rP[7] = rA & 0x80;
 			break;
 
-		case 0x21: case 0x25: case 0x29: case 0x2D:
-		case 0x31: case 0x35: case 0x39: case 0x3D: //and
+		case 0x21: case 0x25: case 0x29: case 0x2D: //and
+		case 0x31: case 0x35: case 0x39: case 0x3D:
 			rA &= dataBus;
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
 			break;
 
-		case 0xC1: case 0xC5: case 0xC9: case 0xCD:
-		case 0xD1: case 0xD5: case 0xD9: case 0xDD: //cmp
-			rP[0] = (rA >= dataBus) ? 1 : 0;
+		case 0xC1: case 0xC5: case 0xC9: case 0xCD: //cmp
+		case 0xD1: case 0xD5: case 0xD9: case 0xDD:
+			rP[0] = !(rA - dataBus & 0x0100);
 			rP[1] = !(rA - dataBus);
 			rP[7] = rA - dataBus & 0x80;
 			break;
 
-		case 0x41: case 0x45: case 0x49: case 0x4D:
-		case 0x51: case 0x55: case 0x59: case 0x5D: //eor
+		case 0x41: case 0x45: case 0x49: case 0x4D: //eor
+		case 0x51: case 0x55: case 0x59: case 0x5D:
 			rA ^= dataBus;
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
 			break;
 
-		case 0xA1: case 0xA5: case 0xA9: case 0xAD:
-		case 0xB1: case 0xB5: case 0xB9: case 0xBD: //lda
+		case 0xA1: case 0xA5: case 0xA9: case 0xAD: //lda
+		case 0xB1: case 0xB5: case 0xB9: case 0xBD:
 			rA = dataBus;
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
 			break;
 
-		case 0x01: case 0x05: case 0x09: case 0x0D:
-		case 0x11: case 0x15: case 0x19: case 0x1D: //ora
+		case 0x01: case 0x05: case 0x09: case 0x0D: //ora
+		case 0x11: case 0x15: case 0x19: case 0x1D:
 			rA |= dataBus;
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
 			break;
 
-		case 0xE1: case 0xE5: case 0xE9: case 0xED:
-		case 0xF1: case 0xF5: case 0xF9: case 0xFD: //sbc
-		case 0xEB:
+		case 0xE1: case 0xE5: case 0xE9: case 0xED: //sbc
+		case 0xF1: case 0xF5: case 0xF9: case 0xFD: case 0xEB:
 			{
-			uint8_t prevrA = rA;
+			const uint8_t prevrA = rA;
 			rA = (rA - dataBus) - !rP[0];
-			rP[0] = ((prevrA - dataBus) - !rP[0] < 0) ? 0 : 1;
+			rP[0] = !((prevrA - dataBus) - !rP[0] & 0x0100);
 			rP[1] = !rA;
 			rP[6] = (prevrA ^ rA) & (~dataBus ^ rA) & 0x80;
 			}
@@ -1313,13 +855,13 @@ void nes::runOpcode()
 			break;
 
 		case 0xE0: case 0xE4: case 0xEC: //cpx
-			rP[0] = (rX >= dataBus) ? 1 : 0;
+			rP[0] = !(rX - dataBus & 0x0100);
 			rP[1] = !(rX - dataBus);
 			rP[7] = rX - dataBus & 0x80;
 			break;
 
 		case 0xC0: case 0xC4: case 0xCC: //cpy
-			rP[0] = (rY >= dataBus) ? 1 : 0;
+			rP[0] = !(rY - dataBus & 0x0100);
 			rP[1] = !(rY - dataBus);
 			rP[7] = rY - dataBus & 0x80;
 			break;
@@ -1394,7 +936,7 @@ void nes::runOpcode()
 			cpuWrite();
 			break;
 
-		case 0xE6: case 0xEE: case 0xF6: case 0xFE: //dec
+		case 0xE6: case 0xEE: case 0xF6: case 0xFE: //inc
 			++dataBus;
 			rP[1] = !dataBus;
 			rP[7] = dataBus & 0x80;
@@ -1407,14 +949,14 @@ void nes::runOpcode()
 
 void nes::cpuRead()
 {
-	dataBus = cpu_mem[addressBus];
+	dataBus = cpuMem[addressBus];
 
 	switch(addressBus)
 	{
 		case 0x2002:
 			dataBus = ppustatus;
 			ppustatus &= 0x7F;
-			// cpu_mem[0x2002] = ppustatus; //probably not necessary
+			// cpuMem[0x2002] = ppustatus; //probably not necessary
 			w_toggle = false;
 			break;
 		case 0x2007:
@@ -1440,7 +982,7 @@ void nes::cpuRead()
 
 void nes::cpuWrite() // block writes to ppu on the first screen
 {
-	cpu_mem[addressBus] = dataBus;
+	cpuMem[addressBus] = dataBus;
 
 	switch(addressBus)
 	{
@@ -1490,7 +1032,7 @@ void nes::cpuWrite() // block writes to ppu on the first screen
 			for(uint16_t x=0; x<=255; ++x)
 			{
 				// cpu_tick(); //r:0x20xx
-				ppu_oam[x] = cpu_mem[(dataBus << 8) + x];
+				ppu_oam[x] = cpuMem[(dataBus << 8) + x];
 				++oamaddr;
 				// cpu_tick(); //w:0x4014
 			}
@@ -1525,20 +1067,20 @@ void nes::cpu_op_done()
 	{
 		// ++PC;
 		// cpuRead();
-		cpu_mem[0x100+rS] = PC >> 8;
+		cpuMem[0x100+rS] = PC >> 8;
 		--rS;
 		// cpuWrite();
-		cpu_mem[0x100+rS] = PC;
+		cpuMem[0x100+rS] = PC;
 		--rS;
 		// cpuWrite();
 		rP.reset(4);
-		cpu_mem[0x100+rS] = rP.to_ulong();
+		cpuMem[0x100+rS] = rP.to_ulong();
 		--rS;
 		// cpuWrite();
-		PC = cpu_mem[0xFFFA];
+		PC = cpuMem[0xFFFA];
 		rP.set(2);
 		// cpuRead();
-		PC += cpu_mem[0xFFFB] << 8;
+		PC += cpuMem[0xFFFB] << 8;
 		// cpuRead();
 
 		nmi_line = false;
@@ -1572,7 +1114,7 @@ void nes::ppu_tick()
 		if(scanline_h == 1)
 		{
 			ppustatus |= 0x80;
-			nmi_line = cpu_mem[0x2000] & ppustatus & 0x80;
+			nmi_line = cpuMem[0x2000] & ppustatus & 0x80;
 		}
 	}
 	else if(scanline_v == 261) //prerender scanline
@@ -1687,7 +1229,7 @@ void nes::ppu_render_fetches() //things done during visible and prerender scanli
 					}
 					break;
 				case 5:
-					ppu_bg_address = (ppu_nametable*16 + (ppu_address >> 12)) | ((ppuctrl & 0x10) << 8); //tile X is correct, but Y is always 0.
+					ppu_bg_address = (ppu_nametable*16 + (ppu_address >> 12)) | ((ppuctrl & 0x10) << 8);
 					ppu_bg_low_latch = vram[ppu_bg_address];
 					break;
 				case 7:
