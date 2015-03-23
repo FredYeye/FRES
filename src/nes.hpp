@@ -15,8 +15,8 @@ class nes
 	private:
 		void LoadRom(std::string inFile);
 		void runOpcode();
-		void cpu_read();
-		void cpu_write();
+		void cpuRead();
+		void cpuWrite();
 		void cpu_tick();
 		void cpu_op_done();
 		void ppu_tick();
@@ -47,8 +47,8 @@ class nes
 		uint8_t rS = 0;
 		std::bitset<8> rP; //0:C | 1:Z | 2:I | 3:D | 4:B | 5:1 | 6:V | 7:N
 
-		uint16_t address;
-		uint8_t content;
+		uint16_t addressBus;
+		uint8_t dataBus;
 		uint8_t controller_reg;
 		bool controller_update = false;
 

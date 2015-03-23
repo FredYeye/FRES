@@ -14,6 +14,7 @@ nes::nes(std::string inFile)
 {
 	LoadRom(inFile);
 	PC = cpu_mem[0xFFFC] + (cpu_mem[0xFFFD] << 8);
+	// PC = 0xC000;
 	rS = 0xFD;
 	rP = 0x34;
 }
@@ -80,11 +81,10 @@ const std::array<uint8_t, 256*240*3>* const nes::GetPixelPtr() const
 
 void nes::runOpcode()
 {
-	bool alu = false;
-
 	const uint8_t opcode = cpu_mem[PC];
 	const uint8_t op1 = cpu_mem[PC+1];
 	const uint8_t op2 = cpu_mem[PC+2];
+
 
 	#ifdef DEBUG
 	std::cout << std::uppercase << std::hex << std::setfill('0')
@@ -110,1162 +110,1309 @@ void nes::runOpcode()
 	}
 	#endif
 
-	++PC;
-	cpu_read();
+
+	// addressBus = PC;
+	// cpuRead();
+
+	// ++PC;
+	// ++addressBus;
+	// cpuRead();
 
 	switch(opcode)
 	{
-		// opcodes left
-		// 03 07 0B 0F
-		// 13 17 1B 1F
-		// 23 27 2B 2F
-		// 33 37 3B 3F
-		// 43 47 4B 4F
-		// 53 57 5B 5F
-		// 63 67 6B 6F
-		// 73 77 7B 7F
-		// 82 89 8B
-		// 93 9B 9C 9E 9F
-		// AB
-		// BB
-		// C2 CB
-		// E2 E3 E7 EF
-		// F3 F7 FB FF
+		case 0x88: //DEY
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+			
+			--rY; //actually set one cycle later
+			rP[1] = !rY;
+			rP[7] = rY & 0x80;
+			break;
+		case 0xCA: //DEX
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+			
+			--rX; //actually set one cycle later
+			rP[1] = !rX;
+			rP[7] = rX & 0x80;
+			break;
+
+		case 0xC8: //INY
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+			
+			++rY; //actually set one cycle later
+			rP[1] = !rY;
+			rP[7] = rY & 0x80;
+			break;
+		case 0xE8: //INX
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+			
+			++rX; //actually set one cycle later
+			rP[1] = !rX;
+			rP[7] = rX & 0x80;
+			break;
 
 		case 0x00: //BRK
+			addressBus = PC;
+			cpuRead();
+
 			++PC;
-			cpu_read();
-			cpu_mem[0x100+rS] = PC >> 8;
-			--rS;
-			cpu_write();
-			cpu_mem[0x100+rS] = PC;
-			--rS;
-			cpu_write();
-			rP.set(4);
-			cpu_mem[0x100+rS] = rP.to_ulong();
-			--rS;
-			cpu_write();
-			PC = cpu_mem[0xFFFE];
-			rP.set(2);
-			cpu_read();
-			PC += cpu_mem[0xFFFF] << 8;
-			cpu_read();
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = 0x0100 | rS;
+			dataBus = PC >> 8;
+			cpuWrite();
+
+			addressBus = 0x0100 | uint8_t(addressBus - 1);
+			dataBus = PC;
+			cpuWrite();
+
+			addressBus = 0x0100 | uint8_t(addressBus - 1);
+			dataBus = rP.to_ulong();
+			cpuWrite();
+
+			rS -= 3;
+			addressBus = 0xFFFE;
+			cpuRead();
+
+			++addressBus;
+			cpuRead();
+
+			PC = cpu_mem[0xFFFE] | (dataBus << 8);
 			break;
-		case 0x06: //ASL
+
+		case 0x20: //JSR
+			addressBus = PC;
+			cpuRead();
+
 			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			rP[0] = cpu_mem[op1] & 0x80;
-			cpu_mem[op1] <<= 1;
-			rP[1] = !cpu_mem[op1];
-			rP[7] = cpu_mem[op1] & 0x80;
-			cpu_write();
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = 0x0100 | rS;
+			// rS = op1; //wtf
+			cpuRead();
+
+			dataBus = PC >> 8;
+			cpuWrite();
+
+			addressBus = 0x0100 | uint8_t(addressBus - 1);
+			dataBus = PC;
+			cpuWrite();
+
+			addressBus = PC;
+			cpuRead();
+
+			rS -= 2;
+			PC = op1 + (op2 << 8);
+			break;
+		case 0x40: //RTI
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = 0x0100 | rS;
+			cpuRead();
+
+			addressBus = 0x0100 | uint8_t(addressBus + 1);
+			cpuRead();
+
+			rP = dataBus | 0x20;
+			addressBus = 0x0100 | uint8_t(addressBus + 1);
+			cpuRead();
+
+			rS += 3;
+			addressBus = 0x0100 | uint8_t(addressBus + 1);
+			cpuRead();
+
+			PC = cpu_mem[0x0100 | uint8_t(addressBus - 1)] | (dataBus << 8);
+			break;
+		case 0x60: //RTS
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = 0x0100 | rS;
+			cpuRead();
+
+			addressBus = 0x0100 | uint8_t(addressBus + 1);
+			cpuRead();
+
+			rS += 2;
+			addressBus = 0x0100 | uint8_t(addressBus + 1);
+			cpuRead();
+
+			PC = cpu_mem[0x0100 | addressBus - 1] | (dataBus << 8);
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			break;
+
+		case 0x4C: //JMP abs
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			PC = op1 + (op2 << 8);
+			break;
+		case 0x6C: //JMP ind
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1 + (op2 << 8);
+			cpuRead();
+
+			addressBus = uint8_t(op1 + 1) + (op2 << 8);
+			cpuRead();
+
+			PC = cpu_mem[op1 + (op2 << 8)] + (dataBus << 8);
+			break;
+
+		case 0x28: //PLP
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			addressBus = 0x0100 + rS;
+			cpuRead();
+
+			++rS;
+			addressBus = 0x0100 + rS;
+			cpuRead();
+
+			rP = dataBus | 0x20;
+			break;
+		case 0x68: //PLA
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			addressBus = 0x0100 + rS;
+			cpuRead();
+
+			++rS;
+			addressBus = 0x0100 + rS;
+			cpuRead();
+
+			rA = dataBus;
+			rP[1] = !rA;
+			rP[7] = rA & 0x80;
 			break;
 		case 0x08: //PHP
-			cpu_read();
-			rP.set(4);
-			cpu_mem[0x100+rS] = rP.to_ulong();
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			addressBus = 0x0100 + rS;
+			dataBus = rP.to_ulong();
+			cpuWrite();
+
 			--rS;
-			cpu_write();
 			break;
-		case 0x0A: //ASL
-			cpu_read();
+		case 0x48: //PHA
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			addressBus = 0x0100 + rS;
+			dataBus = rA;
+			cpuWrite();
+
+			--rS;
+			break;
+
+		case 0x84: //STY zp
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1;
+			dataBus = rY;
+			cpuWrite();
+			break;
+		case 0x8C: //STY abs
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1 + (op2 << 8);
+			dataBus = rY;
+			cpuWrite();
+			break;
+		case 0x94: //STY zp,x
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1;
+			cpuRead();
+
+			addressBus = uint8_t(addressBus + rX);
+			dataBus = rY;
+			cpuWrite();
+			break;
+
+		case 0x86: //STX zp
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1;
+			dataBus = rX;
+			cpuWrite();
+			break;
+		case 0x8E: //STX abs
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1 + (op2 << 8);
+			dataBus = rX;
+			cpuWrite();
+			break;
+		case 0x96: //STX zp,y
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1;
+			cpuRead();
+
+			addressBus = uint8_t(addressBus + rY);
+			dataBus = rX;
+			cpuWrite();
+			break;
+
+		case 0x81: //STA (ind,x)
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1;
+			cpuRead();
+
+			addressBus = uint8_t(addressBus + rX);
+			cpuRead();
+
+			addressBus = uint8_t(addressBus + 1);
+			cpuRead();
+
+			addressBus = cpu_mem[uint8_t(addressBus - 1)] + (cpu_mem[addressBus] << 8);
+			dataBus = rA;
+			cpuWrite();
+			break;
+		case 0x85: //STA zp
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1;
+			dataBus = rA;
+			cpuWrite();
+			break;
+		case 0x8D: //STA abs
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1 + (op2 << 8);
+			dataBus = rA;
+			cpuWrite();
+			break;
+		case 0x91: //STA (ind),y
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1;
+			cpuRead();
+
+			addressBus = uint8_t(addressBus + 1);
+			cpuRead();
+
+			addressBus = uint8_t(cpu_mem[uint8_t(addressBus - 1)] + rY) + (cpu_mem[addressBus] << 8);
+			cpuRead();
+
+			addressBus += cpu_mem[op1] + rY & 0x0100;
+			dataBus = rA;
+			cpuWrite();
+			break;
+		case 0x95: //STA zp,x
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1;
+			cpuRead();
+
+			addressBus = uint8_t(addressBus + rX);
+			dataBus = rA;
+			cpuWrite();
+			break;
+		case 0x99: //STA abs,y
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = uint8_t(op1 + rY) + (op2 << 8);
+			cpuRead();
+
+			addressBus += op1 + rY & 0x0100;
+			dataBus = rA;
+			cpuWrite();
+			break;
+		case 0x9D: //STA abs,x
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = uint8_t(op1 + rX) + (op2 << 8);
+			cpuRead();
+
+			addressBus += op1 + rX & 0x0100;
+			dataBus = rA;
+			cpuWrite();
+			break;
+
+		case 0xAA: //TAX
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			rX = rA;
+			rP[1] = !rX;
+			rP[7] = rX & 0x80;
+			break;
+		case 0xA8: //TAY
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			rY = rA;
+			rP[1] = !rY;
+			rP[7] = rY & 0x80;
+			break;
+		case 0xBA: //TSX
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			rX = rS;
+			rP[1] = !rX;
+			rP[7] = rX & 0x80;
+			break;
+		case 0x8A: //TXA
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			rA = rX;
+			rP[1] = !rA;
+			rP[7] = rA & 0x80;
+			break;
+		case 0x9A: //TXS
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			rS = rX;
+			break;
+		case 0x98: //TYA
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			rA = rY;
+			rP[1] = !rA;
+			rP[7] = rA & 0x80;
+			break;
+
+		case 0xEA: //NOP
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+			break;
+
+		case 0x18: //CLC
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			rP.reset(0);
+			break;
+		case 0x38: //SEC
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			rP.set(0);
+			break;
+		case 0x58: //CLI
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			rP.reset(2);
+			break;
+		case 0x78: //SEI
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			rP.set(2);
+			break;
+		case 0xB8: //CLV
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			rP.reset(6);
+			break;
+		case 0xD8: //CLD
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			rP.reset(3);
+			break;
+		case 0xF8: //SED
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			rP.set(3);
+			break;
+
+		case 0x10: //BPL
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			if(!rP.test(7))
+			{
+				const uint16_t pagePC = PC + int8_t(op1);
+				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
+				addressBus = PC;
+				cpuRead();
+				if(PC != pagePC)
+				{
+					PC = pagePC;
+					addressBus = PC;
+					cpuRead();
+				}
+			}
+			break;
+		case 0x30: //BMI
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			if(rP.test(7))
+			{
+				const uint16_t pagePC = PC + int8_t(op1);
+				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
+				addressBus = PC;
+				cpuRead();
+				if(PC != pagePC)
+				{
+					PC = pagePC;
+					addressBus = PC;
+					cpuRead();
+				}
+			}
+			break;
+		case 0x50: //BVC
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			if(!rP.test(6))
+			{
+				const uint16_t pagePC = PC + int8_t(op1);
+				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
+				addressBus = PC;
+				cpuRead();
+				if(PC != pagePC)
+				{
+					PC = pagePC;
+					addressBus = PC;
+					cpuRead();
+				}
+			}
+			break;
+		case 0x70: //BVS
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			if(rP.test(6))
+			{
+				const uint16_t pagePC = PC + int8_t(op1);
+				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
+				addressBus = PC;
+				cpuRead();
+				if(PC != pagePC)
+				{
+					PC = pagePC;
+					addressBus = PC;
+					cpuRead();
+				}
+			}
+			break;
+		case 0x90: //BCC
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			if(!rP.test(0))
+			{
+				const uint16_t pagePC = PC + int8_t(op1);
+				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
+				addressBus = PC;
+				cpuRead();
+				if(PC != pagePC)
+				{
+					PC = pagePC;
+					addressBus = PC;
+					cpuRead();
+				}
+			}
+			break;
+		case 0xB0: //BCS
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			if(rP.test(0))
+			{
+				const uint16_t pagePC = PC + int8_t(op1);
+				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
+				addressBus = PC;
+				cpuRead();
+				if(PC != pagePC)
+				{
+					PC = pagePC;
+					addressBus = PC;
+					cpuRead();
+				}
+			}
+			break;
+		case 0xD0: //BNE
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			if(!rP.test(1))
+			{
+				const uint16_t pagePC = PC + int8_t(op1);
+				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
+				addressBus = PC;
+				cpuRead();
+				if(PC != pagePC)
+				{
+					PC = pagePC;
+					addressBus = PC;
+					cpuRead();
+				}
+			}
+			break;
+		case 0xF0: //BEQ
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			if(rP.test(1))
+			{
+				const uint16_t pagePC = PC + int8_t(op1);
+				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
+				addressBus = PC;
+				cpuRead();
+				if(PC != pagePC)
+				{
+					PC = pagePC;
+					addressBus = PC;
+					cpuRead();
+				}
+			}
+			break;
+
+		case 0x0A: //ASL acc
+			addressBus = PC;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
 			rP[0] = rA & 0x80;
 			rA <<= 1;
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
 			break;
-		case 0x0E: //ASL
+		case 0x2A: //ROL acc
+			addressBus = PC;
+			cpuRead();
+
 			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			rP[0] = cpu_mem[op1 + (op2 << 8)] & 0x80;
-			cpu_mem[op1 + (op2 << 8)] <<= 1;
-			rP[1] = !cpu_mem[op1 + (op2 << 8)];
-			rP[7] = cpu_mem[op1 + (op2 << 8)] & 0x80;
-			cpu_write();
-			break;
-		case 0x10: //BPL
-			++PC;
-			cpu_read();
-			if(!rP.test(7))
+			++addressBus;
+			cpuRead();
+
 			{
-				const uint8_t prevPCH = PC >> 8;
-				PC += int8_t(op1);
-				cpu_read();
-				if((PC >> 8) != prevPCH)
-				{
-					cpu_read();
-				}
-			}
-			break;
-		case 0x16: //ASL
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			rP[0] = cpu_mem[op1 + rX & 0xFF] & 0x80;
-			cpu_mem[op1 + rX & 0xFF] <<= 1;
-			rP[1] = !cpu_mem[op1 + rX & 0xFF];
-			rP[7] = cpu_mem[op1 + rX & 0xFF] & 0x80;
-			cpu_write();
-			break;
-		case 0x18: //CLC
-			cpu_read();
-			rP.reset(0);
-			break;
-		case 0x1E: //ASL
-			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			rP[0] = cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF] & 0x80;
-			cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF] <<= 1;
-			rP[1] = !cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF];
-			rP[7] = cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF] & 0x80;
-			cpu_write();
-			break;
-		case 0x20: //JSR
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_mem[0x100+rS] = PC >> 8;
-			--rS;
-			cpu_write();
-			cpu_mem[0x100+rS] = PC;
-			--rS;
-			cpu_write();
-			PC = op1 + (op2 << 8);
-			cpu_read();
-			break;
-		case 0x26: //ROL
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			{
-			uint8_t prevMem = cpu_mem[op1];
-			cpu_mem[op1] = (cpu_mem[op1] << 1) | rP[0];
-			rP[0] = prevMem & 0x80;
-			}
-			rP[1] = !cpu_mem[op1];
-			rP[7] = cpu_mem[op1] & 0x80;
-			cpu_write();
-			break;
-		case 0x28: //PLP
-			cpu_read();
-			++rS;
-			cpu_read();
-			rP = cpu_mem[0x100+rS] | 0x20;
-			cpu_read();
-			break;
-		case 0x2A: //ROL
-			cpu_read();
-			{
-			uint8_t prevrA = rA;
+			const bool newCarry = rA & 0x80;
 			rA = (rA << 1) | rP[0];
-			rP[0] = prevrA & 0x80;
+			rP[0] = newCarry;
 			}
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
 			break;
-		case 0x2E: //ROL
+		case 0x4A: //LSR acc
+			addressBus = PC;
+			cpuRead();
+
 			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			{
-			uint8_t prevMem = cpu_mem[op1 + (op2 << 8)];
-			cpu_mem[op1 + (op2 << 8)] = (cpu_mem[op1 + (op2 << 8)] << 1) | rP[0];
-			rP[0] = prevMem & 0x80;
-			}
-			rP[1] = !cpu_mem[op1 + (op2 << 8)];
-			rP[7] = cpu_mem[op1 + (op2 << 8)] & 0x80;
-			cpu_write();
-			break;
-		case 0x30: //BMI
-			++PC;
-			cpu_read();
-			if(rP.test(7))
-			{
-				uint8_t prevPC = PC >> 8;
-				PC += int8_t(op1);
-				cpu_read();
-				if((PC >> 8) != prevPC)
-				{
-					cpu_read();
-				}
-			}
-			break;
-		case 0x36: //ROL
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			{
-			uint8_t prevMem = cpu_mem[op1 + rX & 0xFF];
-			cpu_mem[op1 + rX & 0xFF] = (cpu_mem[op1 + rX & 0xFF] << 1) | rP[0];
-			rP[0] = prevMem & 0x80;
-			}
-			rP[1] = !cpu_mem[op1 + rX & 0xFF];
-			rP[7] = cpu_mem[op1 + rX & 0xFF] & 0x80;
-			cpu_write();
-			break;
-		case 0x38: //SEC
-			cpu_read();
-			rP.set(0);
-			break;
-		case 0x3E: //ROL
-			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			{
-			uint8_t prevMem = cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF];
-			cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF] = (cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF] << 1) | rP[0];
-			rP[0] = prevMem & 0x80;
-			}
-			rP[1] = !cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF];
-			rP[7] = cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF] & 0x80;
-			cpu_write();
-			break;
-		case 0x40: //RTI
-			cpu_read();
-			++rS;
-			cpu_read();
-			rP = cpu_mem[0x100+rS] | 0x20;
-			++rS;
-			cpu_read();
-			PC = cpu_mem[0x100+rS];
-			++rS;
-			cpu_read();
-			PC += cpu_mem[0x100+rS] << 8;
-			cpu_read();
-			break;
-		case 0x46: //LSR
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			rP[0] = cpu_mem[op1] & 0x01;
-			cpu_mem[op1] >>= 1;
-			rP[1] = !cpu_mem[op1];
-			rP.reset(7);
-			cpu_write();
-			break;
-		case 0x48: //PHA
-			cpu_read();
-			cpu_mem[0x100+rS] = rA; //can do rS--
-			--rS;
-			cpu_write();
-			break;
-		case 0x4A: //LSR
-			cpu_read();
+			++addressBus;
+			cpuRead();
+
 			rP[0] = rA & 0x01;
 			rA >>= 1;
 			rP[1] = !rA;
 			rP.reset(7);
 			break;
-		case 0x4C: //JMP
+		case 0x6A: //ROR acc
+			addressBus = PC;
+			cpuRead();
+
 			++PC;
-			cpu_read();
-			PC = op1 + (op2 << 8);
-			cpu_read();
-			break;
-		case 0x4E: //LSR
-			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			rP[0] = cpu_mem[op1 + (op2 << 8)] & 0x01;
-			cpu_mem[op1 + (op2 << 8)] >>= 1;
-			rP[1] = !cpu_mem[op1 + (op2 << 8)];
-			rP.reset(7);
-			cpu_write();
-			break;
-		case 0x50: //BVC
-			++PC;
-			cpu_read();
-			if(!rP.test(6))
+			++addressBus;
+			cpuRead();
+
 			{
-				uint8_t prevPC = PC >> 8;
-				PC += int8_t(op1);
-				cpu_read();
-				if((PC >> 8) != prevPC)
-				{
-					cpu_read();
-				}
-			}
-			break;
-		case 0x56: //LSR
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			rP[0] = cpu_mem[op1 + rX & 0xFF] & 0x01;
-			cpu_mem[op1 + rX & 0xFF] >>= 1;
-			rP[1] = !cpu_mem[op1 + rX & 0xFF];
-			rP.reset(7);
-			cpu_write();
-			break;
-		case 0x5E: //LSR
-			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			rP[0] = cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF] & 0x01;
-			cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF] >>= 1;
-			rP[1] = !cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF];
-			rP.reset(7);
-			cpu_write();
-			break;
-		case 0x60: //RTS
-			cpu_read();
-			++rS;
-			cpu_read();
-			PC = cpu_mem[0x100+rS];
-			++rS;
-			cpu_read();
-			PC += cpu_mem[0x100+rS] << 8;
-			cpu_read();
-			++PC;
-			cpu_read();
-			break;
-		case 0x66: //ROR
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			{
-			uint8_t prevMem = cpu_mem[op1];
-			cpu_mem[op1] = (cpu_mem[op1] >> 1) | (rP[0] << 7);
-			rP[0] = prevMem & 0x01;
-			}
-			rP[1] = !cpu_mem[op1];
-			rP[7] = cpu_mem[op1] & 0x80;
-			cpu_write();
-			break;
-			case 0x68: //PLA
-			cpu_read();
-			++rS;
-			cpu_read();
-			rA = cpu_mem[0x100+rS];
-			rP[1] = !rA;
-			rP[7] = rA & 0x80;
-			cpu_read();
-			break;
-		case 0x6A: //ROR
-			cpu_read();
-			{
-			uint8_t prevrA = rA;
+			const bool newCarry = rA & 0x01;
 			rA = (rA >> 1) | (rP[0] << 7);
-			rP[0] = prevrA & 0x01;
+			rP[0] = newCarry;
 			}
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
 			break;
-		case 0x6C: //JMP
+
+		case 0x06: case 0x26: case 0x46: case 0x66: case 0xC6: case 0xE6: //z RW
+			addressBus = PC;
+			cpuRead();
+
 			++PC;
-			cpu_read();
+			++addressBus;
+			cpuRead();
+
 			++PC;
-			cpu_read();
-			cpu_read();
-			PC = cpu_mem[op1 + (op2 << 8)];
-			PC += cpu_mem[(op1 + 1 & 0xFF) + (op2 << 8)] << 8;
-			cpu_read();
+			addressBus = op1;
+			cpuRead();
+
+			cpuWrite();
 			break;
-		case 0x6E: //ROR
+		case 0x0E: case 0x2E: case 0x4E: case 0x6E: case 0xCE: case 0xEE: //abs RW
+			addressBus = PC;
+			cpuRead();
+
 			++PC;
-			cpu_read();
+			++addressBus;
+			cpuRead();
+
 			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			{
-			uint8_t prevMem = cpu_mem[op1 + (op2 << 8)];
-			cpu_mem[op1 + (op2 << 8)] = (cpu_mem[op1 + (op2 << 8)] >> 1) | (rP[0] << 7);
-			rP[0] = prevMem & 0x01;
-			}
-			rP[1] = !cpu_mem[op1 + (op2 << 8)];
-			rP[7] = cpu_mem[op1 + (op2 << 8)] & 0x80;
-			cpu_write();
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1 + (op2 << 8);
+			cpuRead();
+
+			cpuWrite();
 			break;
-		case 0x70: //BVS
+		case 0x16: case 0x36: case 0x56: case 0x76: case 0xD6: case 0xF6: //z,x RW
+			addressBus = PC;
+			cpuRead();
+
 			++PC;
-			cpu_read();
-			if(rP.test(6))
-			{
-				uint8_t prevPC = PC >> 8;
-				PC += int8_t(op1);
-				cpu_read();
-				if((PC >> 8) != prevPC)
-				{
-					cpu_read();
-				}
-			}
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1;
+			cpuRead();
+
+			addressBus = uint8_t(addressBus + rX);
+			cpuRead();
+
+			cpuWrite();
 			break;
-		case 0x76: //ROR
+		case 0x1E: case 0x3E: case 0x5E: case 0x7E: case 0xDE: case 0xFE: //abs,x RW
+			addressBus = PC;
+			cpuRead();
+
 			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			{
-			uint8_t prevMem = cpu_mem[op1 + rX & 0xFF];
-			cpu_mem[op1 + rX & 0xFF] = (cpu_mem[op1 + rX & 0xFF] >> 1) | (rP[0] << 7);
-			rP[0] = prevMem & 0x01;
-			}
-			rP[1] = !cpu_mem[op1 + rX & 0xFF];
-			rP[7] = cpu_mem[op1 + rX & 0xFF] & 0x80;
-			cpu_write();
-			break;
-		case 0x78: //SEI
-			cpu_read();
-			rP.set(2);
-			break;
-		case 0x7E: //ROR
+			++addressBus;
+			cpuRead();
+
 			++PC;
-			cpu_read();
+			++addressBus;
+			cpuRead();
+
 			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			{
-			uint8_t prevMem = cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF];
-			cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF] = (cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF] >> 1) | (rP[0] << 7);
-			rP[0] = prevMem & 0x01;
-			}
-			rP[1] = !cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF];
-			rP[7] = cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF] & 0x80;
-			cpu_write();
-			break;
-		case 0x81: //STA
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			address = cpu_mem[op1 + rX & 0xFF] + (cpu_mem[op1 + rX + 1 & 0xFF] << 8);
-			content = rA;
-			cpu_mem[address] = rA;
-			cpu_write();
-			break;
-		case 0x83: //SAX
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			address = cpu_mem[op1 + rX & 0xFF] + (cpu_mem[op1 + rX + 1 & 0xFF] << 8);
-			content = rA & rX;
-			cpu_mem[address] = rA & rX;
-			cpu_write();
-			break;
-		case 0x84: //STY
-			++PC;
-			cpu_read();
-			cpu_mem[op1] = rY;
-			cpu_write();
-			break;
-		case 0x85: //STA
-			++PC;
-			cpu_read();
-			cpu_mem[op1] = rA;
-			cpu_write();
-			break;
-		case 0x86: //STX
-			++PC;
-			cpu_read();
-			cpu_mem[op1] = rX;
-			cpu_write();
-			break;
-		case 0x87: //SAX
-			++PC;
-			cpu_read();
-			cpu_mem[op1] = rA & rX;
-			cpu_write();
-			break;
-		case 0x88: //DEY
-			cpu_read();
-			--rY;
-			rP[1] = !rY;
-			rP[7] = rY & 0x80;
-			break;
-		case 0x8A: //TXA
-			cpu_read();
-			rA = rX;
-			rP[1] = !rA;
-			rP[7] = rA & 0x80;
-			break;
-		case 0x8C: //STY
-			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			address = op1 + (op2 << 8);
-			content = rY;
-			cpu_mem[address] = rY;
-			cpu_write();
-			break;
-		case 0x8D: //STA
-			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			address = op1 + (op2 << 8);
-			content = rA;
-			cpu_mem[address] = rA;
-			cpu_write();
-			break;
-		case 0x8E: //STX
-			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			address = op1 + (op2 << 8);
-			content = rX;
-			cpu_mem[op1 + (op2 << 8)] = rX;
-			cpu_write();
-			break;
-		case 0x8F: //SAX
-			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			address = op1 + (op2 << 8);
-			content = rA & rX;
-			cpu_mem[address] = rA & rX;
-			cpu_write();
-			break;
-		case 0x90: //BCC
-			++PC;
-			cpu_read();
-			if(!rP.test(0))
-			{
-				uint8_t prevPC = PC >> 8;
-				PC += int8_t(op1);
-				cpu_read();
-				if((PC >> 8) != prevPC)
-				{
-					cpu_read();
-				}
-			}
-			break;
-		case 0x91: //STA
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			address = cpu_mem[op1] + (cpu_mem[op1 + 1 & 0xFF] << 8) + rY;
-			content = rA;
-			cpu_mem[address] = rA;
-			cpu_write();
-			break;
-		case 0x94: //STY
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_mem[op1 + rX & 0xFF] = rY;
-			cpu_write();
-			break;
-		case 0x95: //STA
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_mem[op1 + rX & 0xFF] = rA;
-			cpu_write();
-			break;
-		case 0x96: // STX
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_mem[op1 + rY & 0xFF] = rX;
-			cpu_write();
-			break;
-		case 0x97: //SAX
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_mem[op1 + rY & 0xFF] = rA & rX;
-			cpu_write();
-			break;
-		case 0x98: //TYA
-			cpu_read();
-			rA = rY;
-			rP[1] = !rA;
-			rP[7] = rA & 0x80;
-			break;
-		case 0x99: //STA
-			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			cpu_read();
-			address = op1 + (op2 << 8) + rY;
-			content = rA;
-			cpu_mem[address] = rA;
-			cpu_write();
-			break;
-		case 0x9A: //TXS
-			cpu_read();
-			rS = rX;
-			break;
-		case 0x9D: //STA
-			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			cpu_read();
-			address = op1 + (op2 << 8) + rX;
-			content = rA;
-			cpu_mem[address] = rA;
-			cpu_write();
-			break;
-		case 0xA8: //TAY
-			cpu_read();
-			rY = rA;
-			rP[1] = !rY;
-			rP[7] = rY & 0x80;
-			break;
-		case 0xAA: //TAX
-			cpu_read();
-			rX = rA;
-			rP[1] = !rX;
-			rP[7] = rX & 0x80;
-			break;
-		case 0xB0: //BCS
-			++PC;
-			cpu_read();
-			if(rP.test(0))
-			{
-				uint8_t prevPC = PC >> 8;
-				PC += int8_t(op1);
-				cpu_read();
-				if((PC >> 8) != prevPC)
-				{
-					cpu_read();
-				}
-			}
-			break;
-		case 0xB8: //CLV
-			cpu_read();
-			rP.reset(6);
-			break;
-		case 0xBA: //TSX
-			cpu_read();
-			rX = rS;
-			rP[1] = !rX;
-			rP[7] = rX & 0x80;
-			break;
-		case 0xC3: //DCP
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			// address = cpu_mem[op1 + rX & 0xFF] + (cpu_mem[op1 + rX + 1 & 0xFF] << 8);
-			// content = cpu_mem[address];
-			cpu_read();
-			//address the same here? research how address behaves
-			cpu_write();
-			address = cpu_mem[op1 + rX & 0xFF] + (cpu_mem[op1 + rX + 1 & 0xFF] << 8);
-			--cpu_mem[address];
-			rP[0] = (rA >= cpu_mem[address]) ? 1 : 0;
-			rP[1] = !(rA - cpu_mem[address]);
-			rP[7] = rA - cpu_mem[address] & 0x80;
-			cpu_write();
-			break;
-		case 0xC6: //DEC
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			--cpu_mem[op1];
-			rP[1] = !cpu_mem[op1];
-			rP[7] = cpu_mem[op1] & 0x80;
-			cpu_write();
-			break;
-		case 0xC7: //DCP
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			--cpu_mem[op1];
-			rP[0] = (rA >= cpu_mem[op1]) ? 1 : 0;
-			rP[1] = !(rA - cpu_mem[op1]);
-			rP[7] = rA - cpu_mem[op1] & 0x80;
-			cpu_write();
-			break;
-		case 0xC8: //INY
-			cpu_read();
-			++rY;
-			rP[1] = !rY;
-			rP[7] = rY & 0x80;
-			break;
-		case 0xCA: //DEX
-			cpu_read();
-			--rX;
-			rP[1] = !rX;
-			rP[7] = rX & 0x80;
-			break;
-		case 0xCE: //DEC
-			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			--cpu_mem[op1 + (op2 << 8)];
-			rP[1] = !cpu_mem[op1 + (op2 << 8)];
-			rP[7] = cpu_mem[op1 + (op2 << 8)] & 0x80;
-			cpu_write();
-			break;
-		case 0xCF: //DCP
-			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			--cpu_mem[op1 + (op2 << 8)];
-			rP[0] = (rA >= cpu_mem[op1 + (op2 << 8)]) ? 1 : 0;
-			rP[1] = !(rA - cpu_mem[op1 + (op2 << 8)]);
-			rP[7] = rA - cpu_mem[op1 + (op2 << 8)] & 0x80;
-			cpu_write();
-		case 0xD0: //BNE
-			++PC;
-			cpu_read();
-			if(!rP.test(1))
-			{
-				uint8_t prevPC = PC >> 8;
-				PC += int8_t(op1);
-				cpu_read();
-				if((PC >> 8) != prevPC)
-				{
-					cpu_read();
-				}
-			}
-			break;
-		case 0xD3: //DCP
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			//read from address without fixing high address bit
-			cpu_read();
-			// address = cpu_mem[op1] + (cpu_mem[op1 + 1 & 0xFF] << 8) + rY;
-			// content = cpu_mem[address];
-			cpu_read();
-			//address = ^
-			cpu_write();
-			address = cpu_mem[op1] + (cpu_mem[op1 + 1 & 0xFF] << 8) + rY;
-			content = --cpu_mem[address];
-			rP[0] = (rA >= cpu_mem[address]) ? 1 : 0;
-			rP[1] = !(rA - cpu_mem[address]);
-			rP[7] = rA - cpu_mem[address] & 0x80;
-			cpu_write();
-			break;
-		case 0xD6: //DEC
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			--cpu_mem[op1 + rX & 0xFF];
-			rP[1] = !cpu_mem[op1 + rX & 0xFF];
-			rP[7] = cpu_mem[op1 + rX & 0xFF] & 0x80;
-			cpu_write();
-			break;
-		case 0xD7: //DCP
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			--cpu_mem[op1 + rX & 0xFF];
-			rP[0] = (rA >= cpu_mem[op1 + rX & 0xFF]) ? 1 : 0;
-			rP[1] = !(rA - cpu_mem[op1 + rX & 0xFF]);
-			rP[7] = rA - cpu_mem[op1 + rX & 0xFF] & 0x80;
-			cpu_write();
-			break;
-		case 0xD8: //CLD
-			cpu_read();
-			rP.reset(3);
-			break;
-		case 0xDB: //DCP
-			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			--cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF];
-			rP[0] = (rA >= cpu_mem[op1 + (op2 << 8) + rY & 0xFFFF]) ? 1 : 0;
-			rP[1] = !(rA - cpu_mem[op1 + (op2 << 8) + rY & 0xFFFF]);
-			rP[7] = rA - cpu_mem[op1 + (op2 << 8) + rY & 0xFFFF] & 0x80;
-			cpu_write();
-			break;
-		case 0xDE: //DEC
-			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			--cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF];
-			rP[1] = !cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF];
-			rP[7] = cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF] & 0x80;
-			cpu_write();
-			break;
-		case 0xDF: //DCP
-			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			--cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF];
-			rP[0] = (rA >= cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF]) ? 1 : 0;
-			rP[1] = !(rA - cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF]);
-			rP[7] = rA - cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF] & 0x80;
-			cpu_write();
-			break;
-		case 0xE6: //INC
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			++cpu_mem[op1];
-			rP[1] = !cpu_mem[op1];
-			rP[7] = cpu_mem[op1] & 0x80;
-			cpu_write();
-			break;
-		case 0xE8: //INX
-			cpu_read();
-			++rX;
-			rP[1] = !rX;
-			rP[7] = rX & 0x80;
-			break;
-		case 0x1A: case 0x3A: case 0x5A: case 0x7A: case 0xDA: case 0xEA: case 0xFA: //NOP
-			cpu_read();
-			break;
-		case 0xEE: //INC
-			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			++cpu_mem[op1 + (op2 << 8)];
-			rP[1] = !cpu_mem[op1 + (op2 << 8)];
-			rP[7] = cpu_mem[op1 + (op2 << 8)] & 0x80;
-			cpu_write();
-			break;
-		case 0xF0: //BEQ
-			++PC;
-			cpu_read();
-			if(rP.test(1))
-			{
-				uint8_t prevPC = PC >> 8;
-				PC += int8_t(op1);
-				cpu_read();
-				if((PC >> 8) != prevPC)
-				{
-					cpu_read();
-				}
-			}
-			break;
-		case 0xF6: //INC
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			++cpu_mem[op1 + rX & 0xFF];
-			rP[1] = !cpu_mem[op1 + rX & 0xFF];
-			rP[7] = cpu_mem[op1 + rX & 0xFF] & 0x80;
-			cpu_write();
-			break;
-		case 0xF8: //SED
-			cpu_read();
-			rP.set(3);
-			break;
-		case 0xFE: //INC
-			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_write();
-			++cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF];
-			rP[1] = !cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF];
-			rP[7] = cpu_mem[op1 + (op2 << 8) + rX & 0xFFFF] & 0x80;
-			cpu_write();
+			addressBus = uint8_t(op1 + rX) + (op2 << 8);
+			cpuRead();
+
+			addressBus = op1 + rX + (op2 << 8);
+			cpuRead();
+
+			cpuWrite();
 			break;
 
 		case 0x01: case 0x21: case 0x41: case 0x61:
 		case 0xA1: case 0xC1: case 0xE1: case 0xA3: //(indirect,x) / indexed indirect
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			address = cpu_mem[op1 + rX & 0xFF] + (cpu_mem[op1 + rX + 1 & 0xFF] << 8);
-			content = cpu_mem[address];
-			cpu_read();
-			alu = true;
-			break;
+			addressBus = PC;
+			cpuRead();
 
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1;
+			cpuRead();
+
+			addressBus = uint8_t(addressBus + rX);
+			cpuRead();
+
+			addressBus = uint8_t(addressBus + 1);
+			cpuRead();
+
+			addressBus = cpu_mem[uint8_t(addressBus - 1)] + (cpu_mem[addressBus] << 8);
+			cpuRead();
+			break;
 		case 0x04: case 0x05: case 0x24: case 0x25: case 0x44: //zero page
 		case 0x45: case 0x64: case 0x65: case 0xA4: case 0xA5:
 		case 0xA6: case 0xC4: case 0xC5: case 0xE4: case 0xE5:
 		case 0xA7:
-			++PC;
-			cpu_read();
-			content = cpu_mem[op1];
-			cpu_read();
-			alu = true;
-			break;
+			addressBus = PC;
+			cpuRead();
 
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1;
+			cpuRead();
+			break;
 		case 0x09: case 0x29: case 0x49: case 0x69: case 0x80: case 0xA0: //immediate
 		case 0xA2: case 0xA9: case 0xC0: case 0xC9: case 0xE0: case 0xE9: case 0xEB:
-			++PC;
-			cpu_read();
-			content = op1;
-			alu = true;
-			break;
+			addressBus = PC;
+			cpuRead();
 
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			break;
 		case 0x0C: case 0x0D: case 0x2C: case 0x2D: case 0x4D: case 0x6D: //absolute
 		case 0xAC: case 0xAD: case 0xAE: case 0xCC: case 0xCD: case 0xEC: case 0xED:
 		case 0xAF:
-			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			address = op1 + (op2 << 8);
-			content = cpu_mem[address];
-			cpu_read();
-			alu = true;
-			break;
+			addressBus = PC;
+			cpuRead();
 
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1 + (op2 << 8);
+			cpuRead();
+			break;
 		case 0x11: case 0x31: case 0x51: //(indirect),y / indirect indexed
 		case 0x71: case 0xB1: case 0xD1: case 0xF1: case 0xB3:
-			++PC;
-			cpu_read();
-			cpu_read();
-			cpu_read();
-			address = (cpu_mem[op1] + rY & 0xFF) + (cpu_mem[op1 + 1 & 0xFF] << 8);
-			content = cpu_mem[address];
-			cpu_read();
-			if((cpu_mem[op1] + rY) > 0xFF)
-			{
-				address = cpu_mem[op1] + (cpu_mem[op1 + 1 & 0xFF] << 8) + rY; // address = address + 0x100 & 0xFFFF; address gets reset. recalculate
-				content = cpu_mem[address];
-				cpu_read();
-			}
-			alu = true;
-			break;
+			addressBus = PC;
+			cpuRead();
 
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1;
+			cpuRead();
+
+			addressBus = uint8_t(addressBus + 1);
+			cpuRead();
+
+			addressBus = uint8_t(cpu_mem[uint8_t(addressBus - 1)] + rY) + (cpu_mem[addressBus] << 8);
+			cpuRead();
+
+			if(cpu_mem[op1] + rY > 0xFF)
+			{
+				addressBus += 0x0100;
+				cpuRead();
+			}
+			break;
 		case 0x14: case 0x15: case 0x34: case 0x35: //zero page,X
 		case 0x54: case 0x55: case 0x74: case 0x75: case 0xB4:
 		case 0xB5: case 0xD4: case 0xD5: case 0xF4: case 0xF5:
-			++PC;
-			cpu_read();
-			cpu_read();
-			content = cpu_mem[op1 + rX & 0xFF];
-			cpu_read();
-			alu = true;
-			break;
+			addressBus = PC;
+			cpuRead();
 
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1;
+			cpuRead();
+
+			addressBus = uint8_t(addressBus + rX);
+			cpuRead();
+			break;
 		case 0x19: case 0x39: case 0x59: case 0x79: //absolute,Y
 		case 0xB9: case 0xBE: case 0xD9: case 0xF9: case 0xBF:
-			++PC;
-			cpu_read();
-			++PC;
-			cpu_read();
-			address = (op1 + rY & 0xFF) + (op2 << 8);
-			content = cpu_mem[address];
-			cpu_read();
-			if((op1 + rY) > 0xFF)
-			{
-				address = op1 + (op2 << 8) + rY;
-				content = cpu_mem[address];
-				cpu_read();
-			}
-			alu = true;
-			break;
+			addressBus = PC;
+			cpuRead();
 
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = uint8_t(op1 + rY) + (op2 << 8);
+			cpuRead();
+
+			if(op1 + rY > 0xFF)
+			{
+				addressBus += 0x0100;
+				cpuRead();
+			}
+			break;
 		case 0x1C: case 0x1D: case 0x3C: case 0x3D: //absolute,X
 		case 0x5C: case 0x5D: case 0x7C: case 0x7D: case 0xBC:
 		case 0xBD: case 0xDC: case 0xDD: case 0xFC: case 0xFD:
+			addressBus = PC;
+			cpuRead();
+
 			++PC;
-			cpu_read();
+			++addressBus;
+			cpuRead();
+
 			++PC;
-			cpu_read();
-			address = (op1 + rX & 0xFF) + (op2 << 8);
-			content = cpu_mem[address];
-			cpu_read();
-			if((op1 + rX) > 0xFF)
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = uint8_t(op1 + rX) + (op2 << 8);
+			cpuRead();
+
+			if(op1 + rX > 0xFF)
 			{
-				address = op1 + (op2 << 8) + rX;
-				content = cpu_mem[address];
-				cpu_read();
+				addressBus += 0x0100;
+				cpuRead();
 			}
-			alu = true;
 			break;
-
 		case 0xB6: case 0xB7: //zero page,Y
-			++PC;
-			cpu_read();
-			cpu_read();
-			content = cpu_mem[op1 + rY & 0xFF];
-			cpu_read();
-			alu = true;
-			break;
+			addressBus = PC;
+			cpuRead();
 
-		default:
-			std::cout << "MELTDOWN " << std::hex << int(opcode) << std::endl;
-			exit(0);
+			++PC;
+			++addressBus;
+			cpuRead();
+
+			++PC;
+			addressBus = op1;
+			cpuRead();
+
+			addressBus = uint8_t(addressBus + rY);
+			cpuRead();
+			break;
 	}
 
-	if(alu)
+	switch(opcode)
 	{
-		switch(opcode)
-		{
-			case 0x61: case 0x65: case 0x69: case 0x6D:
-			case 0x71: case 0x75: case 0x79: case 0x7D: //adc
-				{
-				uint8_t prevrA = rA;
-				rA += content + rP[0];
-				rP[0] = (prevrA + content + rP[0]) & 0x100;
-				rP[1] = !rA;
-				rP[6] = (prevrA ^ rA) & (content ^ rA) & 0x80;
-				}
-				rP[7] = rA & 0x80;
-				break;
+		case 0x61: case 0x65: case 0x69: case 0x6D:
+		case 0x71: case 0x75: case 0x79: case 0x7D: //adc
+			{
+			uint8_t prevrA = rA;
+			rA += dataBus + rP[0];
+			rP[0] = (prevrA + dataBus + rP[0]) & 0x100;
+			rP[1] = !rA;
+			rP[6] = (prevrA ^ rA) & (dataBus ^ rA) & 0x80;
+			}
+			rP[7] = rA & 0x80;
+			break;
 
-			case 0x21: case 0x25: case 0x29: case 0x2D:
-			case 0x31: case 0x35: case 0x39: case 0x3D: //and
-				rA &= content;
-				rP[1] = !rA;
-				rP[7] = rA & 0x80;
-				break;
+		case 0x21: case 0x25: case 0x29: case 0x2D:
+		case 0x31: case 0x35: case 0x39: case 0x3D: //and
+			rA &= dataBus;
+			rP[1] = !rA;
+			rP[7] = rA & 0x80;
+			break;
 
-			case 0xC1: case 0xC5: case 0xC9: case 0xCD:
-			case 0xD1: case 0xD5: case 0xD9: case 0xDD: //cmp
-				rP[0] = (rA >= content) ? 1 : 0;
-				rP[1] = !(rA - content);
-				rP[7] = rA - content & 0x80;
-				break;
+		case 0xC1: case 0xC5: case 0xC9: case 0xCD:
+		case 0xD1: case 0xD5: case 0xD9: case 0xDD: //cmp
+			rP[0] = (rA >= dataBus) ? 1 : 0;
+			rP[1] = !(rA - dataBus);
+			rP[7] = rA - dataBus & 0x80;
+			break;
 
-			case 0x41: case 0x45: case 0x49: case 0x4D:
-			case 0x51: case 0x55: case 0x59: case 0x5D: //eor
-				rA ^= content;
-				rP[1] = !rA;
-				rP[7] = rA & 0x80;
-				break;
+		case 0x41: case 0x45: case 0x49: case 0x4D:
+		case 0x51: case 0x55: case 0x59: case 0x5D: //eor
+			rA ^= dataBus;
+			rP[1] = !rA;
+			rP[7] = rA & 0x80;
+			break;
 
-			case 0xA1: case 0xA5: case 0xA9: case 0xAD:
-			case 0xB1: case 0xB5: case 0xB9: case 0xBD: //lda
-				rA = content;
-				rP[1] = !rA;
-				rP[7] = rA & 0x80;
-				break;
+		case 0xA1: case 0xA5: case 0xA9: case 0xAD:
+		case 0xB1: case 0xB5: case 0xB9: case 0xBD: //lda
+			rA = dataBus;
+			rP[1] = !rA;
+			rP[7] = rA & 0x80;
+			break;
 
-			case 0x01: case 0x05: case 0x09: case 0x0D:
-			case 0x11: case 0x15: case 0x19: case 0x1D: //ora
-				rA |= content;
-				rP[1] = !rA;
-				rP[7] = rA & 0x80;
-				break;
+		case 0x01: case 0x05: case 0x09: case 0x0D:
+		case 0x11: case 0x15: case 0x19: case 0x1D: //ora
+			rA |= dataBus;
+			rP[1] = !rA;
+			rP[7] = rA & 0x80;
+			break;
 
-			case 0xE1: case 0xE5: case 0xE9: case 0xED:
-			case 0xF1: case 0xF5: case 0xF9: case 0xFD: //sbc
-			case 0xEB:
-				{
-				uint8_t prevrA = rA;
-				rA = (rA - content) - !rP[0];
-				rP[0] = ((prevrA - content) - !rP[0] < 0) ? 0 : 1;
-				rP[1] = !rA;
-				rP[6] = (prevrA ^ rA) & (~content ^ rA) & 0x80;
-				}
-				rP[7] = rA & 0x80;
-				break;
+		case 0xE1: case 0xE5: case 0xE9: case 0xED:
+		case 0xF1: case 0xF5: case 0xF9: case 0xFD: //sbc
+		case 0xEB:
+			{
+			uint8_t prevrA = rA;
+			rA = (rA - dataBus) - !rP[0];
+			rP[0] = ((prevrA - dataBus) - !rP[0] < 0) ? 0 : 1;
+			rP[1] = !rA;
+			rP[6] = (prevrA ^ rA) & (~dataBus ^ rA) & 0x80;
+			}
+			rP[7] = rA & 0x80;
+			break;
 
-			case 0xE0: case 0xE4: case 0xEC: //cpx
-				rP[0] = (rX >= content) ? 1 : 0;
-				rP[1] = !(rX - content);
-				rP[7] = rX - content & 0x80;
-				break;
+		case 0xE0: case 0xE4: case 0xEC: //cpx
+			rP[0] = (rX >= dataBus) ? 1 : 0;
+			rP[1] = !(rX - dataBus);
+			rP[7] = rX - dataBus & 0x80;
+			break;
 
-			case 0xC0: case 0xC4: case 0xCC: //cpy
-				rP[0] = (rY >= content) ? 1 : 0;
-				rP[1] = !(rY - content);
-				rP[7] = rY - content & 0x80;
-				break;
+		case 0xC0: case 0xC4: case 0xCC: //cpy
+			rP[0] = (rY >= dataBus) ? 1 : 0;
+			rP[1] = !(rY - dataBus);
+			rP[7] = rY - dataBus & 0x80;
+			break;
 
-			case 0xA2: case 0xA6: case 0xAE: case 0xB6: case 0xBE: //ldx
-				rX = content;
-				rP[1] = !rX;
-				rP[7] = rX & 0x80;
-				break;
+		case 0xA2: case 0xA6: case 0xAE: case 0xB6: case 0xBE: //ldx
+			rX = dataBus;
+			rP[1] = !rX;
+			rP[7] = rX & 0x80;
+			break;
 
-			case 0xA0: case 0xA4: case 0xAC: case 0xB4: case 0xBC: //ldy
-				rY = content;
-				rP[1] = !rY;
-				rP[7] = rY & 0x80;
-				break;
+		case 0xA0: case 0xA4: case 0xAC: case 0xB4: case 0xBC: //ldy
+			rY = dataBus;
+			rP[1] = !rY;
+			rP[7] = rY & 0x80;
+			break;
 
-			case 0x24: case 0x2C: //bit
-				rP[1] = !(content & rA);
-				rP[6] = content & 0x40;
-				rP[7] = content & 0x80;
-				break;
+		case 0x24: case 0x2C: //bit
+			rP[1] = !(dataBus & rA);
+			rP[6] = dataBus & 0x40;
+			rP[7] = dataBus & 0x80;
+			break;
 
-			case 0xA3: case 0xA7: case 0xAF: case 0xB3: case 0xB7: case 0xBF: //lax
-				rA = content;
-				rX = content;
-				rP[1] = !rX;
-				rP[7] = rX & 0x80;
-				break;
-		}
+		case 0xA3: case 0xA7: case 0xAF: case 0xB3: case 0xB7: case 0xBF: //lax
+			rA = dataBus;
+			rX = dataBus;
+			rP[1] = !rX;
+			rP[7] = rX & 0x80;
+			break;
+
+		case 0x46: case 0x4E: case 0x56: case 0x5E: //lsr
+			rP[0] = dataBus & 0x01;
+			dataBus >>= 1;
+			rP[1] = !dataBus;
+			rP.reset(7);
+			cpuWrite();
+			break;
+
+		case 0x06: case 0x0E: case 0x16: case 0x1E: //asl
+			rP[0] = dataBus & 0x80;
+			dataBus <<= 1;
+			rP[1] = !dataBus;
+			rP[7] = dataBus & 0x80;
+			cpuWrite();
+			break;
+
+		case 0x26: case 0x2E: case 0x36: case 0x3E: //rol
+			{
+			const bool newCarry = dataBus & 0x80;
+			dataBus = (dataBus << 1) | rP[0];
+			rP[0] = newCarry;
+			}
+			rP[1] = !dataBus;
+			rP[7] = dataBus & 0x80;
+			cpuWrite();
+			break;
+
+		case 0x66: case 0x6E: case 0x76: case 0x7E: //ror
+			{
+			const bool newCarry = dataBus & 0x01;
+			dataBus = (dataBus >> 1) | (rP[0] << 7);
+			rP[0] = newCarry;
+			}
+			rP[1] = !dataBus;
+			rP[7] = dataBus & 0x80;
+			cpuWrite();
+			break;
+
+		case 0xC6: case 0xCE: case 0xD6: case 0xDE: //dec
+			--dataBus;
+			rP[1] = !dataBus;
+			rP[7] = dataBus & 0x80;
+			cpuWrite();
+			break;
+
+		case 0xE6: case 0xEE: case 0xF6: case 0xFE: //dec
+			++dataBus;
+			rP[1] = !dataBus;
+			rP[7] = dataBus & 0x80;
+			cpuWrite();
+			break;
 	}
 	cpu_op_done();
 }
 
 
-void nes::cpu_read()
+void nes::cpuRead()
 {
-	switch(address)
+	dataBus = cpu_mem[addressBus];
+
+	switch(addressBus)
 	{
 		case 0x2002:
-			content = ppustatus;
+			dataBus = ppustatus;
 			ppustatus &= 0x7F;
 			// cpu_mem[0x2002] = ppustatus; //probably not necessary
 			w_toggle = false;
@@ -1275,54 +1422,55 @@ void nes::cpu_read()
 			{
 				//if in palette range, reload latch(mirrored) but send palette byte immediately
 				//perform NT mirroring here
-				content = ppudata_latch;
+				dataBus = ppudata_latch;
 				ppudata_latch = vram[ppu_address];
 				ppu_address += (ppuctrl & 0x04) ? 0x20 : 0x01;
 			}
 			break;
 
 		case 0x4016:
-			content = (address & 0xE0) | (controller_reg & 1); //address = open bus?
+			dataBus = (addressBus & 0xE0) | (controller_reg & 1); //address = open bus?
 			controller_reg >>= 1; //if we have read 4016 8 times, start returning 1s
 			break;
 	}
 
 	cpu_tick();
-	return;
 }
 
 
-void nes::cpu_write()
-{ // block writes to ppu on the first screen
-	switch(address)
+void nes::cpuWrite() // block writes to ppu on the first screen
+{
+	cpu_mem[addressBus] = dataBus;
+
+	switch(addressBus)
 	{
 		case 0x2000:
-			ppuctrl = content;
+			ppuctrl = dataBus;
 			ppu_address_latch = (ppu_address_latch & 0x73FF) | ((ppuctrl & 0x03) << 10);
 			break;
 		case 0x2001:
-			ppumask = content;
+			ppumask = dataBus;
 			break;
 		case 0x2005:
 			if(!w_toggle)
 			{
-				ppu_address_latch = (ppu_address_latch & 0x7FE0) | (content >> 3);
-				fine_x = content & 0x07;
+				ppu_address_latch = (ppu_address_latch & 0x7FE0) | (dataBus >> 3);
+				fine_x = dataBus & 0x07;
 			}
 			else
 			{
-				ppu_address_latch = (ppu_address_latch & 0xC1F) | ((content & 0x07) << 12) | ((content & 0xF8) << 2);
+				ppu_address_latch = (ppu_address_latch & 0xC1F) | ((dataBus & 0x07) << 12) | ((dataBus & 0xF8) << 2);
 			}
 			w_toggle = !w_toggle;
 			break;
 		case 0x2006:
 			if(!w_toggle)
 			{
-				ppu_address_latch = (ppu_address_latch & 0xFF) | ((content & 0x3F) << 8);
+				ppu_address_latch = (ppu_address_latch & 0xFF) | ((dataBus & 0x3F) << 8);
 			}
 			else
 			{
-				ppu_address_latch = (ppu_address_latch & 0x7F00) | content;
+				ppu_address_latch = (ppu_address_latch & 0x7F00) | dataBus;
 				ppu_address = ppu_address_latch & 0x3FFF; //assuming only the address gets mirrored down, not the latch
 			}
 			w_toggle = !w_toggle;
@@ -1330,7 +1478,7 @@ void nes::cpu_write()
 		case 0x2007:
 			if((scanline_v >= 240 && scanline_v <= 260) || !(ppumask & 0x18))
 			{
-				vram[ppu_address] = content; //perform NT mirroring here
+				vram[ppu_address] = dataBus; //perform NT mirroring here
 				ppu_address += (ppuctrl & 0x04) ? 0x20 : 0x01;
 			}
 			break;
@@ -1342,13 +1490,13 @@ void nes::cpu_write()
 			for(uint16_t x=0; x<=255; ++x)
 			{
 				// cpu_tick(); //r:0x20xx
-				ppu_oam[x] = cpu_mem[(content << 8) + x];
+				ppu_oam[x] = cpu_mem[(dataBus << 8) + x];
 				++oamaddr;
 				// cpu_tick(); //w:0x4014
 			}
 			break;
 		case 0x4016:
-			if(content & 1)
+			if(dataBus & 1)
 			{
 				controller_update = true;
 			}
@@ -1360,7 +1508,6 @@ void nes::cpu_write()
 	}
 
 	cpu_tick();
-	return;
 }
 
 
@@ -1369,10 +1516,6 @@ void nes::cpu_tick()
 	ppu_tick();
 	ppu_tick();
 	ppu_tick();
-
-	address = 0; //not entirely correct, but necessary right now
-
-	return;
 }
 
 
@@ -1381,27 +1524,25 @@ void nes::cpu_op_done()
 	if(nmi_line)
 	{
 		// ++PC;
-		// cpu_read();
+		// cpuRead();
 		cpu_mem[0x100+rS] = PC >> 8;
 		--rS;
-		// cpu_write();
+		// cpuWrite();
 		cpu_mem[0x100+rS] = PC;
 		--rS;
-		// cpu_write();
+		// cpuWrite();
 		rP.reset(4);
 		cpu_mem[0x100+rS] = rP.to_ulong();
 		--rS;
-		// cpu_write();
+		// cpuWrite();
 		PC = cpu_mem[0xFFFA];
 		rP.set(2);
-		// cpu_read();
+		// cpuRead();
 		PC += cpu_mem[0xFFFB] << 8;
-		// cpu_read();
+		// cpuRead();
 
 		nmi_line = false;
 	}
-
-	return;
 }
 
 
@@ -1472,8 +1613,6 @@ void nes::ppu_tick()
 	{
 		++scanline_h;
 	}
-
-	return;
 }
 
 
@@ -1569,8 +1708,6 @@ void nes::ppu_render_fetches() //things done during visible and prerender scanli
 	{
 		oamaddr = 0;
 	}
-
-	return;
 }
 
 
