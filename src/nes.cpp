@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <iostream>
 #include <iomanip>
 #include <sstream>
 #include <vector>
@@ -24,9 +25,9 @@ void nes::AdvanceFrame(uint8_t input)
 	renderFrame = false;
 	while(!renderFrame)
 	{
-		runOpcode();
+		RunOpcode();
 
-		if(controller_update) //doesn't work outside while
+		if(readJoy1) //doesn't work outside while
 		{
 			controller_reg = input;
 		}
@@ -78,7 +79,7 @@ const std::array<uint8_t, 256*240*3>* const nes::GetPixelPtr() const
 }
 
 
-void nes::runOpcode()
+void nes::RunOpcode()
 {
 	const uint8_t opcode = cpuMem[PC];
 	const uint8_t op1 = cpuMem[PC+1];
@@ -87,20 +88,20 @@ void nes::runOpcode()
 
 	#ifdef DEBUG
 	std::cout << std::uppercase << std::hex << std::setfill('0')
-		 << std::setw(4) << PC
-		 << "  " << std::setw(2) << int(opcode)
-		 << " " << std::setw(2) << int(op1)
-		 << " " << std::setw(2) << int(op2)
-		 << "        A:" << std::setw(2) << int(rA)
-		 << " X:" << std::setw(2) << int(rX)
-		 << " Y:" << std::setw(2) << int(rY)
-		 << " P:" << std::setw(2) << int(rP.to_ulong() & ~0x10)
-		 << " SP:" << std::setw(2) << int(rS)
-		 << " PPU:" << std::setw(3) << std::dec << scanline_h
-		 << " SL:" << std::setw(3) << std::dec << scanline_v << std::endl;
+			  << std::setw(4) << PC
+			  << "  " << std::setw(2) << int(opcode)
+			  << " " << std::setw(2) << int(op1)
+			  << " " << std::setw(2) << int(op2)
+			  << "        A:" << std::setw(2) << int(rA)
+			  << " X:" << std::setw(2) << int(rX)
+			  << " Y:" << std::setw(2) << int(rY)
+			  << " P:" << std::setw(2) << int(rP.to_ulong() & ~0x10)
+			  << " SP:" << std::setw(2) << int(rS)
+			  << " PPU:" << std::setw(3) << std::dec << scanlineH
+			  << " SL:" << std::setw(3) << scanlineV << std::endl;
 	#endif
 	#ifdef DUMP_VRAM
-	if(scanline_v == 261)
+	if(scanlineV == 261)
 	{
 		std::string outfile = "vram.txt";
 		std::ofstream result(outfile.c_str(), std::ios::out | std::ios::binary);
@@ -111,11 +112,11 @@ void nes::runOpcode()
 
 
 	addressBus = PC;
-	cpuRead();
+	CpuRead();
 
 	++PC;
 	++addressBus;
-	cpuRead();
+	CpuRead();
 
 	switch(opcode)
 	{
@@ -123,22 +124,22 @@ void nes::runOpcode()
 			++PC;
 			addressBus = 0x0100 | rS;
 			dataBus = PC >> 8;
-			cpuWrite();
+			CpuWrite();
 
 			addressBus = 0x0100 | uint8_t(addressBus - 1);
 			dataBus = PC;
-			cpuWrite();
+			CpuWrite();
 
 			addressBus = 0x0100 | uint8_t(addressBus - 1);
 			dataBus = rP.to_ulong();
-			cpuWrite();
+			CpuWrite();
 
 			rS -= 3;
 			addressBus = 0xFFFE;
-			cpuRead();
+			CpuRead();
 
 			++addressBus;
-			cpuRead();
+			CpuRead();
 
 			PC = cpuMem[0xFFFE] | (dataBus << 8);
 			break;
@@ -152,34 +153,34 @@ void nes::runOpcode()
 		case 0x08: //PHP
 			addressBus = 0x0100 | rS;
 			dataBus = rP.to_ulong();
-			cpuWrite();
+			CpuWrite();
 
 			--rS;
 			break;
 		case 0x28: //PLP
 			addressBus = 0x0100 | rS;
-			cpuRead();
+			CpuRead();
 
 			++rS;
 			addressBus = 0x0100 | rS;
-			cpuRead();
+			CpuRead();
 
 			rP = dataBus | 0x20;
 			break;
 		case 0x48: //PHA
 			addressBus = 0x0100 | rS;
 			dataBus = rA;
-			cpuWrite();
+			CpuWrite();
 
 			--rS;
 			break;
 		case 0x68: //PLA
 			addressBus = 0x0100 | rS;
-			cpuRead();
+			CpuRead();
 
 			++rS;
 			addressBus = 0x0100 | rS;
-			cpuRead();
+			CpuRead();
 
 			rA = dataBus;
 			rP[1] = !rA;
@@ -225,12 +226,12 @@ void nes::runOpcode()
 				const uint16_t pagePC = PC + int8_t(op1);
 				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
 				addressBus = PC;
-				cpuRead();
+				CpuRead();
 				if(PC != pagePC)
 				{
 					PC = pagePC;
 					addressBus = PC;
-					cpuRead();
+					CpuRead();
 				}
 			}
 			break;
@@ -242,12 +243,12 @@ void nes::runOpcode()
 				const uint16_t pagePC = PC + int8_t(op1);
 				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
 				addressBus = PC;
-				cpuRead();
+				CpuRead();
 				if(PC != pagePC)
 				{
 					PC = pagePC;
 					addressBus = PC;
-					cpuRead();
+					CpuRead();
 				}
 			}
 			break;
@@ -259,12 +260,12 @@ void nes::runOpcode()
 				const uint16_t pagePC = PC + int8_t(op1);
 				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
 				addressBus = PC;
-				cpuRead();
+				CpuRead();
 				if(PC != pagePC)
 				{
 					PC = pagePC;
 					addressBus = PC;
-					cpuRead();
+					CpuRead();
 				}
 			}
 			break;
@@ -276,12 +277,12 @@ void nes::runOpcode()
 				const uint16_t pagePC = PC + int8_t(op1);
 				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
 				addressBus = PC;
-				cpuRead();
+				CpuRead();
 				if(PC != pagePC)
 				{
 					PC = pagePC;
 					addressBus = PC;
-					cpuRead();
+					CpuRead();
 				}
 			}
 			break;
@@ -293,12 +294,12 @@ void nes::runOpcode()
 				const uint16_t pagePC = PC + int8_t(op1);
 				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
 				addressBus = PC;
-				cpuRead();
+				CpuRead();
 				if(PC != pagePC)
 				{
 					PC = pagePC;
 					addressBus = PC;
-					cpuRead();
+					CpuRead();
 				}
 			}
 			break;
@@ -310,12 +311,12 @@ void nes::runOpcode()
 				const uint16_t pagePC = PC + int8_t(op1);
 				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
 				addressBus = PC;
-				cpuRead();
+				CpuRead();
 				if(PC != pagePC)
 				{
 					PC = pagePC;
 					addressBus = PC;
-					cpuRead();
+					CpuRead();
 				}
 			}
 			break;
@@ -327,12 +328,12 @@ void nes::runOpcode()
 				const uint16_t pagePC = PC + int8_t(op1);
 				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
 				addressBus = PC;
-				cpuRead();
+				CpuRead();
 				if(PC != pagePC)
 				{
 					PC = pagePC;
 					addressBus = PC;
-					cpuRead();
+					CpuRead();
 				}
 			}
 			break;
@@ -344,12 +345,12 @@ void nes::runOpcode()
 				const uint16_t pagePC = PC + int8_t(op1);
 				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
 				addressBus = PC;
-				cpuRead();
+				CpuRead();
 				if(PC != pagePC)
 				{
 					PC = pagePC;
 					addressBus = PC;
-					cpuRead();
+					CpuRead();
 				}
 			}
 			break;
@@ -380,17 +381,17 @@ void nes::runOpcode()
 			++PC;
 			addressBus = 0x0100 | rS;
 			// rS = op1; //wtf
-			cpuRead();
+			CpuRead();
 
 			dataBus = PC >> 8;
-			cpuWrite();
+			CpuWrite();
 
 			addressBus = 0x0100 | uint8_t(addressBus - 1);
 			dataBus = PC;
-			cpuWrite();
+			CpuWrite();
 
 			addressBus = PC;
-			cpuRead();
+			CpuRead();
 
 			rS -= 2;
 			PC = op1 + (op2 << 8);
@@ -398,36 +399,36 @@ void nes::runOpcode()
 		case 0x40: //RTI
 			++PC;
 			addressBus = 0x0100 | rS;
-			cpuRead();
+			CpuRead();
 
 			addressBus = 0x0100 | uint8_t(addressBus + 1);
-			cpuRead();
+			CpuRead();
 
 			rP = dataBus | 0x20;
 			addressBus = 0x0100 | uint8_t(addressBus + 1);
-			cpuRead();
+			CpuRead();
 
 			rS += 3;
 			addressBus = 0x0100 | uint8_t(addressBus + 1);
-			cpuRead();
+			CpuRead();
 
 			PC = cpuMem[0x0100 | uint8_t(addressBus - 1)] | (dataBus << 8);
 			break;
 		case 0x60: //RTS
 			++PC;
 			addressBus = 0x0100 | rS;
-			cpuRead();
+			CpuRead();
 
 			addressBus = 0x0100 | uint8_t(addressBus + 1);
-			cpuRead();
+			CpuRead();
 
 			rS += 2;
 			addressBus = 0x0100 | uint8_t(addressBus + 1);
-			cpuRead();
+			CpuRead();
 
 			PC = cpuMem[0x0100 | addressBus - 1] | (dataBus << 8);
 			addressBus = PC;
-			cpuRead();
+			CpuRead();
 
 			++PC;
 			break;
@@ -435,21 +436,21 @@ void nes::runOpcode()
 		case 0x4C: //JMP abs
 			++PC;
 			++addressBus;
-			cpuRead();
+			CpuRead();
 
 			PC = op1 | (op2 << 8);
 			break;
 		case 0x6C: //JMP ind
 			++PC;
 			++addressBus;
-			cpuRead();
+			CpuRead();
 
 			++PC;
 			addressBus = op1 | (op2 << 8);
-			cpuRead();
+			CpuRead();
 
 			addressBus = uint8_t(op1 + 1) | (op2 << 8);
-			cpuRead();
+			CpuRead();
 
 			PC = cpuMem[op1 | (op2 << 8)] | (dataBus << 8);
 			break;
@@ -460,17 +461,17 @@ void nes::runOpcode()
 			rP[7] = rY & 0x80;
 			break;
 		case 0xC8: //INY
-			++rY; //actually set one cycle later
+			++rY;
 			rP[1] = !rY;
 			rP[7] = rY & 0x80;
 			break;
 		case 0xCA: //DEX
-			--rX; //actually set one cycle later
+			--rX;
 			rP[1] = !rX;
 			rP[7] = rX & 0x80;
 			break;
 		case 0xE8: //INX
-			++rX; //actually set one cycle later
+			++rX;
 			rP[1] = !rX;
 			rP[7] = rX & 0x80;
 			break;
@@ -478,135 +479,135 @@ void nes::runOpcode()
 		case 0x81: //STA (ind,x)
 			++PC;
 			addressBus = op1;
-			cpuRead();
+			CpuRead();
 
 			addressBus = uint8_t(addressBus + rX);
-			cpuRead();
+			CpuRead();
 
 			addressBus = uint8_t(addressBus + 1);
-			cpuRead();
+			CpuRead();
 
 			addressBus = cpuMem[uint8_t(addressBus - 1)] | (cpuMem[addressBus] << 8);
 			dataBus = rA;
-			cpuWrite();
+			CpuWrite();
 			break;
 		case 0x85: //STA zp
 			++PC;
 			addressBus = op1;
 			dataBus = rA;
-			cpuWrite();
+			CpuWrite();
 			break;
 		case 0x8D: //STA abs
 			++PC;
 			++addressBus;
-			cpuRead();
+			CpuRead();
 
 			++PC;
 			addressBus = op1 | (op2 << 8);
 			dataBus = rA;
-			cpuWrite();
+			CpuWrite();
 			break;
 		case 0x91: //STA (ind),y
 			++PC;
 			addressBus = op1;
-			cpuRead();
+			CpuRead();
 
 			addressBus = uint8_t(addressBus + 1);
-			cpuRead();
+			CpuRead();
 
 			addressBus = uint8_t(cpuMem[uint8_t(addressBus - 1)] + rY) | (cpuMem[addressBus] << 8);
-			cpuRead();
+			CpuRead();
 
 			addressBus += cpuMem[op1] + rY & 0x0100;
 			dataBus = rA;
-			cpuWrite();
+			CpuWrite();
 			break;
 		case 0x95: //STA zp,x
 			++PC;
 			addressBus = op1;
-			cpuRead();
+			CpuRead();
 
 			addressBus = uint8_t(addressBus + rX);
 			dataBus = rA;
-			cpuWrite();
+			CpuWrite();
 			break;
 		case 0x99: //STA abs,y
 			++PC;
 			++addressBus;
-			cpuRead();
+			CpuRead();
 
 			++PC;
 			addressBus = uint8_t(op1 + rY) | (op2 << 8);
-			cpuRead();
+			CpuRead();
 
 			addressBus += op1 + rY & 0x0100;
 			dataBus = rA;
-			cpuWrite();
+			CpuWrite();
 			break;
 		case 0x9D: //STA abs,x
 			++PC;
 			++addressBus;
-			cpuRead();
+			CpuRead();
 
 			++PC;
 			addressBus = uint8_t(op1 + rX) | (op2 << 8);
-			cpuRead();
+			CpuRead();
 
 			addressBus += op1 + rX & 0x0100;
 			dataBus = rA;
-			cpuWrite();
+			CpuWrite();
 			break;
 
 		case 0x84: //STY zp
 			++PC;
 			addressBus = op1;
 			dataBus = rY;
-			cpuWrite();
+			CpuWrite();
 			break;
 		case 0x8C: //STY abs
 			++PC;
 			++addressBus;
-			cpuRead();
+			CpuRead();
 
 			++PC;
 			addressBus = op1 | (op2 << 8);
 			dataBus = rY;
-			cpuWrite();
+			CpuWrite();
 			break;
 		case 0x94: //STY zp,x
 			++PC;
 			addressBus = op1;
-			cpuRead();
+			CpuRead();
 
 			addressBus = uint8_t(addressBus + rX);
 			dataBus = rY;
-			cpuWrite();
+			CpuWrite();
 			break;
 
 		case 0x86: //STX zp
 			++PC;
 			addressBus = op1;
 			dataBus = rX;
-			cpuWrite();
+			CpuWrite();
 			break;
 		case 0x8E: //STX abs
 			++PC;
 			++addressBus;
-			cpuRead();
+			CpuRead();
 
 			++PC;
 			addressBus = op1 | (op2 << 8);
 			dataBus = rX;
-			cpuWrite();
+			CpuWrite();
 			break;
 		case 0x96: //STX zp,y
 			++PC;
 			addressBus = op1;
-			cpuRead();
+			CpuRead();
 
 			addressBus = uint8_t(addressBus + rY);
 			dataBus = rX;
-			cpuWrite();
+			CpuWrite();
 			break;
 
 		case 0x8A: //TXA
@@ -644,60 +645,60 @@ void nes::runOpcode()
 		case 0x06: case 0x26: case 0x46: case 0x66: case 0xC6: case 0xE6: //z RW
 			++PC;
 			addressBus = op1;
-			cpuRead();
+			CpuRead();
 
-			cpuWrite();
+			CpuWrite();
 			break;
 		case 0x0E: case 0x2E: case 0x4E: case 0x6E: case 0xCE: case 0xEE: //abs RW
 			++PC;
 			++addressBus;
-			cpuRead();
+			CpuRead();
 
 			++PC;
 			addressBus = op1 + (op2 << 8);
-			cpuRead();
+			CpuRead();
 
-			cpuWrite();
+			CpuWrite();
 			break;
 		case 0x16: case 0x36: case 0x56: case 0x76: case 0xD6: case 0xF6: //z,x RW
 			++PC;
 			addressBus = op1;
-			cpuRead();
+			CpuRead();
 
 			addressBus = uint8_t(addressBus + rX);
-			cpuRead();
+			CpuRead();
 
-			cpuWrite();
+			CpuWrite();
 			break;
 		case 0x1E: case 0x3E: case 0x5E: case 0x7E: case 0xDE: case 0xFE: //abs,x RW
 			++PC;
 			++addressBus;
-			cpuRead();
+			CpuRead();
 
 			++PC;
 			addressBus = uint8_t(op1 + rX) | (op2 << 8);
-			cpuRead();
+			CpuRead();
 
 			addressBus = op1 + rX + (op2 << 8);
-			cpuRead();
+			CpuRead();
 
-			cpuWrite();
+			CpuWrite();
 			break;
 
 		case 0x01: case 0x21: case 0x41: case 0x61: //(indirect,x) / indexed indirect R
 		case 0xA1: case 0xC1: case 0xE1: case 0xA3:
 			++PC;
 			addressBus = op1;
-			cpuRead();
+			CpuRead();
 
 			addressBus = uint8_t(addressBus + rX);
-			cpuRead();
+			CpuRead();
 
 			addressBus = uint8_t(addressBus + 1);
-			cpuRead();
+			CpuRead();
 
 			addressBus = cpuMem[uint8_t(addressBus - 1)] | (cpuMem[addressBus] << 8);
-			cpuRead();
+			CpuRead();
 			break;
 		case 0x04: case 0x05: case 0x24: case 0x25: case 0x44: //zero page R
 		case 0x45: case 0x64: case 0x65: case 0xA4: case 0xA5:
@@ -705,7 +706,7 @@ void nes::runOpcode()
 		case 0xA7:
 			++PC;
 			addressBus = op1;
-			cpuRead();
+			CpuRead();
 			break;
 		case 0x09: case 0x29: case 0x49: case 0x69: case 0x80: case 0xA0: //immediate R
 		case 0xA2: case 0xA9: case 0xC0: case 0xC9: case 0xE0: case 0xE9: case 0xEB:
@@ -716,28 +717,28 @@ void nes::runOpcode()
 		case 0xAF:
 			++PC;
 			++addressBus;
-			cpuRead();
+			CpuRead();
 
 			++PC;
 			addressBus = op1 | (op2 << 8);
-			cpuRead();
+			CpuRead();
 			break;
 		case 0x11: case 0x31: case 0x51: //(indirect),y / indirect indexed R
 		case 0x71: case 0xB1: case 0xD1: case 0xF1: case 0xB3:
 			++PC;
 			addressBus = op1;
-			cpuRead();
+			CpuRead();
 
 			addressBus = uint8_t(addressBus + 1);
-			cpuRead();
+			CpuRead();
 
 			addressBus = uint8_t(cpuMem[uint8_t(addressBus - 1)] + rY) | (cpuMem[addressBus] << 8);
-			cpuRead();
+			CpuRead();
 
 			if(cpuMem[op1] + rY > 0xFF)
 			{
 				addressBus += 0x0100;
-				cpuRead();
+				CpuRead();
 			}
 			break;
 		case 0x14: case 0x15: case 0x34: case 0x35: //zero page,X R
@@ -745,25 +746,25 @@ void nes::runOpcode()
 		case 0xB5: case 0xD4: case 0xD5: case 0xF4: case 0xF5:
 			++PC;
 			addressBus = op1;
-			cpuRead();
+			CpuRead();
 
 			addressBus = uint8_t(addressBus + rX);
-			cpuRead();
+			CpuRead();
 			break;
 		case 0x19: case 0x39: case 0x59: case 0x79: //absolute,Y R
 		case 0xB9: case 0xBE: case 0xD9: case 0xF9: case 0xBF:
 			++PC;
 			++addressBus;
-			cpuRead();
+			CpuRead();
 
 			++PC;
 			addressBus = uint8_t(op1 + rY) + (op2 << 8);
-			cpuRead();
+			CpuRead();
 
 			if(op1 + rY > 0xFF)
 			{
 				addressBus += 0x0100;
-				cpuRead();
+				CpuRead();
 			}
 			break;
 		case 0x1C: case 0x1D: case 0x3C: case 0x3D: //absolute,X R
@@ -771,25 +772,25 @@ void nes::runOpcode()
 		case 0xBD: case 0xDC: case 0xDD: case 0xFC: case 0xFD:
 			++PC;
 			++addressBus;
-			cpuRead();
+			CpuRead();
 
 			++PC;
 			addressBus = uint8_t(op1 + rX) + (op2 << 8);
-			cpuRead();
+			CpuRead();
 
 			if(op1 + rX > 0xFF)
 			{
 				addressBus += 0x0100;
-				cpuRead();
+				CpuRead();
 			}
 			break;
 		case 0xB6: case 0xB7: //zero page,Y R
 			++PC;
 			addressBus = op1;
-			cpuRead();
+			CpuRead();
 
 			addressBus = uint8_t(addressBus + rY);
-			cpuRead();
+			CpuRead();
 			break;
 	}
 
@@ -896,7 +897,7 @@ void nes::runOpcode()
 			dataBus >>= 1;
 			rP[1] = !dataBus;
 			rP.reset(7);
-			cpuWrite();
+			CpuWrite();
 			break;
 
 		case 0x06: case 0x0E: case 0x16: case 0x1E: //asl
@@ -904,7 +905,7 @@ void nes::runOpcode()
 			dataBus <<= 1;
 			rP[1] = !dataBus;
 			rP[7] = dataBus & 0x80;
-			cpuWrite();
+			CpuWrite();
 			break;
 
 		case 0x26: case 0x2E: case 0x36: case 0x3E: //rol
@@ -915,7 +916,7 @@ void nes::runOpcode()
 			}
 			rP[1] = !dataBus;
 			rP[7] = dataBus & 0x80;
-			cpuWrite();
+			CpuWrite();
 			break;
 
 		case 0x66: case 0x6E: case 0x76: case 0x7E: //ror
@@ -926,87 +927,87 @@ void nes::runOpcode()
 			}
 			rP[1] = !dataBus;
 			rP[7] = dataBus & 0x80;
-			cpuWrite();
+			CpuWrite();
 			break;
 
 		case 0xC6: case 0xCE: case 0xD6: case 0xDE: //dec
 			--dataBus;
 			rP[1] = !dataBus;
 			rP[7] = dataBus & 0x80;
-			cpuWrite();
+			CpuWrite();
 			break;
 
 		case 0xE6: case 0xEE: case 0xF6: case 0xFE: //inc
 			++dataBus;
 			rP[1] = !dataBus;
 			rP[7] = dataBus & 0x80;
-			cpuWrite();
+			CpuWrite();
 			break;
 	}
-	cpu_op_done();
+	CpuOpDone();
 }
 
 
-void nes::cpuRead()
+void nes::CpuRead()
 {
 	dataBus = cpuMem[addressBus];
 
 	switch(addressBus)
 	{
 		case 0x2002:
-			dataBus = ppustatus;
-			ppustatus &= 0x7F;
-			// cpuMem[0x2002] = ppustatus; //probably not necessary
-			w_toggle = false;
+			dataBus = ppuStatus;
+			ppuStatus &= 0x7F;
+			// cpuMem[0x2002] = ppuStatus; //probably not necessary
+			wToggle = false;
 			break;
 		case 0x2007:
-			if((scanline_v >= 240 && scanline_v <= 260) || !(ppumask & 0x18))
+			if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18))
 			{
 				//if in palette range, reload latch(mirrored) but send palette byte immediately
 				//perform NT mirroring here
 				dataBus = ppudata_latch;
 				ppudata_latch = vram[ppu_address];
-				ppu_address += (ppuctrl & 0x04) ? 0x20 : 0x01;
+				ppu_address += (ppuCtrl & 0x04) ? 0x20 : 0x01;
 			}
 			break;
 
 		case 0x4016:
-			dataBus = (addressBus & 0xE0) | (controller_reg & 1); //address = open bus?
+			dataBus = (addressBus & 0xE0) | (controller_reg & 1); //addressBus = open bus?
 			controller_reg >>= 1; //if we have read 4016 8 times, start returning 1s
 			break;
 	}
 
-	cpu_tick();
+	CpuTick();
 }
 
 
-void nes::cpuWrite() // block writes to ppu on the first screen
+void nes::CpuWrite() // block writes to ppu on the first screen
 {
 	cpuMem[addressBus] = dataBus;
 
 	switch(addressBus)
 	{
 		case 0x2000:
-			ppuctrl = dataBus;
-			ppu_address_latch = (ppu_address_latch & 0x73FF) | ((ppuctrl & 0x03) << 10);
+			ppuCtrl = dataBus;
+			ppu_address_latch = (ppu_address_latch & 0x73FF) | ((ppuCtrl & 0x03) << 10);
 			break;
 		case 0x2001:
-			ppumask = dataBus;
+			ppuMask = dataBus;
 			break;
 		case 0x2005:
-			if(!w_toggle)
+			if(!wToggle)
 			{
 				ppu_address_latch = (ppu_address_latch & 0x7FE0) | (dataBus >> 3);
-				fine_x = dataBus & 0x07;
+				fineX = dataBus & 0x07;
 			}
 			else
 			{
 				ppu_address_latch = (ppu_address_latch & 0xC1F) | ((dataBus & 0x07) << 12) | ((dataBus & 0xF8) << 2);
 			}
-			w_toggle = !w_toggle;
+			wToggle = !wToggle;
 			break;
 		case 0x2006:
-			if(!w_toggle)
+			if(!wToggle)
 			{
 				ppu_address_latch = (ppu_address_latch & 0xFF) | ((dataBus & 0x3F) << 8);
 			}
@@ -1015,13 +1016,13 @@ void nes::cpuWrite() // block writes to ppu on the first screen
 				ppu_address_latch = (ppu_address_latch & 0x7F00) | dataBus;
 				ppu_address = ppu_address_latch & 0x3FFF; //assuming only the address gets mirrored down, not the latch
 			}
-			w_toggle = !w_toggle;
+			wToggle = !wToggle;
 			break;
 		case 0x2007:
-			if((scanline_v >= 240 && scanline_v <= 260) || !(ppumask & 0x18))
+			if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18))
 			{
 				vram[ppu_address] = dataBus; //perform NT mirroring here
-				ppu_address += (ppuctrl & 0x04) ? 0x20 : 0x01;
+				ppu_address += (ppuCtrl & 0x04) ? 0x20 : 0x01;
 			}
 			break;
 		case 0x4014:
@@ -1032,137 +1033,137 @@ void nes::cpuWrite() // block writes to ppu on the first screen
 			for(uint16_t x=0; x<=255; ++x)
 			{
 				// cpu_tick(); //r:0x20xx
-				ppu_oam[x] = cpuMem[(dataBus << 8) + x];
-				++oamaddr;
+				oam[x] = cpuMem[(dataBus << 8) + x];
+				++oamAddr;
 				// cpu_tick(); //w:0x4014
 			}
 			break;
 		case 0x4016:
 			if(dataBus & 1)
 			{
-				controller_update = true;
+				readJoy1 = true;
 			}
 			else
 			{
-				controller_update = false;
+				readJoy1 = false;
 			}
 			break;
 	}
 
-	cpu_tick();
+	CpuTick();
 }
 
 
-void nes::cpu_tick()
+void nes::CpuTick()
 {
-	ppu_tick();
-	ppu_tick();
-	ppu_tick();
+	PpuTick();
+	PpuTick();
+	PpuTick();
 }
 
 
-void nes::cpu_op_done()
+void nes::CpuOpDone()
 {
-	if(nmi_line)
+	if(nmiLine)
 	{
 		// ++PC;
-		// cpuRead();
+		// CpuRead();
 		cpuMem[0x100+rS] = PC >> 8;
 		--rS;
-		// cpuWrite();
+		// CpuWrite();
 		cpuMem[0x100+rS] = PC;
 		--rS;
-		// cpuWrite();
+		// CpuWrite();
 		rP.reset(4);
 		cpuMem[0x100+rS] = rP.to_ulong();
 		--rS;
-		// cpuWrite();
+		// CpuWrite();
 		PC = cpuMem[0xFFFA];
 		rP.set(2);
-		// cpuRead();
+		// CpuRead();
 		PC += cpuMem[0xFFFB] << 8;
-		// cpuRead();
+		// CpuRead();
 
-		nmi_line = false;
+		nmiLine = false;
 	}
 }
 
 
-void nes::ppu_tick()
+void nes::PpuTick()
 {
-	if(scanline_v < 240) //visible scanlines
+	if(scanlineV < 240) //visible scanlines
 	{
-		if(scanline_h && scanline_h <= 256)
+		if(scanlineH && scanlineH <= 256)
 		{
-			uint8_t ppu_pixel = (ppu_bg_low >> (15 - fine_x)) & 1;
-			ppu_pixel |= (ppu_bg_high >> (14 - fine_x)) & 2;
-			ppu_pixel |= (ppu_attribute >> (28 - fine_x * 2)) & 0x0C;
+			uint8_t ppuPixel = (ppu_bg_low >> (15 - fineX)) & 1;
+			ppuPixel |= (ppu_bg_high >> (14 - fineX)) & 2;
+			ppuPixel |= (ppu_attribute >> (28 - fineX * 2)) & 0x0C;
 
-			uint32_t renderpos = (scanline_v*256 + (scanline_h-1)) * 3;
-			uint16_t pindex = vram[0x3F00 + ppu_pixel] * 3;
-			render[renderpos  ] = palette[pindex  ];
-			render[renderpos+1] = palette[pindex+1];
-			render[renderpos+2] = palette[pindex+2];
+			const uint32_t renderPos = (scanlineV * 256 + (scanlineH-1)) * 3;
+			const uint16_t pIndex = vram[0x3F00 + ppuPixel] * 3;
+			render[renderPos  ] = palette[pIndex  ];
+			render[renderPos+1] = palette[pIndex+1];
+			render[renderPos+2] = palette[pIndex+2];
 		}
 
-		ppu_render_fetches();
-		// ppu_oam_scan(); //order?
+		PpuRenderFetches();
+		// PpuOamScan(); //order?
 
 	}
-	else if(scanline_v == 241) //vblank scanlines
+	else if(scanlineV == 241) //vblank scanlines
 	{
-		if(scanline_h == 1)
+		if(scanlineH == 1)
 		{
-			ppustatus |= 0x80;
-			nmi_line = cpuMem[0x2000] & ppustatus & 0x80;
+			ppuStatus |= 0x80;
+			nmiLine = cpuMem[0x2000] & ppuStatus & 0x80;
 		}
 	}
-	else if(scanline_v == 261) //prerender scanline
+	else if(scanlineV == 261) //prerender scanline
 	{
-		if(scanline_h == 1)
+		if(scanlineH == 1)
 		{
-			ppustatus &= 0x1F; //clear sprite overflow, sprite 0 hit and vblank
+			ppuStatus &= 0x1F; //clear sprite overflow, sprite 0 hit and vblank
 		}
-		else if(scanline_h >= 280 && scanline_h <= 304 && ppumask & 0x18)
+		else if(scanlineH >= 280 && scanlineH <= 304 && ppuMask & 0x18)
 		{
 			ppu_address = (ppu_address & 0x41F) | (ppu_address_latch & 0x7BE0);
 		}
 
-		ppu_render_fetches();
-		// ppu_oam_scan(); //order?
+		PpuRenderFetches();
+		// PpuOamScan(); //order?
 
-		if(ppu_odd_frame && scanline_h == 339)
+		if(ppu_odd_frame && scanlineH == 339)
 		{
-			++scanline_h;
+			++scanlineH;
 		}
 	}
 
-	if(scanline_h == 340)
+	if(scanlineH == 340)
 	{
-		scanline_h = 0;
-		if(scanline_v == 261)
+		scanlineH = 0;
+		if(scanlineV == 261)
 		{
-			scanline_v = 0;
+			scanlineV = 0;
 			ppu_odd_frame = !ppu_odd_frame;
 			renderFrame = true;
 		}
 		else
 		{
-			++scanline_v;
+			++scanlineV;
 		}
 	}
 	else
 	{
-		++scanline_h;
+		++scanlineH;
 	}
 }
 
 
-void nes::ppu_render_fetches() //things done during visible and prerender scanlines
+void nes::PpuRenderFetches() //things done during visible and prerender scanlines
 {
-	if(ppumask & 0x18) //if rendering is enabled
+	if(ppuMask & 0x18) //if rendering is enabled
 	{
-		if(scanline_h == 256) //Y increment
+		if(scanlineH == 256) //Y increment
 		{
 			if(ppu_address < 0x7000)
 			{
@@ -1186,15 +1187,14 @@ void nes::ppu_render_fetches() //things done during visible and prerender scanli
 				}
 			}
 		}
-
-		if(scanline_h == 257)
+		else if(scanlineH == 257)
 		{
 			ppu_address = (ppu_address & 0x7BE0) | (ppu_address_latch & 0x41F);
 		}
 
-		if((scanline_h >= 1 && scanline_h <= 257) || (scanline_h >= 321 && scanline_h <= 339))
+		if((scanlineH >= 1 && scanlineH <= 257) || (scanlineH >= 321 && scanlineH <= 339))
 		{
-			if(!(scanline_h & 0x07)) //coarse X increment
+			if(!(scanlineH & 0x07)) //coarse X increment
 			{
 				if((ppu_address & 0x1F) != 0x1F)
 				{
@@ -1206,10 +1206,10 @@ void nes::ppu_render_fetches() //things done during visible and prerender scanli
 				}
 			}
 
-			switch(scanline_h & 0x07)
+			switch(scanlineH & 0x07)
 			{
 				case 1:
-					if(scanline_h != 1 && scanline_h != 321) 
+					if(scanlineH != 1 && scanlineH != 321) 
 					{
 						ppu_bg_low |= ppu_bg_low_latch;
 						ppu_bg_high |= ppu_bg_high_latch;
@@ -1218,7 +1218,7 @@ void nes::ppu_render_fetches() //things done during visible and prerender scanli
 					ppu_nametable = vram[0x2000 | (ppu_address & 0xFFF)];
 					break;
 				case 3:
-					if(scanline_h != 339)
+					if(scanlineH != 339)
 					{
 						ppu_attribute_latch = vram[0x23C0 | (ppu_address & 0xC00) | (ppu_address >> 4 & 0x38) | (ppu_address >> 2 & 0x07)];
 						ppu_attribute_latch >>= (((ppu_address >> 1) & 0x01) | ((ppu_address >> 5) & 0x02)) * 2;
@@ -1229,7 +1229,7 @@ void nes::ppu_render_fetches() //things done during visible and prerender scanli
 					}
 					break;
 				case 5:
-					ppu_bg_address = (ppu_nametable*16 + (ppu_address >> 12)) | ((ppuctrl & 0x10) << 8);
+					ppu_bg_address = (ppu_nametable*16 + (ppu_address >> 12)) | ((ppuCtrl & 0x10) << 8);
 					ppu_bg_low_latch = vram[ppu_bg_address];
 					break;
 				case 7:
@@ -1238,7 +1238,7 @@ void nes::ppu_render_fetches() //things done during visible and prerender scanli
 			}
 		}
 
-		if((scanline_h >= 1 && scanline_h <= 256) || (scanline_h >= 321 && scanline_h <= 336))
+		if((scanlineH >= 1 && scanlineH <= 256) || (scanlineH >= 321 && scanlineH <= 336))
 		{
 			ppu_bg_low <<= 1;
 			ppu_bg_high <<= 1;
@@ -1246,45 +1246,45 @@ void nes::ppu_render_fetches() //things done during visible and prerender scanli
 		}
 	}
 
-	if(scanline_h >= 257 && scanline_h <= 320) //rendering enabled only?
+	if(scanlineH >= 257 && scanlineH <= 320) //rendering enabled only?
 	{
-		oamaddr = 0;
+		oamAddr = 0;
 	}
 }
 
 
-void nes::ppu_oam_scan()
+void nes::PpuOamScan()
 {
-	if(scanline_h && scanline_h <= 64)
+	if(scanlineH && scanlineH <= 64)
 	{
-		if(!(scanline_h & 1))
+		if(!(scanlineH & 1))
 		{
-			ppu_secondary_oam[scanline_h / 2] = 0xFF;
+			secondaryOam[scanlineH / 2] = 0xFF;
 		}
 	}
-	else if(scanline_h && scanline_h <= 256)
+	else if(scanlineH && scanlineH <= 256)
 	{
-		if(!(scanline_h & 1))
+		if(!(scanlineH & 1))
 		{
 			switch(oam_eval_pattern)
 			{
 				case 0:
-					ppu_secondary_oam[secondary_oam_index] = ppu_oam[oam_spritenum];
-					if(scanline_v >= ppu_oam[oam_spritenum] && scanline_v < ppu_oam[oam_spritenum] + (8 << (ppuctrl >> 5 & 1)))
+					secondaryOam[secondary_oam_index] = oam[oam_spritenum];
+					if(scanlineV >= oam[oam_spritenum] && scanlineV < oam[oam_spritenum] + (8 << (ppuCtrl >> 5 & 1)))
 					{
 						++oam_eval_pattern;
 					}
 					else
 					{
-						ppu_oam_update_index();
+						PpuOamUpdateIndex();
 					}
 					break;
 				case 1: case 2: case 3:
-					ppu_secondary_oam[secondary_oam_index + oam_eval_pattern] = ppu_oam[oam_spritenum + oam_eval_pattern];
+					secondaryOam[secondary_oam_index + oam_eval_pattern] = oam[oam_spritenum + oam_eval_pattern];
 					if(oam_eval_pattern == 3)
 					{
 						++secondary_oam_index;
-						ppu_oam_update_index();						
+						PpuOamUpdateIndex();						
 					}
 					break;
 			}
@@ -1293,7 +1293,7 @@ void nes::ppu_oam_scan()
 }
 
 
-void nes::ppu_oam_update_index()
+void nes::PpuOamUpdateIndex()
 {
 	oam_spritenum += 4;
 	if(!oam_spritenum)

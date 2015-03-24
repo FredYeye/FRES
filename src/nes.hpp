@@ -2,7 +2,6 @@
 
 #include <array>
 #include <bitset>
-#include <iostream>
 
 
 class nes
@@ -14,15 +13,15 @@ class nes
 
 	private:
 		void LoadRom(std::string inFile);
-		void runOpcode();
-		void cpuRead();
-		void cpuWrite();
-		void cpu_tick();
-		void cpu_op_done();
-		void ppu_tick();
-		void ppu_render_fetches();
-		void ppu_oam_scan();
-		void ppu_oam_update_index();
+		void RunOpcode();
+		void CpuRead();
+		void CpuWrite();
+		void CpuTick();
+		void CpuOpDone();
+		void PpuTick();
+		void PpuRenderFetches();
+		void PpuOamScan();
+		void PpuOamUpdateIndex();
 
 		std::array<uint8_t, 256*240*3> render;
 		const std::array<uint8_t, 64*3> palette
@@ -39,28 +38,27 @@ class nes
 
 		std::array<uint8_t, 0x10000> cpuMem;
 		std::array<uint8_t, 0x4000> vram;
-		std::array<uint8_t, 0x100> ppu_oam;
-		std::array<uint8_t, 0x20> ppu_secondary_oam;
+		std::array<uint8_t, 0x100> oam;
+		std::array<uint8_t, 0x20> secondaryOam;
 
 		uint16_t PC;
-		uint8_t rA = 0, rX = 0, rY = 0;
-		uint8_t rS = 0;
+		uint8_t rA = 0, rX = 0, rY = 0, rS = 0;
 		std::bitset<8> rP; //0:C | 1:Z | 2:I | 3:D | 4:B | 5:1 | 6:V | 7:N
 
 		uint16_t addressBus;
 		uint8_t dataBus;
 		uint8_t controller_reg;
-		bool controller_update = false;
+		bool readJoy1 = false;
 
-		uint8_t fine_x = 0;
-		uint8_t ppuctrl = 0, ppumask = 0, ppustatus = 0, oamaddr = 0;
+		uint8_t fineX = 0;
+		uint8_t ppuCtrl = 0, ppuMask = 0, ppuStatus = 0, oamAddr = 0;
 
-		uint16_t scanline_h = 0, scanline_v = 0;
+		uint16_t scanlineH = 0, scanlineV = 0;
 		uint16_t ppu_address, ppu_address_latch;
 		uint16_t ppu_bg_low, ppu_bg_high;
 
-		bool nmi_line = false;
-		bool w_toggle = false;
+		bool nmiLine = false;
+		bool wToggle = false;
 
 		bool ppu_odd_frame = false;
 		uint8_t ppu_bg_low_latch, ppu_bg_high_latch;
