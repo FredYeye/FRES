@@ -131,7 +131,7 @@ void nes::RunOpcode()
 			CpuWrite();
 
 			addressBus = 0x0100 | uint8_t(addressBus - 1);
-			dataBus = rP.to_ulong();
+			dataBus = rP.to_ulong() | 0x10;
 			CpuWrite();
 
 			rS -= 3;
@@ -957,7 +957,6 @@ void nes::CpuRead()
 		case 0x2002:
 			dataBus = ppuStatus;
 			ppuStatus &= 0x7F;
-			// cpuMem[0x2002] = ppuStatus; //probably not necessary
 			wToggle = false;
 			break;
 		case 0x2007:
@@ -1072,23 +1071,34 @@ void nes::CpuOpDone()
 {
 	if(nmiLine)
 	{
-		// ++PC;
-		// CpuRead();
-		cpuMem[0x100+rS] = PC >> 8;
-		--rS;
-		// CpuWrite();
-		cpuMem[0x100+rS] = PC;
-		--rS;
-		// CpuWrite();
-		rP.reset(4);
-		cpuMem[0x100+rS] = rP.to_ulong();
-		--rS;
-		// CpuWrite();
-		PC = cpuMem[0xFFFA];
-		rP.set(2);
-		// CpuRead();
-		PC += cpuMem[0xFFFB] << 8;
-		// CpuRead();
+		addressBus = PC;
+		CpuRead();
+
+		++PC;
+		++addressBus;
+		CpuRead();
+
+		++PC;
+		addressBus = 0x0100 | rS;
+		dataBus = PC >> 8;
+		CpuWrite();
+
+		addressBus = 0x0100 | uint8_t(addressBus - 1);
+		dataBus = PC;
+		CpuWrite();
+
+		addressBus = 0x0100 | uint8_t(addressBus - 1);
+		dataBus = rP.to_ulong();
+		CpuWrite();
+
+		rS -= 3;
+		addressBus = 0xFFFA;
+		CpuRead();
+
+		++addressBus;
+		CpuRead();
+
+		PC = cpuMem[0xFFFA] | (dataBus << 8);
 
 		nmiLine = false;
 	}
@@ -1138,7 +1148,7 @@ void nes::PpuTick()
 		PpuRenderFetches();
 		// PpuOamScan(); //order?
 
-		if(ppu_odd_frame && scanlineH == 339)
+		if(ppu_odd_frame && scanlineH == 339 && ppuMask & 0x18)
 		{
 			++scanlineH;
 		}
