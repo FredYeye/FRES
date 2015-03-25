@@ -994,7 +994,14 @@ void nes::CpuWrite() // block writes to ppu on the first screen
 		case 0x2001:
 			ppuMask = dataBus;
 			break;
-		case 0x2005:
+		case 0x2003: //OAMADDR
+			oamAddr = dataBus;
+			break;
+		case 0x2004: //OAMDATA
+			oam[oamAddr] = dataBus;
+			++oamAddr;
+			break;
+		case 0x2005: //PPUSCROLL
 			if(!wToggle)
 			{
 				ppu_address_latch = (ppu_address_latch & 0x7FE0) | (dataBus >> 3);
@@ -1026,16 +1033,15 @@ void nes::CpuWrite() // block writes to ppu on the first screen
 			}
 			break;
 		case 0x4014:
-			// the cpu writes to oamdata (0x2004) 256 times, the cpu is suspended during the transfer.
-
 			// if(cycles & 1) cpu_tick(); //+1 cycle if dma started on an odd cycle
-			// cpu_tick();
-			for(uint16_t x=0; x<=255; ++x)
+			CpuTick(); //tick or read?
+			for(uint16_t x=0; x<=255; ++x) //only toggle bool here, move this to CpuOpDone?
 			{
-				// cpu_tick(); //r:0x20xx
-				oam[x] = cpuMem[(dataBus << 8) + x];
-				++oamAddr;
-				// cpu_tick(); //w:0x4014
+				addressBus = (dataBus << 8) + x;
+				CpuRead();
+
+				addressBus = 0x2004;
+				CpuWrite();
 			}
 			break;
 		case 0x4016:
