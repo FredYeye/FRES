@@ -14,9 +14,37 @@
 nes::nes(std::string inFile)
 {
 	LoadRom(inFile);
-	PC = cpuMem[0xFFFC] | (cpuMem[0xFFFD] << 8);
-	rS = 0xFD;
-	rP = 0x34;
+
+	addressBus = PC;
+	CpuRead();
+
+	++PC;
+	++addressBus;
+	CpuRead();
+
+	++PC;
+	addressBus = 0x0100 | rS;
+	dataBus = PC >> 8;
+	CpuRead();
+
+	addressBus = 0x0100 | uint8_t(addressBus - 1);
+	dataBus = PC;
+	CpuRead();
+
+	addressBus = 0x0100 | uint8_t(addressBus - 1);
+	dataBus = rP.to_ulong() | 0x10;
+	CpuRead();
+
+	rS -= 3;
+	addressBus = 0xFFFC;
+	CpuRead();
+
+	++addressBus;
+	CpuRead();
+
+	PC = cpuMem[0xFFFC] | (dataBus << 8);
+
+	rP = 0x36;
 }
 
 
