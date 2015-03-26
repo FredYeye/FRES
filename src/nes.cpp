@@ -1299,39 +1299,51 @@ void nes::PpuRenderFetches() //things done during visible and prerender scanline
 
 void nes::PpuOamScan()
 {
-	if(scanlineH && scanlineH <= 64)
+	if(scanlineH)
 	{
-		if(!(scanlineH & 1))
+		if(scanlineH <= 64)
 		{
-			secondaryOam[scanlineH / 2] = 0xFF;
-		}
-	}
-	else if(scanlineH && scanlineH <= 256)
-	{
-		if(!(scanlineH & 1))
-		{
-			switch(oam_eval_pattern)
+			if(!(scanlineH & 1))
 			{
-				case 0:
-					secondaryOam[secondary_oam_index] = oam[oam_spritenum];
-					if(scanlineV >= oam[oam_spritenum] && scanlineV < oam[oam_spritenum] + (8 << (ppuCtrl >> 5 & 1)))
-					{
-						++oam_eval_pattern;
-					}
-					else
-					{
-						PpuOamUpdateIndex();
-					}
-					break;
-				case 1: case 2: case 3:
-					secondaryOam[secondary_oam_index + oam_eval_pattern] = oam[oam_spritenum + oam_eval_pattern];
-					if(oam_eval_pattern == 3)
-					{
-						++secondary_oam_index;
-						PpuOamUpdateIndex();						
-					}
-					break;
+				oam2[scanlineH / 2] = 0xFF;
 			}
+		}
+		else if(scanlineH <= 256)
+		{
+			if(!(scanlineH & 1))
+			{
+				switch(oam_eval_pattern)
+				{
+					case 0:
+						oam2[oam2Index] = oam[oam_spritenum];
+						if(scanlineV >= oam[oam_spritenum] && scanlineV < oam[oam_spritenum] + (8 << (ppuCtrl >> 5 & 1)))
+						{
+							++oam_eval_pattern;
+						}
+						else
+						{
+							PpuOamUpdateIndex();
+						}
+						break;
+					case 1: case 2: case 3:
+						oam2[++oam2Index] = oam[oam_spritenum + oam_eval_pattern++];
+						if(oam_eval_pattern == 3)
+						{
+							++oam2Index;
+							PpuOamUpdateIndex();						
+						}
+						break;
+					case 4:
+						oam_spritenum += 4;
+						break;
+				}
+			}
+		}
+		else if(scanlineH <= 320)
+		{
+		}
+		else
+		{
 		}
 	}
 }
@@ -1344,12 +1356,14 @@ void nes::PpuOamUpdateIndex()
 	{
 		oam_eval_pattern = 4;
 	}
-	else if(secondary_oam_index < 8)
+	else if(oam2Index < 32)
 	{
 		oam_eval_pattern = 0;
 	}
-	else if(secondary_oam_index == 8)
+	else if(oam2Index == 32)
 	{
-		oam_block_writes = false;
+		oam2Index = 0;
+		oam_block_writes = true; //use this
+		//if we find 8 sprites in range, keep scanning to set spr overflow
 	}
 }

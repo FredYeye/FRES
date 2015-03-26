@@ -38,8 +38,8 @@ class nes
 
 		std::array<uint8_t, 0x10000> cpuMem;
 		std::array<uint8_t, 0x4000> vram;
-		std::array<uint8_t, 0x100> oam;
-		std::array<uint8_t, 0x20> secondaryOam;
+		std::array<uint8_t, 64*4> oam;
+		std::array<uint8_t, 8*4> oam2;
 
 		uint16_t PC;
 		uint8_t rA = 0, rX = 0, rY = 0, rS = 0;
@@ -68,7 +68,7 @@ class nes
 		uint16_t ppu_bg_address;
 		uint8_t ppudata_latch;
 		uint16_t ppu_nt_mirroring;
-		uint8_t secondary_oam_index = 0;
+		uint8_t oam2Index = 0;
 		uint8_t oam_eval_pattern = 0;
 		uint8_t oam_spritenum = 0;
 		bool oam_block_writes = false;
