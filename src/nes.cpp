@@ -16,31 +16,31 @@ nes::nes(std::string inFile)
 	LoadRom(inFile);
 
 	addressBus = PC;
-	CpuRead();
+	dataBus = cpuMem[addressBus]; // CpuRead();
 
 	++PC;
 	++addressBus;
-	CpuRead();
+	dataBus = cpuMem[addressBus]; //CpuRead();
 
 	++PC;
 	addressBus = 0x0100 | rS;
 	dataBus = PC >> 8;
-	CpuRead();
+	dataBus = cpuMem[addressBus]; //CpuRead();
 
 	addressBus = 0x0100 | uint8_t(addressBus - 1);
 	dataBus = PC;
-	CpuRead();
+	dataBus = cpuMem[addressBus]; //CpuRead();
 
 	addressBus = 0x0100 | uint8_t(addressBus - 1);
 	dataBus = rP.to_ulong() | 0x10;
-	CpuRead();
+	dataBus = cpuMem[addressBus]; //CpuRead();
 
 	rS -= 3;
 	addressBus = 0xFFFC;
-	CpuRead();
+	dataBus = cpuMem[addressBus]; //CpuRead();
 
 	++addressBus;
-	CpuRead();
+	dataBus = cpuMem[addressBus]; //CpuRead();
 
 	PC = cpuMem[0xFFFC] | (dataBus << 8);
 
@@ -76,8 +76,8 @@ void nes::LoadRom(std::string inFile)
     contents << iFile.rdbuf();
 	iFile.close();
 
-	std::string contentStr = contents.str();
-	std::vector<uint8_t> contentVec(contentStr.begin(), contentStr.end());
+	const std::string contentStr = contents.str();
+	const std::vector<uint8_t> contentVec(contentStr.begin(), contentStr.end());
 
 
 //----- iNes stuff
@@ -683,7 +683,7 @@ void nes::RunOpcode()
 			CpuRead();
 
 			++PC;
-			addressBus = op1 + (op2 << 8);
+			addressBus = op1 | (op2 << 8);
 			CpuRead();
 
 			CpuWrite();
@@ -983,8 +983,13 @@ void nes::CpuRead()
 	switch(addressBus)
 	{
 		case 0x2002:
+			if(scanlineV == 241 && scanlineH == 1)
+			{
+				ppuStatus &= 0x7F;
+				nmiSuppress = true;
+			}
 			dataBus = ppuStatus;
-			ppuStatus &= 0x7F;
+			ppuStatus &= 0x7F; //clear nmi_occurred bit
 			wToggle = false;
 			break;
 		case 0x2007:
@@ -1151,15 +1156,21 @@ void nes::PpuTick()
 		}
 
 		PpuRenderFetches();
-		// PpuOamScan(); //order?
-
+		// PpuOamScan();
 	}
 	else if(scanlineV == 241) //vblank scanlines
 	{
 		if(scanlineH == 1)
 		{
-			ppuStatus |= 0x80;
-			nmiLine = cpuMem[0x2000] & ppuStatus & 0x80;
+			if(!nmiSuppress)
+			{
+				ppuStatus |= 0x80; //VBL nmi
+				nmiLine = (ppuCtrl & ppuStatus) & 0x80;
+			}
+			else
+			{
+				nmiSuppress = false;
+			}
 		}
 	}
 	else if(scanlineV == 261) //prerender scanline
@@ -1174,7 +1185,7 @@ void nes::PpuTick()
 		}
 
 		PpuRenderFetches();
-		// PpuOamScan(); //order?
+		// PpuOamScan();
 
 		if(ppu_odd_frame && scanlineH == 339 && ppuMask & 0x18)
 		{
@@ -1182,23 +1193,15 @@ void nes::PpuTick()
 		}
 	}
 
-	if(scanlineH == 340)
+	if(scanlineH++ == 340)
 	{
 		scanlineH = 0;
-		if(scanlineV == 261)
+		if(scanlineV++ == 261)
 		{
 			scanlineV = 0;
 			ppu_odd_frame = !ppu_odd_frame;
 			renderFrame = true;
 		}
-		else
-		{
-			++scanlineV;
-		}
-	}
-	else
-	{
-		++scanlineH;
 	}
 }
 
@@ -1299,44 +1302,38 @@ void nes::PpuRenderFetches() //things done during visible and prerender scanline
 
 void nes::PpuOamScan()
 {
-	if(scanlineH)
+	if(scanlineH && !(scanlineH & 1))
 	{
 		if(scanlineH <= 64)
 		{
-			if(!(scanlineH & 1))
-			{
-				oam2[scanlineH / 2] = 0xFF;
-			}
+			oam2[(scanlineH >> 1) - 1] = 0xFF;
 		}
 		else if(scanlineH <= 256)
 		{
-			if(!(scanlineH & 1))
+			switch(oam_eval_pattern)
 			{
-				switch(oam_eval_pattern)
-				{
-					case 0:
-						oam2[oam2Index] = oam[oam_spritenum];
-						if(scanlineV >= oam[oam_spritenum] && scanlineV < oam[oam_spritenum] + (8 << (ppuCtrl >> 5 & 1)))
-						{
-							++oam_eval_pattern;
-						}
-						else
-						{
-							PpuOamUpdateIndex();
-						}
-						break;
-					case 1: case 2: case 3:
-						oam2[++oam2Index] = oam[oam_spritenum + oam_eval_pattern++];
-						if(oam_eval_pattern == 3)
-						{
-							++oam2Index;
-							PpuOamUpdateIndex();						
-						}
-						break;
-					case 4:
-						oam_spritenum += 4;
-						break;
-				}
+				case 0:
+					oam2[oam2Index] = oam[oam_spritenum];
+					if(scanlineV >= oam[oam_spritenum] && scanlineV < oam[oam_spritenum] + 8 + (ppuCtrl >> 2 & 8))
+					{
+						++oam_eval_pattern;
+					}
+					else
+					{
+						PpuOamUpdateIndex();
+					}
+					break;
+				case 1: case 2: case 3:
+					oam2[++oam2Index] = oam[oam_spritenum + oam_eval_pattern++];
+					if(oam_eval_pattern > 3)
+					{
+						++oam2Index;
+						PpuOamUpdateIndex();						
+					}
+					break;
+				case 4:
+					oam_spritenum += 4;
+					break;
 			}
 		}
 		else if(scanlineH <= 320)
@@ -1344,6 +1341,9 @@ void nes::PpuOamScan()
 		}
 		else
 		{
+			oam2Index = 0;
+			oam_spritenum = 0;
+			oam_eval_pattern = 0;			
 		}
 	}
 }
@@ -1364,6 +1364,6 @@ void nes::PpuOamUpdateIndex()
 	{
 		oam2Index = 0;
 		oam_block_writes = true; //use this
-		//if we find 8 sprites in range, keep scanning to set spr overflow
+		// if we find 8 sprites in range, keep scanning to set spr overflow
 	}
 }

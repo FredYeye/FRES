@@ -18,6 +18,7 @@ class nes
 		void CpuWrite();
 		void CpuTick();
 		void CpuOpDone();
+
 		void PpuTick();
 		void PpuRenderFetches();
 		void PpuOamScan();
@@ -70,8 +71,9 @@ class nes
 		uint16_t ppu_nt_mirroring;
 		uint8_t oam2Index = 0;
 		uint8_t oam_eval_pattern = 0;
-		uint8_t oam_spritenum = 0;
+		uint8_t oam_spritenum = 0; //0-3 = sprite0, 4-7 = sprite1 [...] 252-255 = sprite63
 		bool oam_block_writes = false;
 
 		bool renderFrame;
+		bool nmiSuppress = false;
 };

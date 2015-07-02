@@ -11,7 +11,7 @@ include_directories(${GLFW_INCLUDE})
 include_directories(${GLFW_LIB})
 find_library(GLFW_LIBRARY "glfw3" HINTS ${GLFW_LIB})
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -msse2 -mfpmath=sse")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -march=native -mfpmath=sse")
 add_definitions(-lglfw3 -lopengl32)
 
 set(source_files
