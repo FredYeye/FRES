@@ -983,11 +983,18 @@ void nes::CpuRead()
 	switch(addressBus)
 	{
 		case 0x2002:
-			if(scanlineV == 241 && scanlineH == 1)
+			if(scanlineV == 241)
 			{
-				ppuStatus &= 0x7F;
-				nmiSuppress = true;
+				//   -1: reads it as clear and never sets the flag or generates NMI for that frame
+				//  0-1: reads it as set, clears it, and suppresses the NMI for that frame
+				// -2,2: behaves normally (reads flag's value, clears it, and doesn't affect NMI operation)
+				if(scanlineH == 1)
+				{
+					ppuStatus &= 0x7F;
+					nmiSuppress = true;
+				}
 			}
+
 			dataBus = ppuStatus;
 			ppuStatus &= 0x7F; //clear nmi_occurred bit
 			wToggle = false;
@@ -1102,16 +1109,13 @@ void nes::CpuTick()
 
 void nes::CpuOpDone()
 {
-	if(nmiLine)
+	if(nmiLine && !nmiSuppress)
 	{
 		addressBus = PC;
 		CpuRead();
 
-		++PC;
-		++addressBus;
 		CpuRead();
 
-		++PC;
 		addressBus = 0x0100 | rS;
 		dataBus = PC >> 8;
 		CpuWrite();
@@ -1156,21 +1160,14 @@ void nes::PpuTick()
 		}
 
 		PpuRenderFetches();
-		// PpuOamScan();
+		PpuOamScan();
 	}
 	else if(scanlineV == 241) //vblank scanlines
 	{
-		if(scanlineH == 1)
+		if(scanlineH == 1 && !nmiSuppress)
 		{
-			if(!nmiSuppress)
-			{
-				ppuStatus |= 0x80; //VBL nmi
-				nmiLine = (ppuCtrl & ppuStatus) & 0x80;
-			}
-			else
-			{
-				nmiSuppress = false;
-			}
+			ppuStatus |= 0x80; //VBL nmi
+			nmiLine = (ppuCtrl & ppuStatus) & 0x80;
 		}
 	}
 	else if(scanlineV == 261) //prerender scanline
@@ -1178,6 +1175,7 @@ void nes::PpuTick()
 		if(scanlineH == 1)
 		{
 			ppuStatus &= 0x1F; //clear sprite overflow, sprite 0 hit and vblank
+			nmiSuppress = false;
 		}
 		else if(scanlineH >= 280 && scanlineH <= 304 && ppuMask & 0x18)
 		{
@@ -1185,7 +1183,7 @@ void nes::PpuTick()
 		}
 
 		PpuRenderFetches();
-		// PpuOamScan();
+		PpuOamScan();
 
 		if(ppu_odd_frame && scanlineH == 339 && ppuMask & 0x18)
 		{
