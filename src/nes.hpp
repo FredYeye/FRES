@@ -76,4 +76,10 @@ class nes
 
 		bool renderFrame;
 		bool nmiSuppress = false;
+
+		std::array<uint8_t, 8> ppu_sprite_bitmap_low;
+		std::array<uint8_t, 8> ppu_sprite_bitmap_high;
+		std::array<uint8_t, 8> ppu_sprite_attribute;
+		std::array<uint8_t, 8> ppu_sprite_Xpos;
+		uint8_t spriteIndex = 0;
 };

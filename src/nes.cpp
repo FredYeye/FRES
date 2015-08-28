@@ -1237,7 +1237,7 @@ void nes::PpuRenderFetches() //things done during visible and prerender scanline
 			ppu_address = (ppu_address & 0x7BE0) | (ppu_address_latch & 0x41F);
 		}
 
-		if((scanlineH >= 1 && scanlineH <= 257) || (scanlineH >= 321 && scanlineH <= 339))
+		if((scanlineH >= 1 && scanlineH <= 256) || (scanlineH >= 321 && scanlineH <= 339))
 		{
 			if(!(scanlineH & 0x07)) //coarse X increment
 			{
@@ -1253,6 +1253,7 @@ void nes::PpuRenderFetches() //things done during visible and prerender scanline
 
 			switch(scanlineH & 0x07)
 			{
+				//value is determined on the first cycle of each fetch (1,3,5,7)
 				case 1:
 					if(scanlineH != 1 && scanlineH != 321) 
 					{
@@ -1281,19 +1282,51 @@ void nes::PpuRenderFetches() //things done during visible and prerender scanline
 					ppu_bg_high_latch = vram[ppu_bg_address + 8];
 					break;
 			}
+		
+			if(scanlineH <= 336)
+			{
+				ppu_bg_low <<= 1;
+				ppu_bg_high <<= 1;
+				ppu_attribute <<= 2;
+			}
 		}
 
-		if((scanlineH >= 1 && scanlineH <= 256) || (scanlineH >= 321 && scanlineH <= 336))
+		if(scanlineH >= 257 && scanlineH <= 320)
 		{
-			ppu_bg_low <<= 1;
-			ppu_bg_high <<= 1;
-			ppu_attribute <<= 2;
-		}
-	}
+			oamAddr = 0; //what is this?
 
-	if(scanlineH >= 257 && scanlineH <= 320) //rendering enabled only?
-	{
-		oamAddr = 0;
+			//sprite fetching
+			switch(scanlineH & 0x07)
+			{
+				//set ppu_address for this?
+				case 3: //load sprite attr
+					ppu_sprite_attribute[spriteIndex] = oam2[spriteIndex * 4 + 2];
+					break;
+				case 4: //load sprite X
+					ppu_sprite_Xpos[spriteIndex] = oam2[spriteIndex * 4 + 3];
+					break;
+				case 5: //sprite low
+					ppu_sprite_bitmap_low[spriteIndex] = vram[((ppuCtrl & 0b1000) << 9) | oam2[spriteIndex * 4 + 1] * 0x10];
+					break;
+				case 7: //sprite high
+					ppu_sprite_bitmap_high[spriteIndex] = vram[((ppuCtrl & 0b1000) << 9) | oam2[spriteIndex * 4 + 1] * 0x10 + 8];
+					break;
+			}
+			if(++spriteIndex == 8)
+			{
+				spriteIndex = 0;
+			}
+		}
+		if(scanlineH >= 1 && scanlineH <= 256)
+		{
+			for(uint8_t &x : ppu_sprite_Xpos)
+			{
+				if(x)
+				{
+					--x;
+				}
+			}
+		}
 	}
 }
 
