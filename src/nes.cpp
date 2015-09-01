@@ -1085,6 +1085,11 @@ void nes::CpuWrite() // block writes to ppu on the first screen
 				CpuWrite();
 			}
 			}
+
+			// for(auto v : oam)
+				// std::cout << std::hex << +v << " ";
+			// std::cout << std::endl << std::endl;
+
 			break;
 		case 0x4016:
 			if(dataBus & 1)
@@ -1175,7 +1180,9 @@ void nes::PpuTick()
 			uint16_t pIndex = vram[0x3F00 + ppuPixel] * 3;
 
 			if(spritePixel)
+			{
 				pIndex = vram[0x3F00 + spritePixel] * 3;
+			}
 
 			render[renderPos  ] = palette[pIndex  ];
 			render[renderPos+1] = palette[pIndex+1];
@@ -1333,11 +1340,11 @@ void nes::PpuRenderFetches() //things done during visible and prerender scanline
 					break;
 				case 7: //sprite high
 					ppu_sprite_bitmap_high[spriteIndex] = vram[((ppuCtrl & 0b1000) << 9) | oam2[spriteIndex * 4 + 1] * 0x10 + 8];
+					if(++spriteIndex == 8)
+					{
+						spriteIndex = 0;
+					}
 					break;
-			}
-			if(++spriteIndex == 8)
-			{
-				spriteIndex = 0;
 			}
 		}
 		if(scanlineH >= 1 && scanlineH <= 256)
@@ -1364,34 +1371,31 @@ void nes::PpuOamScan()
 		}
 		else if(scanlineH <= 256)
 		{
-			switch(oam_eval_pattern)
+			if(!oam_eval_pattern)
 			{
-				case 0:
-					oam2[oam2Index] = oam[oam_spritenum];
-					if(scanlineV >= oam[oam_spritenum] && scanlineV < oam[oam_spritenum] + 8 + (ppuCtrl >> 2 & 8))
-					{
-						++oam_eval_pattern;
-					}
-					else
-					{
-						PpuOamUpdateIndex();
-					}
-					break;
-				case 1: case 2: case 3:
-					oam2[++oam2Index] = oam[oam_spritenum + oam_eval_pattern++];
-					if(oam_eval_pattern > 3)
-					{
-						++oam2Index;
-						PpuOamUpdateIndex();						
-					}
-					break;
-				case 4:
-					oam_spritenum += 4;
-					break;
+				oam2[oam2Index] = oam[oam_spritenum];
+				if(scanlineV >= oam[oam_spritenum] && scanlineV < oam[oam_spritenum] + 8 + (ppuCtrl >> 2 & 8))
+				{
+					++oam_eval_pattern;
+					++oam2Index;
+				}
+				else
+				{
+					PpuOamUpdateIndex();
+				}
 			}
-		}
-		else if(scanlineH <= 320)
-		{
+			else if(oam_eval_pattern <= 3)
+			{
+				oam2[oam2Index++] = oam[oam_spritenum + oam_eval_pattern++];
+				if(oam_eval_pattern > 3)
+				{
+					PpuOamUpdateIndex();						
+				}
+			}
+			else
+			{
+				oam_spritenum += 4;
+			}
 		}
 		else
 		{
@@ -1416,7 +1420,6 @@ void nes::PpuOamUpdateIndex()
 	}
 	else if(oam2Index == 32)
 	{
-		oam2Index = 0;
 		oam_block_writes = true; //use this
 		// if we find 8 sprites in range, keep scanning to set spr overflow
 	}
