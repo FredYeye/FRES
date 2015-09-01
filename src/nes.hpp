@@ -4,6 +4,15 @@
 #include <bitset>
 
 
+// struct Sprite
+// {
+	// uint8_t y;
+	// uint8_t tileIndex;
+	// uint8_t attribute;
+	// uint8_t x;
+// };
+
+
 class nes
 {
 	public:

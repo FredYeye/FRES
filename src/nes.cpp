@@ -1037,8 +1037,7 @@ void nes::CpuWrite() // block writes to ppu on the first screen
 			oamAddr = dataBus;
 			break;
 		case 0x2004: //OAMDATA
-			oam[oamAddr] = dataBus;
-			++oamAddr;
+			oam[oamAddr++] = dataBus;
 			break;
 		case 0x2005: //PPUSCROLL
 			if(!wToggle)
@@ -1074,13 +1073,17 @@ void nes::CpuWrite() // block writes to ppu on the first screen
 		case 0x4014:
 			// if(cycles & 1) cpu_tick(); //+1 cycle if dma started on an odd cycle
 			CpuTick(); //tick or read?
+			{
+			uint16_t dmaOffset = dataBus << 8;
+
 			for(uint16_t x=0; x<=255; ++x) //only toggle bool here, move this to CpuOpDone?
 			{
-				addressBus = (dataBus << 8) + x;
+				addressBus = dmaOffset++;
 				CpuRead();
 
 				addressBus = 0x2004;
 				CpuWrite();
+			}
 			}
 			break;
 		case 0x4016:
@@ -1148,12 +1151,32 @@ void nes::PpuTick()
 	{
 		if(scanlineH && scanlineH <= 256)
 		{
+			uint8_t spritePixel;
+			for(uint8_t x = 0; x < 8; ++x)
+			{
+				if(!ppu_sprite_Xpos[x])
+				{
+					spritePixel = (ppu_sprite_bitmap_low[x] & 0b10000000) >> 7;
+					spritePixel |= (ppu_sprite_bitmap_high[x] & 0b10000000) >> 6;
+					// spritePixel |= ppu_sprite_attribute
+
+					ppu_sprite_bitmap_low[x] <<= 1;
+					ppu_sprite_bitmap_high[x] <<= 1;
+				}
+			}
+
 			uint8_t ppuPixel = (ppu_bg_low >> (15 - fineX)) & 1;
 			ppuPixel |= (ppu_bg_high >> (14 - fineX)) & 2;
 			ppuPixel |= (ppu_attribute >> (28 - fineX * 2)) & 0x0C;
 
+
 			const uint32_t renderPos = (scanlineV * 256 + (scanlineH-1)) * 3;
-			const uint16_t pIndex = vram[0x3F00 + ppuPixel] * 3;
+
+			uint16_t pIndex = vram[0x3F00 + ppuPixel] * 3;
+
+			if(spritePixel)
+				pIndex = vram[0x3F00 + spritePixel] * 3;
+
 			render[renderPos  ] = palette[pIndex  ];
 			render[renderPos+1] = palette[pIndex+1];
 			render[renderPos+2] = palette[pIndex+2];
@@ -1293,7 +1316,7 @@ void nes::PpuRenderFetches() //things done during visible and prerender scanline
 
 		if(scanlineH >= 257 && scanlineH <= 320)
 		{
-			oamAddr = 0; //what is this?
+			oamAddr = 0;
 
 			//sprite fetching
 			switch(scanlineH & 0x07)
