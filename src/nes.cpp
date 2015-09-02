@@ -1156,17 +1156,21 @@ void nes::PpuTick()
 	{
 		if(scanlineH && scanlineH <= 256)
 		{
-			uint8_t spritePixel;
+			uint8_t spritePixel = 0;
+			uint8_t spriteAttribute;
+			bool spritePriority = true; //false puts sprite in front of BG
+
 			for(uint8_t x = 0; x < 8; ++x)
 			{
 				if(!ppu_sprite_Xpos[x])
 				{
 					spritePixel = (ppu_sprite_bitmap_low[x] & 0b10000000) >> 7;
 					spritePixel |= (ppu_sprite_bitmap_high[x] & 0b10000000) >> 6;
-					// spritePixel |= ppu_sprite_attribute
+					spriteAttribute = (ppu_sprite_attribute[x] & 0b11) << 2;
 
 					ppu_sprite_bitmap_low[x] <<= 1;
 					ppu_sprite_bitmap_high[x] <<= 1;
+					spritePriority = ppu_sprite_attribute[x] & 0b00100000;
 				}
 			}
 
@@ -1174,16 +1178,14 @@ void nes::PpuTick()
 			ppuPixel |= (ppu_bg_high >> (14 - fineX)) & 2;
 			ppuPixel |= (ppu_attribute >> (28 - fineX * 2)) & 0x0C;
 
-
-			const uint32_t renderPos = (scanlineV * 256 + (scanlineH-1)) * 3;
-
 			uint16_t pIndex = vram[0x3F00 + ppuPixel] * 3;
-
-			if(spritePixel)
+			if(spritePixel && !spritePriority)
 			{
+				spritePixel |= spriteAttribute;
 				pIndex = vram[0x3F00 + spritePixel] * 3;
 			}
 
+			const uint32_t renderPos = (scanlineV * 256 + (scanlineH-1)) * 3;
 			render[renderPos  ] = palette[pIndex  ];
 			render[renderPos+1] = palette[pIndex+1];
 			render[renderPos+2] = palette[pIndex+2];
@@ -1267,24 +1269,23 @@ void nes::PpuRenderFetches() //things done during visible and prerender scanline
 			ppu_address = (ppu_address & 0x7BE0) | (ppu_address_latch & 0x41F);
 		}
 
-		if((scanlineH >= 1 && scanlineH <= 256) || (scanlineH >= 321 && scanlineH <= 339))
+		if((scanlineH && scanlineH <= 256) || scanlineH >= 321)
 		{
-			if(!(scanlineH & 0x07)) //coarse X increment
-			{
-				if((ppu_address & 0x1F) != 0x1F)
-				{
-					++ppu_address;
-				}
-				else
-				{
-					ppu_address = (ppu_address & 0x7FE0) ^ 0x400;
-				}
-			}
-
 			switch(scanlineH & 0x07)
 			{
+				case 0: //coarse X increment
+					if((ppu_address & 0x1F) != 0x1F)
+					{
+						++ppu_address;
+					}
+					else
+					{
+						ppu_address = (ppu_address & 0x7FE0) ^ 0x400;
+					}
+					break;
+
 				//value is determined on the first cycle of each fetch (1,3,5,7)
-				case 1:
+				case 1: //NT
 					if(scanlineH != 1 && scanlineH != 321) 
 					{
 						ppu_bg_low |= ppu_bg_low_latch;
@@ -1293,7 +1294,7 @@ void nes::PpuRenderFetches() //things done during visible and prerender scanline
 					}
 					ppu_nametable = vram[0x2000 | (ppu_address & 0xFFF)];
 					break;
-				case 3:
+				case 3: //AT
 					if(scanlineH != 339)
 					{
 						ppu_attribute_latch = vram[0x23C0 | (ppu_address & 0xC00) | (ppu_address >> 4 & 0x38) | (ppu_address >> 2 & 0x07)];
@@ -1304,15 +1305,26 @@ void nes::PpuRenderFetches() //things done during visible and prerender scanline
 						ppu_nametable = vram[0x2000 | (ppu_address & 0xFFF)];
 					}
 					break;
-				case 5:
+				case 5: //low
 					ppu_bg_address = (ppu_nametable*16 + (ppu_address >> 12)) | ((ppuCtrl & 0x10) << 8);
 					ppu_bg_low_latch = vram[ppu_bg_address];
 					break;
-				case 7:
+				case 7: //high
 					ppu_bg_high_latch = vram[ppu_bg_address + 8];
 					break;
 			}
-		
+
+			if(scanlineH <= 256)
+			{
+				for(uint8_t &x : ppu_sprite_Xpos)
+				{
+					if(x)
+					{
+						--x;
+					}
+				}
+			}
+
 			if(scanlineH <= 336)
 			{
 				ppu_bg_low <<= 1;
@@ -1320,8 +1332,7 @@ void nes::PpuRenderFetches() //things done during visible and prerender scanline
 				ppu_attribute <<= 2;
 			}
 		}
-
-		if(scanlineH >= 257 && scanlineH <= 320)
+		else //257-320
 		{
 			oamAddr = 0;
 
@@ -1345,16 +1356,6 @@ void nes::PpuRenderFetches() //things done during visible and prerender scanline
 						spriteIndex = 0;
 					}
 					break;
-			}
-		}
-		if(scanlineH >= 1 && scanlineH <= 256)
-		{
-			for(uint8_t &x : ppu_sprite_Xpos)
-			{
-				if(x)
-				{
-					--x;
-				}
 			}
 		}
 	}
