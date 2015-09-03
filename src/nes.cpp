@@ -1157,16 +1157,18 @@ void nes::PpuTick()
 		if(scanlineH && scanlineH <= 256)
 		{
 			uint8_t spritePixel = 0;
-			uint8_t spriteAttribute;
 			bool spritePriority = true; //false puts sprite in front of BG
 
-			for(uint8_t x = 0; x < 8; ++x)
+			for(uint8_t x = 0; x < 8; ++x) //7-0?
 			{
 				if(!ppu_sprite_Xpos[x])
 				{
-					spritePixel = (ppu_sprite_bitmap_low[x] & 0b10000000) >> 7;
-					spritePixel |= (ppu_sprite_bitmap_high[x] & 0b10000000) >> 6;
-					spriteAttribute = (ppu_sprite_attribute[x] & 0b11) << 2;
+					spritePixel = ppu_sprite_bitmap_low[x] >> 7;
+					spritePixel |= (ppu_sprite_bitmap_high[x] >> 6) & 0b10;
+					if(spritePixel)
+					{
+						spritePixel |= (ppu_sprite_attribute[x] & 0b11) << 2;
+					}
 
 					ppu_sprite_bitmap_low[x] <<= 1;
 					ppu_sprite_bitmap_high[x] <<= 1;
@@ -1176,13 +1178,20 @@ void nes::PpuTick()
 
 			uint8_t ppuPixel = (ppu_bg_low >> (15 - fineX)) & 1;
 			ppuPixel |= (ppu_bg_high >> (14 - fineX)) & 2;
-			ppuPixel |= (ppu_attribute >> (28 - fineX * 2)) & 0x0C;
+			if(ppuPixel)
+			{
+				ppuPixel |= (ppu_attribute >> (28 - fineX * 2)) & 0x0C;
+			}
+
+			if(ppuPixel && spritePixel)
+			{
+				ppuStatus |= 0b01000000; //sprite 0 hit. attr bits?
+			}
 
 			uint16_t pIndex = vram[0x3F00 + ppuPixel] * 3;
 			if(spritePixel && !spritePriority)
 			{
-				spritePixel |= spriteAttribute;
-				pIndex = vram[0x3F00 + spritePixel] * 3;
+				pIndex = vram[0x3F10 + spritePixel] * 3;
 			}
 
 			const uint32_t renderPos = (scanlineV * 256 + (scanlineH-1)) * 3;
