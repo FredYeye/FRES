@@ -1189,7 +1189,7 @@ void nes::PpuTick()
 			}
 
 			uint16_t pIndex = vram[0x3F00 + ppuPixel] * 3;
-			if(spritePixel && !spritePriority)
+			if(spritePixel && (!spritePriority || !(ppuPixel & 0b11)))
 			{
 				pIndex = vram[0x3F10 + spritePixel] * 3;
 			}
@@ -1315,7 +1315,7 @@ void nes::PpuRenderFetches() //things done during visible and prerender scanline
 					}
 					break;
 				case 5: //low
-					ppu_bg_address = (ppu_nametable*16 + (ppu_address >> 12)) | ((ppuCtrl & 0x10) << 8);
+					ppu_bg_address = ppu_nametable*16 + (ppu_address >> 12) | ((ppuCtrl & 0x10) << 8);
 					ppu_bg_low_latch = vram[ppu_bg_address];
 					break;
 				case 7: //high
@@ -1356,10 +1356,19 @@ void nes::PpuRenderFetches() //things done during visible and prerender scanline
 					ppu_sprite_Xpos[spriteIndex] = oam2[spriteIndex * 4 + 3];
 					break;
 				case 5: //sprite low
-					ppu_sprite_bitmap_low[spriteIndex] = vram[((ppuCtrl & 0b1000) << 9) | oam2[spriteIndex * 4 + 1] * 0x10];
+					ppu_bg_address = oam2[spriteIndex * 4 + 1] * 0x10 + (ppu_address >> 12) | ((ppuCtrl & 0b1000) << 9);
+					ppu_sprite_bitmap_low[spriteIndex] = vram[ppu_bg_address];
+					if(ppu_sprite_attribute[spriteIndex]) //flip H
+					{
+						ReverseBits(ppu_sprite_bitmap_low[spriteIndex]);
+					}
 					break;
 				case 7: //sprite high
-					ppu_sprite_bitmap_high[spriteIndex] = vram[((ppuCtrl & 0b1000) << 9) | oam2[spriteIndex * 4 + 1] * 0x10 + 8];
+					ppu_sprite_bitmap_high[spriteIndex] = vram[ppu_bg_address + 8];
+					if(ppu_sprite_attribute[spriteIndex]) //flip H
+					{
+						ReverseBits(ppu_sprite_bitmap_high[spriteIndex]);
+					}
 					if(++spriteIndex == 8)
 					{
 						spriteIndex = 0;
@@ -1433,4 +1442,11 @@ void nes::PpuOamUpdateIndex()
 		oam_block_writes = true; //use this
 		// if we find 8 sprites in range, keep scanning to set spr overflow
 	}
+}
+
+
+void nes::ReverseBits(uint8_t &b) {
+   b = b >> 4 | b << 4;
+   b = (b & 0b11001100) >> 2 | (b & 0b00110011) << 2;
+   b = (b & 0b10101010) >> 1 | (b & 0b01010101) << 1;
 }

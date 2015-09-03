@@ -24,6 +24,8 @@ class nes
 		void PpuOamScan();
 		void PpuOamUpdateIndex();
 
+		void ReverseBits(uint8_t &b);
+
 		std::array<uint8_t, 256*240*3> render;
 		const std::array<uint8_t, 64*3> palette
 		{{
