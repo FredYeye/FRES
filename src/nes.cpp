@@ -45,6 +45,8 @@ nes::nes(std::string inFile)
 	PC = cpuMem[0xFFFC] | (dataBus << 8);
 
 	rP = 0x36;
+
+	oam.fill(0xFF);
 }
 
 
@@ -80,7 +82,7 @@ void nes::LoadRom(std::string inFile)
 	const std::vector<uint8_t> contentVec(contentStr.begin(), contentStr.end());
 
 
-//----- iNes stuff
+	//header stuff
 	std::array<uint8_t, 16> header;
 	std::copy_n(contentVec.begin(), 16, header.begin());
 
@@ -92,12 +94,22 @@ void nes::LoadRom(std::string inFile)
 
 	ppu_nt_mirroring = (header[6] & 1) ? ~0x400 : ~0x800; //false=v, true=h
 	//where to do this? cpu r/w to ppu, everything that does stuff between ppu:0x2000-0x2FFF
-//-----
 
 
 	std::copy_n(contentVec.begin() + 0x10, 0x4000, cpuMem.begin() + 0x8000);
-	std::copy_n(contentVec.begin() + 0x4010, 0x2000, vram.begin());
-	std::copy(cpuMem.begin()+0x8000, cpuMem.begin()+0xC000, cpuMem.begin()+0xC000);
+	if(header[4] == 1)
+	{
+		std::copy_n(cpuMem.begin() + 0x8000, 0x4000, cpuMem.begin() + 0xC000);
+	}
+	else if(header[4] == 2)
+	{
+		std::copy_n(contentVec.begin() + 0x4010, 0x4000, cpuMem.begin() + 0xC000);
+	}
+
+	if(header[5])
+	{
+		std::copy_n(contentVec.begin() + 0x4000 * header[4] + 0x10, 0x2000, vram.begin());
+	}
 }
 
 
@@ -139,12 +151,9 @@ void nes::RunOpcode()
 	#endif
 
 
-	addressBus = PC;
-	CpuRead();
-
-	++PC;
-	++addressBus;
-	CpuRead();
+	++PC;         //fetch
+	++addressBus; //
+	CpuRead();    //
 
 	switch(opcode)
 	{
@@ -972,6 +981,10 @@ void nes::RunOpcode()
 			CpuWrite();
 			break;
 	}
+
+	addressBus = PC; //second last cycle
+	CpuRead();       //
+
 	CpuOpDone();
 }
 
@@ -983,23 +996,25 @@ void nes::CpuRead()
 	switch(addressBus)
 	{
 		case 0x2002:
-			if(scanlineV == 241)
-			{
-				//   -1: reads it as clear and never sets the flag or generates NMI for that frame
-				//  0-1: reads it as set, clears it, and suppresses the NMI for that frame
-				// -2,2: behaves normally (reads flag's value, clears it, and doesn't affect NMI operation)
-				if(scanlineH == 1)
-				{
-					ppuStatus &= 0x7F;
-					nmiSuppress = true;
-				}
-			}
-
 			dataBus = ppuStatus;
 			ppuStatus &= 0x7F; //clear nmi_occurred bit
 			wToggle = false;
+
+
+			if(scanlineV == 241)
+			{
+				if(scanlineH <= 2)
+				{
+					nmiSuppress = scanlineH;
+					//   -1: reads it as clear and never sets the flag or generates NMI for that frame
+					//  0-1: reads it as set, clears it, and suppresses the NMI for that frame
+					// -2,2: behaves normally (reads flag's value, clears it, and doesn't affect NMI operation)
+				}
+			}
+
+
 			break;
-		case 0x2007:
+		case 0x2007: //ppuData
 			if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18))
 			{
 				//if in palette range, reload latch(mirrored) but send palette byte immediately
@@ -1033,13 +1048,13 @@ void nes::CpuWrite() // block writes to ppu on the first screen
 		case 0x2001:
 			ppuMask = dataBus;
 			break;
-		case 0x2003: //OAMADDR
+		case 0x2003: //oamAddr
 			oamAddr = dataBus;
 			break;
-		case 0x2004: //OAMDATA
+		case 0x2004: //oamData
 			oam[oamAddr++] = dataBus;
 			break;
-		case 0x2005: //PPUSCROLL
+		case 0x2005: //ppuScroll
 			if(!wToggle)
 			{
 				ppu_address_latch = (ppu_address_latch & 0x7FE0) | (dataBus >> 3);
@@ -1063,10 +1078,15 @@ void nes::CpuWrite() // block writes to ppu on the first screen
 			}
 			wToggle = !wToggle;
 			break;
-		case 0x2007:
+		case 0x2007: //ppuData
 			if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18))
 			{
-				vram[ppu_address] = dataBus; //perform NT mirroring here
+				if(ppu_address >= 0x3F10 && !(ppu_address & 3)) //sprite palette mirror write
+				{
+					vram[ppu_address & ~0x10] = dataBus; //need else after this?
+				}
+
+				vram[ppu_address] = dataBus; //perform NT mirroring here?
 				ppu_address += (ppuCtrl & 0x04) ? 0x20 : 0x01;
 			}
 			break;
@@ -1085,11 +1105,6 @@ void nes::CpuWrite() // block writes to ppu on the first screen
 				CpuWrite();
 			}
 			}
-
-			// for(auto v : oam)
-				// std::cout << std::hex << +v << " ";
-			// std::cout << std::endl << std::endl;
-
 			break;
 		case 0x4016:
 			if(dataBus & 1)
@@ -1117,7 +1132,7 @@ void nes::CpuTick()
 
 void nes::CpuOpDone()
 {
-	if(nmiLine && !nmiSuppress)
+	if(nmiLine && nmiSuppress == 3)
 	{
 		addressBus = PC;
 		CpuRead();
@@ -1165,14 +1180,16 @@ void nes::PpuTick()
 				{
 					spritePixel = ppu_sprite_bitmap_low[x] >> 7;
 					spritePixel |= (ppu_sprite_bitmap_high[x] >> 6) & 0b10;
-					if(spritePixel)
-					{
-						spritePixel |= (ppu_sprite_attribute[x] & 0b11) << 2;
-					}
 
 					ppu_sprite_bitmap_low[x] <<= 1;
 					ppu_sprite_bitmap_high[x] <<= 1;
 					spritePriority = ppu_sprite_attribute[x] & 0b00100000;
+
+					if(spritePixel)
+					{
+						spritePixel |= (ppu_sprite_attribute[x] & 0b11) << 2;
+						break;
+					}
 				}
 			}
 
@@ -1205,10 +1222,16 @@ void nes::PpuTick()
 	}
 	else if(scanlineV == 241) //vblank scanlines
 	{
-		if(scanlineH == 1 && !nmiSuppress)
+		if(scanlineH == 1)
 		{
-			ppuStatus |= 0x80; //VBL nmi
-			nmiLine = (ppuCtrl & ppuStatus) & 0x80;
+			if(nmiSuppress)
+			{
+				ppuStatus |= 0x80; //VBL nmi
+				if(nmiSuppress == 3)
+				{
+					nmiLine = (ppuCtrl & ppuStatus) & 0x80;
+				}
+			}
 		}
 	}
 	else if(scanlineV == 261) //prerender scanline
@@ -1216,7 +1239,7 @@ void nes::PpuTick()
 		if(scanlineH == 1)
 		{
 			ppuStatus &= 0x1F; //clear sprite overflow, sprite 0 hit and vblank
-			nmiSuppress = false;
+			nmiSuppress = 3;
 		}
 		else if(scanlineH >= 280 && scanlineH <= 304 && ppuMask & 0x18)
 		{
@@ -1356,7 +1379,7 @@ void nes::PpuRenderFetches() //things done during visible and prerender scanline
 					ppu_sprite_Xpos[spriteIndex] = oam2[spriteIndex * 4 + 3];
 					break;
 				case 5: //sprite low
-					ppu_bg_address = oam2[spriteIndex * 4 + 1] * 0x10 + (ppu_address >> 12) | ((ppuCtrl & 0b1000) << 9);
+					ppu_bg_address = oam2[spriteIndex * 4 + 1] * 0x10 | (ppu_address >> 12) | ((ppuCtrl & 0b1000) << 9);
 					ppu_sprite_bitmap_low[spriteIndex] = vram[ppu_bg_address];
 					if(ppu_sprite_attribute[spriteIndex]) //flip H
 					{
@@ -1392,7 +1415,7 @@ void nes::PpuOamScan()
 		{
 			if(!oam_eval_pattern)
 			{
-				oam2[oam2Index] = oam[oam_spritenum];
+				oam2[oam2Index] = oam[oam_spritenum]; //oam search starts at oam[oamAddr]
 				if(scanlineV >= oam[oam_spritenum] && scanlineV < oam[oam_spritenum] + 8 + (ppuCtrl >> 2 & 8))
 				{
 					++oam_eval_pattern;

@@ -77,7 +77,7 @@ class nes
 		bool oam_block_writes = false;
 
 		bool renderFrame;
-		bool nmiSuppress = false;
+		uint8_t nmiSuppress = 3;
 
 		std::array<uint8_t, 8> ppu_sprite_bitmap_low;
 		std::array<uint8_t, 8> ppu_sprite_bitmap_high;
