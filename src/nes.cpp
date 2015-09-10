@@ -13,14 +13,15 @@
 
 nes::nes(std::string inFile)
 {
+	oam.fill(0xFF);
 	LoadRom(inFile);
 
 	addressBus = PC;
 	dataBus = cpuMem[addressBus]; // CpuRead();
 
-	++PC;
-	++addressBus;
-	dataBus = cpuMem[addressBus]; //CpuRead();
+	// ++PC;
+	// ++addressBus;
+	// dataBus = cpuMem[addressBus]; //CpuRead();
 
 	++PC;
 	addressBus = 0x0100 | rS;
@@ -44,9 +45,10 @@ nes::nes(std::string inFile)
 
 	PC = cpuMem[0xFFFC] | (dataBus << 8);
 
-	rP = 0x36;
+	addressBus = PC;              //fetch next opcode
+	dataBus = cpuMem[addressBus]; //CpuRead();
 
-	oam.fill(0xFF);
+	rP = 0x36;
 }
 
 
@@ -151,7 +153,7 @@ void nes::RunOpcode()
 	#endif
 
 
-	++PC;         //fetch
+	++PC;         //fetch op1
 	++addressBus; //
 	CpuRead();    //
 
@@ -982,7 +984,7 @@ void nes::RunOpcode()
 			break;
 	}
 
-	addressBus = PC; //second last cycle
+	addressBus = PC; //fetch next opcode
 	CpuRead();       //
 
 	CpuOpDone();
