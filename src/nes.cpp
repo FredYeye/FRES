@@ -19,9 +19,9 @@ nes::nes(std::string inFile)
 	addressBus = PC;
 	dataBus = cpuMem[addressBus]; // CpuRead();
 
-	// ++PC;
-	// ++addressBus;
-	// dataBus = cpuMem[addressBus]; //CpuRead();
+	++PC;
+	++addressBus;
+	dataBus = cpuMem[addressBus]; //CpuRead();
 
 	++PC;
 	addressBus = 0x0100 | rS;
@@ -649,6 +649,47 @@ void nes::RunOpcode()
 			CpuWrite();
 			break;
 
+		case 0x83: //SAX (ind,x)
+			++PC;
+			addressBus = op1;
+			CpuRead();
+
+			addressBus = uint8_t(addressBus + rX);
+			CpuRead();
+
+			addressBus = uint8_t(addressBus + 1);
+			CpuRead();
+
+			addressBus = cpuMem[uint8_t(addressBus - 1)] | (cpuMem[addressBus] << 8);
+			dataBus = rA & rX;
+			CpuWrite();
+			break;
+		case 0x87: //SAX zp
+			++PC;
+			addressBus = op1;
+			dataBus = rA & rX;
+			CpuWrite();
+			break;
+		case 0x8F: //SAX abs
+			++PC;
+			++addressBus;
+			CpuRead();
+
+			++PC;
+			addressBus = op1 | (op2 << 8);
+			dataBus = rA & rX;
+			CpuWrite();
+			break;
+		case 0x97: //SAX zp,y
+			++PC;
+			addressBus = op1;
+			CpuRead();
+
+			addressBus = uint8_t(addressBus + rY);
+			dataBus = rA & rX;
+			CpuWrite();
+			break;
+
 		case 0x8A: //TXA
 			rA = rX;
 			rP[1] = !rA;
@@ -681,14 +722,14 @@ void nes::RunOpcode()
 		// case 0x1A: case 0x3A: case 0x5A: case 0x7A: case 0xDA: case 0xEA: case 0xFA: //NOP
 			// break;
 
-		case 0x06: case 0x26: case 0x46: case 0x66: case 0xC6: case 0xE6: //z RW
+		case 0x06: case 0x26: case 0x46: case 0x66: case 0xC6: case 0xE6: case 0xC7: case 0xE7: case 0x07: case 0x27: case 0x47: case 0x67: //z RW
 			++PC;
 			addressBus = op1;
 			CpuRead();
 
 			CpuWrite();
 			break;
-		case 0x0E: case 0x2E: case 0x4E: case 0x6E: case 0xCE: case 0xEE: //abs RW
+		case 0x0E: case 0x2E: case 0x4E: case 0x6E: case 0xCE: case 0xEE: case 0xCF: case 0xEF: case 0x0F: case 0x2F: case 0x4F: case 0x6F: //abs RW
 			++PC;
 			++addressBus;
 			CpuRead();
@@ -699,7 +740,7 @@ void nes::RunOpcode()
 
 			CpuWrite();
 			break;
-		case 0x16: case 0x36: case 0x56: case 0x76: case 0xD6: case 0xF6: //z,x RW
+		case 0x16: case 0x36: case 0x56: case 0x76: case 0xD6: case 0xF6: case 0xD7: case 0xF7: case 0x17: case 0x37: case 0x57: case 0x77: //z,x RW
 			++PC;
 			addressBus = op1;
 			CpuRead();
@@ -709,7 +750,7 @@ void nes::RunOpcode()
 
 			CpuWrite();
 			break;
-		case 0x1E: case 0x3E: case 0x5E: case 0x7E: case 0xDE: case 0xFE: //abs,x RW
+		case 0x1E: case 0x3E: case 0x5E: case 0x7E: case 0xDE: case 0xFE: case 0xDF: case 0xFF: case 0x1F: case 0x3F: case 0x5F: case 0x7F: //abs,x RW
 			++PC;
 			++addressBus;
 			CpuRead();
@@ -719,6 +760,52 @@ void nes::RunOpcode()
 			CpuRead();
 
 			addressBus = op1 + rX + (op2 << 8);
+			CpuRead();
+
+			CpuWrite();
+			break;
+		case 0xDB: case 0xFB: case 0x1B: case 0x3B: case 0x5B: case 0x7B: //abs,y RW
+			++PC;
+			++addressBus;
+			CpuRead();
+
+			++PC;
+			addressBus = uint8_t(op1 + rY) | (op2 << 8);
+			CpuRead();
+
+			addressBus = op1 + rY + (op2 << 8);
+			CpuRead();
+
+			CpuWrite();
+			break;
+		case 0xC3: case 0xE3: case 0x03: case 0x23: case 0x43: case 0x63: //(indir,x) RW
+			++PC;
+			addressBus = op1;
+			CpuRead();
+
+			addressBus = uint8_t(addressBus + rX);
+			CpuRead();
+
+			addressBus = uint8_t(addressBus + 1);
+			CpuRead();
+
+			addressBus = cpuMem[uint8_t(addressBus - 1)] | (cpuMem[addressBus] << 8);
+			CpuRead();
+
+			CpuWrite();
+			break;
+		case 0xD3: case 0xF3: case 0x13: case 0x33: case 0x53: case 0x73: //(ind),y RW
+			++PC;
+			addressBus = op1;
+			CpuRead();
+
+			addressBus = uint8_t(addressBus + 1);
+			CpuRead();
+
+			addressBus = uint8_t(cpuMem[uint8_t(addressBus - 1)] + rY) | (cpuMem[addressBus] << 8);
+			CpuRead();
+
+			addressBus += cpuMem[op1] + rY & 0x0100;
 			CpuRead();
 
 			CpuWrite();
@@ -981,6 +1068,92 @@ void nes::RunOpcode()
 			rP[1] = !dataBus;
 			rP[7] = dataBus & 0x80;
 			CpuWrite();
+			break;
+
+		case 0xC3: case 0xC7: case 0xCF: case 0xD3: case 0xD7: case 0xDB: case 0xDF: //dcp
+			--dataBus;
+			rP[1] = !dataBus;
+			rP[7] = dataBus & 0x80;
+			CpuWrite();
+
+			rP[0] = !(rA - dataBus & 0x0100);
+			rP[1] = !(rA - dataBus);
+			rP[7] = rA - dataBus & 0x80;
+			break;
+
+		case 0xE3: case 0xE7: case 0xEF: case 0xF3: case 0xF7: case 0xFB: case 0xFF: //isc
+			++dataBus;
+			rP[1] = !dataBus;
+			rP[7] = dataBus & 0x80;
+			CpuWrite();
+
+			{
+			const uint8_t prevrA = rA;
+			rA = (rA - dataBus) - !rP[0];
+			rP[0] = !((prevrA - dataBus) - !rP[0] & 0x0100);
+			rP[1] = !rA;
+			rP[6] = (prevrA ^ rA) & (~dataBus ^ rA) & 0x80;
+			}
+			rP[7] = rA & 0x80;
+			break;
+
+		case 0x03: case 0x07: case 0x0F: case 0x13: case 0x17: case 0x1B: case 0x1F: //slo
+			rP[0] = dataBus & 0x80;
+			dataBus <<= 1;
+			rP[1] = !dataBus;
+			rP[7] = dataBus & 0x80;
+			CpuWrite();
+
+			rA |= dataBus;
+			rP[1] = !rA;
+			rP[7] = rA & 0x80;
+			break;
+
+		case 0x23: case 0x27: case 0x2F: case 0x33: case 0x37: case 0x3B: case 0x3F: //rla
+			{
+			const bool newCarry = dataBus & 0x80;
+			dataBus = (dataBus << 1) | rP[0];
+			rP[0] = newCarry;
+			}
+			rP[1] = !dataBus;
+			rP[7] = dataBus & 0x80;
+			CpuWrite();
+
+			rA &= dataBus;
+			rP[1] = !rA;
+			rP[7] = rA & 0x80;
+			break;
+
+		case 0x43: case 0x47: case 0x4F: case 0x53: case 0x57: case 0x5B: case 0x5F: //sre
+			rP[0] = dataBus & 0x01;
+			dataBus >>= 1;
+			rP[1] = !dataBus;
+			rP.reset(7);
+			CpuWrite();
+
+			rA ^= dataBus;
+			rP[1] = !rA;
+			rP[7] = rA & 0x80;
+			break;
+
+		case 0x63: case 0x67: case 0x6F: case 0x73: case 0x77: case 0x7B: case 0x7F: //rra
+			{
+			const bool newCarry = dataBus & 0x01;
+			dataBus = (dataBus >> 1) | (rP[0] << 7);
+			rP[0] = newCarry;
+			}
+			rP[1] = !dataBus;
+			rP[7] = dataBus & 0x80;
+			CpuWrite();
+
+			{
+			const uint8_t prevrA = rA;
+			rA += dataBus + rP[0];
+			rP[0] = (prevrA + dataBus + rP[0]) & 0x100;
+			rP[1] = !rA;
+			rP[6] = (prevrA ^ rA) & (dataBus ^ rA) & 0x80;
+			}
+			rP[7] = rA & 0x80;
 			break;
 	}
 
