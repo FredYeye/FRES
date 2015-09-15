@@ -3,6 +3,8 @@
 #include <array>
 #include <bitset>
 
+#include "apu.hpp"
+
 
 class nes
 {
@@ -25,6 +27,7 @@ class nes
 		void PpuOamUpdateIndex();
 
 		void ReverseBits(uint8_t &b);
+		void DebugCpu();
 
 		std::array<uint8_t, 256*240*3> render;
 		const std::array<uint8_t, 64*3> palette
@@ -84,4 +87,6 @@ class nes
 		std::array<uint8_t, 8> ppu_sprite_attribute;
 		std::array<uint8_t, 8> ppu_sprite_Xpos;
 		uint8_t spriteIndex = 0;
+
+		apu apu;
 };

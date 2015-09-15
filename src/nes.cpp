@@ -1,14 +1,15 @@
 // #define DEBUG
 // #define DUMP_VRAM
 
-#include "nes.hpp"
-
 #include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <iomanip>
 #include <sstream>
 #include <vector>
+
+#include "nes.hpp"
+#include "apu.hpp"
 
 
 nes::nes(std::string inFile)
@@ -129,18 +130,7 @@ void nes::RunOpcode()
 
 
 	#ifdef DEBUG
-	std::cout << std::uppercase << std::hex << std::setfill('0')
-			  << std::setw(4) << PC
-			  << "  " << std::setw(2) << int(opcode)
-			  << " " << std::setw(2) << int(op1)
-			  << " " << std::setw(2) << int(op2)
-			  << "        A:" << std::setw(2) << int(rA)
-			  << " X:" << std::setw(2) << int(rX)
-			  << " Y:" << std::setw(2) << int(rY)
-			  << " P:" << std::setw(2) << int(rP.to_ulong() & ~0x10)
-			  << " SP:" << std::setw(2) << int(rS)
-			  << " PPU:" << std::setw(3) << std::dec << scanlineH
-			  << " SL:" << std::setw(3) << scanlineV << std::endl;
+	DebugCpu();
 	#endif
 	#ifdef DUMP_VRAM
 	if(scanlineV == 261)
@@ -722,14 +712,16 @@ void nes::RunOpcode()
 		// case 0x1A: case 0x3A: case 0x5A: case 0x7A: case 0xDA: case 0xEA: case 0xFA: //NOP
 			// break;
 
-		case 0x06: case 0x26: case 0x46: case 0x66: case 0xC6: case 0xE6: case 0xC7: case 0xE7: case 0x07: case 0x27: case 0x47: case 0x67: //z RW
+		case 0x06: case 0x07: case 0x26: case 0x27: case 0x46: case 0x47: //z RW
+		case 0x66: case 0x67: case 0xC6: case 0xC7: case 0xE6: case 0xE7:
 			++PC;
 			addressBus = op1;
 			CpuRead();
 
 			CpuWrite();
 			break;
-		case 0x0E: case 0x2E: case 0x4E: case 0x6E: case 0xCE: case 0xEE: case 0xCF: case 0xEF: case 0x0F: case 0x2F: case 0x4F: case 0x6F: //abs RW
+		case 0x0E: case 0x0F: case 0x2E: case 0x2F: case 0x4E: case 0x4F: //abs RW
+		case 0x6E: case 0x6F: case 0xCE: case 0xCF: case 0xEE: case 0xEF:
 			++PC;
 			++addressBus;
 			CpuRead();
@@ -740,7 +732,8 @@ void nes::RunOpcode()
 
 			CpuWrite();
 			break;
-		case 0x16: case 0x36: case 0x56: case 0x76: case 0xD6: case 0xF6: case 0xD7: case 0xF7: case 0x17: case 0x37: case 0x57: case 0x77: //z,x RW
+		case 0x16: case 0x17: case 0x36: case 0x37: case 0x56: case 0x57: //z,x RW
+		case 0x76: case 0x77: case 0xD6: case 0xD7: case 0xF6: case 0xF7:
 			++PC;
 			addressBus = op1;
 			CpuRead();
@@ -750,7 +743,8 @@ void nes::RunOpcode()
 
 			CpuWrite();
 			break;
-		case 0x1E: case 0x3E: case 0x5E: case 0x7E: case 0xDE: case 0xFE: case 0xDF: case 0xFF: case 0x1F: case 0x3F: case 0x5F: case 0x7F: //abs,x RW
+		case 0x1E: case 0x1F: case 0x3E: case 0x3F: case 0x5E: case 0x5F: //abs,x RW
+		case 0x7E: case 0x7F: case 0xDE: case 0xDF: case 0xFE: case 0xFF:
 			++PC;
 			++addressBus;
 			CpuRead();
@@ -764,7 +758,7 @@ void nes::RunOpcode()
 
 			CpuWrite();
 			break;
-		case 0xDB: case 0xFB: case 0x1B: case 0x3B: case 0x5B: case 0x7B: //abs,y RW
+		case 0x1B: case 0x3B: case 0x5B: case 0x7B: case 0xDB: case 0xFB: //abs,y RW
 			++PC;
 			++addressBus;
 			CpuRead();
@@ -778,7 +772,7 @@ void nes::RunOpcode()
 
 			CpuWrite();
 			break;
-		case 0xC3: case 0xE3: case 0x03: case 0x23: case 0x43: case 0x63: //(indir,x) RW
+		case 0x03: case 0x23: case 0x43: case 0x63: case 0xC3: case 0xE3: //(indir,x) RW
 			++PC;
 			addressBus = op1;
 			CpuRead();
@@ -794,7 +788,7 @@ void nes::RunOpcode()
 
 			CpuWrite();
 			break;
-		case 0xD3: case 0xF3: case 0x13: case 0x33: case 0x53: case 0x73: //(ind),y RW
+		case 0x13: case 0x33: case 0x53: case 0x73: case 0xD3: case 0xF3: //(ind),y RW
 			++PC;
 			addressBus = op1;
 			CpuRead();
@@ -849,8 +843,8 @@ void nes::RunOpcode()
 			addressBus = op1 | (op2 << 8);
 			CpuRead();
 			break;
-		case 0x11: case 0x31: case 0x51: //(indirect),y / indirect indexed R
-		case 0x71: case 0xB1: case 0xD1: case 0xF1: case 0xB3:
+		case 0x11: case 0x31: case 0x51: case 0x71: //(indirect),y / indirect indexed R
+		case 0xB1: case 0xD1: case 0xF1: case 0xB3:
 			++PC;
 			addressBus = op1;
 			CpuRead();
@@ -969,8 +963,8 @@ void nes::RunOpcode()
 			rP[7] = rA & 0x80;
 			break;
 
-		case 0xE1: case 0xE5: case 0xE9: case 0xED: //sbc
-		case 0xF1: case 0xF5: case 0xF9: case 0xFD: case 0xEB:
+		case 0xE1: case 0xE5: case 0xE9: case 0xEB: case 0xED: //sbc
+		case 0xF1: case 0xF5: case 0xF9: case 0xFD:
 			{
 			const uint8_t prevrA = rA;
 			rA = (rA - dataBus) - !rP[0];
@@ -1265,6 +1259,16 @@ void nes::CpuWrite() // block writes to ppu on the first screen
 				ppu_address += (ppuCtrl & 0x04) ? 0x20 : 0x01;
 			}
 			break;
+
+		case 0x4000:
+			apu.Pulse1Write(dataBus);
+			break;
+		case 0x4001:
+			apu.Pulse1SweepWrite(dataBus);
+			break;
+		case 0x4002:
+			apu.Pulse1TimerWrite(dataBus);
+			break;
 		case 0x4014:
 			// if(cycles & 1) cpu_tick(); //+1 cycle if dma started on an odd cycle
 			CpuTick(); //tick or read?
@@ -1290,6 +1294,9 @@ void nes::CpuWrite() // block writes to ppu on the first screen
 			{
 				readJoy1 = false;
 			}
+			break;
+		case 0x4017:
+			apu.FrameCounterWrite(dataBus);
 			break;
 	}
 
@@ -1349,7 +1356,7 @@ void nes::PpuTick()
 			uint8_t spritePixel = 0;
 			bool spritePriority = true; //false puts sprite in front of BG
 
-			for(uint8_t x = 0; x < 8; ++x) //7-0?
+			for(uint8_t x = 0; x < 8; ++x)
 			{
 				if(!ppu_sprite_Xpos[x])
 				{
@@ -1373,11 +1380,11 @@ void nes::PpuTick()
 			if(ppuPixel)
 			{
 				ppuPixel |= (ppu_attribute >> (28 - fineX * 2)) & 0x0C;
-			}
 
-			if(ppuPixel && spritePixel)
-			{
-				ppuStatus |= 0b01000000; //sprite 0 hit. attr bits?
+				if(spritePixel)
+				{
+					ppuStatus |= 0b01000000; //sprite 0 hit
+				}
 			}
 
 			uint16_t pIndex = vram[0x3F00 + ppuPixel] * 3;
@@ -1643,8 +1650,50 @@ void nes::PpuOamUpdateIndex()
 }
 
 
-void nes::ReverseBits(uint8_t &b) {
-   b = b >> 4 | b << 4;
-   b = (b & 0b11001100) >> 2 | (b & 0b00110011) << 2;
-   b = (b & 0b10101010) >> 1 | (b & 0b01010101) << 1;
+void nes::ReverseBits(uint8_t &b)
+{
+	b = b >> 4 | b << 4;
+	b = (b & 0b11001100) >> 2 | (b & 0b00110011) << 2;
+	b = (b & 0b10101010) >> 1 | (b & 0b01010101) << 1;
+}
+
+
+void nes::DebugCpu()
+{
+	const std::array<std::string, 256> opName
+	{
+		"BRK","ORA","KIL","SLO","NOP","ORA","ASL","SLO","PHP","ORA","ASL","ANC","NOP","ORA","ASL","SLO",
+		"BPL","ORA","KIL","SLO","NOP","ORA","ASL","SLO","CLC","ORA","NOP","SLO","NOP","ORA","ASL","SLO",
+		"JSR","AND","KIL","RLA","BIT","AND","ROL","RLA","PLP","AND","ROL","ANC","BIT","AND","ROL","RLA",
+		"BMI","AND","KIL","RLA","NOP","AND","ROL","RLA","SEC","AND","NOP","RLA","NOP","AND","ROL","RLA",
+		"RTI","EOR","KIL","SRE","NOP","EOR","LSR","SRE","PHA","EOR","LSR","ALR","JMP","EOR","LSR","SRE",
+		"BVC","EOR","KIL","SRE","NOP","EOR","LSR","SRE","CLI","EOR","NOP","SRE","NOP","EOR","LSR","SRE",
+		"RTS","ADC","KIL","RRA","NOP","ADC","ROR","RRA","PLA","ADC","ROR","ARR","JMP","ADC","ROR","RRA",
+		"BVS","ADC","KIL","RRA","NOP","ADC","ROR","RRA","SEI","ADC","NOP","RRA","NOP","ADC","ROR","RRA",
+		"NOP","STA","NOP","SAX","STY","STA","STX","SAX","DEY","NOP","TXA","XAA","STY","STA","STX","SAX",
+		"BCC","STA","KIL","AHX","STY","STA","STX","SAX","TYA","STA","TXS","TAS","SHY","STA","SHX","AHX",
+		"LDY","LDA","LDX","LAX","LDY","LDA","LDX","LAX","TAY","LDA","TAX","LAX","LDY","LDA","LDX","LAX",
+		"BCS","LDA","KIL","LAX","LDY","LDA","LDX","LAX","CLV","LDA","TSX","LAS","LDY","LDA","LDX","LAX",
+		"CPY","CMP","NOP","DCP","CPY","CMP","DEC","DCP","INY","CMP","DEX","AXS","CPY","CMP","DEC","DCP",
+		"BNE","CMP","KIL","DCP","NOP","CMP","DEC","DCP","CLD","CMP","NOP","DCP","NOP","CMP","DEC","DCP",
+		"CPX","SBC","NOP","ISC","CPX","SBC","INC","ISC","INX","SBC","NOP","SBC","CPX","SBC","INC","ISC",
+		"BEQ","SBC","KIL","ISC","NOP","SBC","INC","ISC","SED","SBC","NOP","ISC","NOP","SBC","INC","ISC"
+	};
+
+	const uint8_t opcode = cpuMem[PC];
+	const uint8_t op1 = cpuMem[PC+1];
+	const uint8_t op2 = cpuMem[PC+2];
+
+	std::cout << std::uppercase << std::hex << std::setfill('0')
+			  << std::setw(4) << PC
+			  << "  " << std::setw(2) << +opcode
+			  << " " << std::setw(4) << op1 + (op2 << 8)
+			  << "  " << opName[opcode]
+			  << "       A:" << std::setw(2) << +rA
+			  << " X:" << std::setw(2) << +rX
+			  << " Y:" << std::setw(2) << +rY
+			  << " P:" << std::setw(2) << int(rP.to_ulong() & ~0x10)
+			  << " SP:" << std::setw(2) << +rS
+			  << " PPU:" << std::setw(3) << std::dec << scanlineH
+			  << " SL:" << std::setw(3) << scanlineV << std::endl;
 }
