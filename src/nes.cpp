@@ -10,6 +10,7 @@
 
 #include "nes.hpp"
 #include "apu.hpp"
+// #include "ppu.hpp"
 
 
 nes::nes(std::string inFile)
@@ -60,7 +61,7 @@ void nes::AdvanceFrame(uint8_t input)
 	{
 		RunOpcode();
 
-		if(readJoy1) //doesn't work outside while
+		if(readJoy1)
 		{
 			controller_reg = input;
 		}
@@ -1194,6 +1195,9 @@ void nes::CpuRead()
 			}
 			break;
 
+		case 0x4015:
+			dataBus = apu.StatusRead();
+			break;
 		case 0x4016:
 			dataBus = (addressBus & 0xE0) | (controller_reg & 1); //addressBus = open bus?
 			controller_reg >>= 1; //if we have read 4016 8 times, start returning 1s
@@ -1268,6 +1272,9 @@ void nes::CpuWrite() // block writes to ppu on the first screen
 			break;
 		case 0x4002:
 			apu.Pulse1TimerWrite(dataBus);
+			break;
+		case 0x4003:
+			apu.Pulse1LengthWrite(dataBus);
 			break;
 		case 0x4014:
 			// if(cycles & 1) cpu_tick(); //+1 cycle if dma started on an odd cycle
@@ -1358,7 +1365,7 @@ void nes::PpuTick()
 
 			for(uint8_t x = 0; x < 8; ++x)
 			{
-				if(!ppu_sprite_Xpos[x])
+				if(!ppu_sprite_Xpos[x] && !spritePixel)
 				{
 					spritePixel = ppu_sprite_bitmap_low[x] >> 7;
 					spritePixel |= (ppu_sprite_bitmap_high[x] >> 6) & 0b10;
@@ -1370,10 +1377,15 @@ void nes::PpuTick()
 					if(spritePixel)
 					{
 						spritePixel |= (ppu_sprite_attribute[x] & 0b11) << 2;
-						break;
 					}
 				}
+				else if(!ppu_sprite_Xpos[x])
+				{
+					ppu_sprite_bitmap_low[x] <<= 1;
+					ppu_sprite_bitmap_high[x] <<= 1;
+				}
 			}
+			
 
 			uint8_t ppuPixel = (ppu_bg_low >> (15 - fineX)) & 1;
 			ppuPixel |= (ppu_bg_high >> (14 - fineX)) & 2;
@@ -1563,14 +1575,14 @@ void nes::PpuRenderFetches() //things done during visible and prerender scanline
 				case 5: //sprite low
 					ppu_bg_address = oam2[spriteIndex * 4 + 1] * 0x10 | (ppu_address >> 12) | ((ppuCtrl & 0b1000) << 9);
 					ppu_sprite_bitmap_low[spriteIndex] = vram[ppu_bg_address];
-					if(ppu_sprite_attribute[spriteIndex]) //flip H
+					if(ppu_sprite_attribute[spriteIndex] & 0b01000000) //flip H
 					{
 						ReverseBits(ppu_sprite_bitmap_low[spriteIndex]);
 					}
 					break;
 				case 7: //sprite high
 					ppu_sprite_bitmap_high[spriteIndex] = vram[ppu_bg_address + 8];
-					if(ppu_sprite_attribute[spriteIndex]) //flip H
+					if(ppu_sprite_attribute[spriteIndex] & 0b01000000) //flip H
 					{
 						ReverseBits(ppu_sprite_bitmap_high[spriteIndex]);
 					}
@@ -1692,7 +1704,7 @@ void nes::DebugCpu()
 			  << "       A:" << std::setw(2) << +rA
 			  << " X:" << std::setw(2) << +rX
 			  << " Y:" << std::setw(2) << +rY
-			  << " P:" << std::setw(2) << int(rP.to_ulong() & ~0x10)
+			  << " P:" << std::setw(2) << (rP.to_ulong() & ~0x10)
 			  << " SP:" << std::setw(2) << +rS
 			  << " PPU:" << std::setw(3) << std::dec << scanlineH
 			  << " SL:" << std::setw(3) << scanlineV << std::endl;
