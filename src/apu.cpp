@@ -19,9 +19,21 @@ void apu::Pulse1TimerWrite(uint8_t dataBus) //4002
 }
 
 
+void apu::Pulse1LengthWrite(uint8_t dataBus) //4003
+{
+	pulse1Length = dataBus;
+}
+
+
 void apu::StatusWrite(uint8_t dataBus) //4015
 {
 	status = (status & 0b01100000) | (dataBus & 00011111);
+}
+
+
+uint8_t apu::StatusRead() //4015
+{
+	return status;
 }
 
 
