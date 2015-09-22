@@ -29,6 +29,7 @@ int main(int argc, char* argv[])
 	}
 
 	GLFWwindow* window = glfwCreateWindow(256, 240, "FRES++", NULL, NULL);
+	// GLFWwindow* window = glfwCreateWindow(512, 480, "FRES++", NULL, NULL);
 	if (!window)
 	{
 		glfwTerminate();
@@ -47,7 +48,7 @@ int main(int argc, char* argv[])
 	nes nes(infile);
 
 	GLuint vao;
-	initialize(vao, nes.GetPixelPtr());
+	initialize(vao, nes.ppu.GetPixelPtr());
 	glfwSetKeyCallback(window, key_callback);
 
 	uint32_t frameTime = 0;
@@ -59,7 +60,7 @@ int main(int argc, char* argv[])
 		nes.AdvanceFrame(input);
 
 		glClear(GL_COLOR_BUFFER_BIT);
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 240, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)nes.GetPixelPtr());
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 240, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)nes.ppu.GetPixelPtr());
 		glBindVertexArray(vao);
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, 0);
 		glfwSwapBuffers(window);
@@ -67,8 +68,10 @@ int main(int argc, char* argv[])
 
 		std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
 		std::chrono::microseconds tus = std::chrono::duration_cast<std::chrono::microseconds>(t2-t1);
-		if(tus < std::chrono::microseconds(16667)) {
-			std::this_thread::sleep_for(std::chrono::microseconds(16667) - tus);
+
+		//16667
+		if(tus < std::chrono::microseconds(15000)) {
+			std::this_thread::sleep_for(std::chrono::microseconds(15000) - tus);
 		}
 
 		std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();

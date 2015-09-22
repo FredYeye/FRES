@@ -17,12 +17,16 @@ add_definitions(-lglfw3 -lopengl32)
 set(source_files
 	src/main.cpp
 	src/nes.cpp
+	src/apu.cpp
+	src/ppu.cpp
 	src/gl_core_3_3.c
 	)
 
 set(header_files
 	src/main.hpp
 	src/nes.hpp
+	src/apu.hpp
+	src/ppu.hpp
 	src/gl_core_3_3.h
 	)
 

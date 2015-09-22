@@ -10,12 +10,11 @@
 
 #include "nes.hpp"
 #include "apu.hpp"
-// #include "ppu.hpp"
+#include "ppu.hpp"
 
 
 nes::nes(std::string inFile)
 {
-	oam.fill(0xFF);
 	LoadRom(inFile);
 
 	addressBus = PC;
@@ -56,8 +55,7 @@ nes::nes(std::string inFile)
 
 void nes::AdvanceFrame(uint8_t input)
 {
-	renderFrame = false;
-	while(!renderFrame)
+	while(!ppu.RenderFrame())
 	{
 		RunOpcode();
 
@@ -96,7 +94,8 @@ void nes::LoadRom(std::string inFile)
 		exit(0);
 	}
 
-	ppu_nt_mirroring = (header[6] & 1) ? ~0x400 : ~0x800; //false=v, true=h
+	//send mirroring info to ppu
+	//ppu_nt_mirroring = (header[6] & 1) ? ~0x400 : ~0x800; //false=v, true=h
 	//where to do this? cpu r/w to ppu, everything that does stuff between ppu:0x2000-0x2FFF
 
 
@@ -112,14 +111,8 @@ void nes::LoadRom(std::string inFile)
 
 	if(header[5])
 	{
-		std::copy_n(contentVec.begin() + 0x4000 * header[4] + 0x10, 0x2000, vram.begin());
+		std::copy_n(contentVec.begin() + 0x4000 * header[4] + 0x10, 0x2000, ppu.VramIterator());
 	}
-}
-
-
-const std::array<uint8_t, 256*240*3>* const nes::GetPixelPtr() const
-{
-	return &render;
 }
 
 
@@ -133,15 +126,15 @@ void nes::RunOpcode()
 	#ifdef DEBUG
 	DebugCpu();
 	#endif
-	#ifdef DUMP_VRAM
-	if(scanlineV == 261)
-	{
-		std::string outfile = "vram.txt";
-		std::ofstream result(outfile.c_str(), std::ios::out | std::ios::binary);
-		result.write((char*)&vram[0],0x4000);
-		result.close();
-	}
-	#endif
+	// #ifdef DUMP_VRAM
+	// if(scanlineV == 261)
+	// {
+		// std::string outfile = "vram.txt";
+		// std::ofstream result(outfile.c_str(), std::ios::out | std::ios::binary);
+		// result.write((char*)&vram[0],0x4000);
+		// result.close();
+	// }
+	// #endif
 
 
 	++PC;         //fetch op1
@@ -1166,33 +1159,10 @@ void nes::CpuRead()
 	switch(addressBus)
 	{
 		case 0x2002:
-			dataBus = ppuStatus;
-			ppuStatus &= 0x7F; //clear nmi_occurred bit
-			wToggle = false;
-
-
-			if(scanlineV == 241)
-			{
-				if(scanlineH <= 2)
-				{
-					nmiSuppress = scanlineH;
-					//   -1: reads it as clear and never sets the flag or generates NMI for that frame
-					//  0-1: reads it as set, clears it, and suppresses the NMI for that frame
-					// -2,2: behaves normally (reads flag's value, clears it, and doesn't affect NMI operation)
-				}
-			}
-
-
+			dataBus = ppu.StatusRead();
 			break;
 		case 0x2007: //ppuData
-			if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18))
-			{
-				//if in palette range, reload latch(mirrored) but send palette byte immediately
-				//perform NT mirroring here
-				dataBus = ppudata_latch;
-				ppudata_latch = vram[ppu_address];
-				ppu_address += (ppuCtrl & 0x04) ? 0x20 : 0x01;
-			}
+			dataBus = ppu.DataRead();
 			break;
 
 		case 0x4015:
@@ -1215,53 +1185,25 @@ void nes::CpuWrite() // block writes to ppu on the first screen
 	switch(addressBus)
 	{
 		case 0x2000:
-			ppuCtrl = dataBus;
-			ppu_address_latch = (ppu_address_latch & 0x73FF) | ((ppuCtrl & 0x03) << 10);
+			ppu.CtrlWrite(dataBus);
 			break;
 		case 0x2001:
-			ppuMask = dataBus;
+			ppu.MaskWrite(dataBus);
 			break;
 		case 0x2003: //oamAddr
-			oamAddr = dataBus;
+			ppu.OamAddrWrite(dataBus);
 			break;
 		case 0x2004: //oamData
-			oam[oamAddr++] = dataBus;
+			ppu.OamDataWrite(dataBus);
 			break;
 		case 0x2005: //ppuScroll
-			if(!wToggle)
-			{
-				ppu_address_latch = (ppu_address_latch & 0x7FE0) | (dataBus >> 3);
-				fineX = dataBus & 0x07;
-			}
-			else
-			{
-				ppu_address_latch = (ppu_address_latch & 0xC1F) | ((dataBus & 0x07) << 12) | ((dataBus & 0xF8) << 2);
-			}
-			wToggle = !wToggle;
+			ppu.ScrollWrite(dataBus);
 			break;
 		case 0x2006:
-			if(!wToggle)
-			{
-				ppu_address_latch = (ppu_address_latch & 0xFF) | ((dataBus & 0x3F) << 8);
-			}
-			else
-			{
-				ppu_address_latch = (ppu_address_latch & 0x7F00) | dataBus;
-				ppu_address = ppu_address_latch & 0x3FFF; //assuming only the address gets mirrored down, not the latch
-			}
-			wToggle = !wToggle;
+			ppu.AddrWrite(dataBus);
 			break;
 		case 0x2007: //ppuData
-			if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18))
-			{
-				if(ppu_address >= 0x3F10 && !(ppu_address & 3)) //sprite palette mirror write
-				{
-					vram[ppu_address & ~0x10] = dataBus; //need else after this?
-				}
-
-				vram[ppu_address] = dataBus; //perform NT mirroring here?
-				ppu_address += (ppuCtrl & 0x04) ? 0x20 : 0x01;
-			}
+			ppu.DataWrite(dataBus);
 			break;
 
 		case 0x4000:
@@ -1313,15 +1255,15 @@ void nes::CpuWrite() // block writes to ppu on the first screen
 
 void nes::CpuTick()
 {
-	PpuTick();
-	PpuTick();
-	PpuTick();
+	ppu.Tick();
+	ppu.Tick();
+	ppu.Tick();
 }
 
 
 void nes::CpuOpDone()
 {
-	if(nmiLine && nmiSuppress == 3)
+	if(ppu.GetNmiLine() && ppu.GetNmiSuppress() == 3)
 	{
 		addressBus = PC;
 		CpuRead();
@@ -1349,324 +1291,8 @@ void nes::CpuOpDone()
 
 		PC = cpuMem[0xFFFA] | (dataBus << 8);
 
-		nmiLine = false;
+		ppu.ClearNmiLine();
 	}
-}
-
-
-void nes::PpuTick()
-{
-	if(scanlineV < 240) //visible scanlines
-	{
-		if(scanlineH && scanlineH <= 256)
-		{
-			uint8_t spritePixel = 0;
-			bool spritePriority = true; //false puts sprite in front of BG
-
-			for(uint8_t x = 0; x < 8; ++x)
-			{
-				if(!ppu_sprite_Xpos[x] && !spritePixel)
-				{
-					spritePixel = ppu_sprite_bitmap_low[x] >> 7;
-					spritePixel |= (ppu_sprite_bitmap_high[x] >> 6) & 0b10;
-
-					ppu_sprite_bitmap_low[x] <<= 1;
-					ppu_sprite_bitmap_high[x] <<= 1;
-					spritePriority = ppu_sprite_attribute[x] & 0b00100000;
-
-					if(spritePixel)
-					{
-						spritePixel |= (ppu_sprite_attribute[x] & 0b11) << 2;
-					}
-				}
-				else if(!ppu_sprite_Xpos[x])
-				{
-					ppu_sprite_bitmap_low[x] <<= 1;
-					ppu_sprite_bitmap_high[x] <<= 1;
-				}
-			}
-			
-
-			uint8_t ppuPixel = (ppu_bg_low >> (15 - fineX)) & 1;
-			ppuPixel |= (ppu_bg_high >> (14 - fineX)) & 2;
-			if(ppuPixel)
-			{
-				ppuPixel |= (ppu_attribute >> (28 - fineX * 2)) & 0x0C;
-
-				if(spritePixel)
-				{
-					ppuStatus |= 0b01000000; //sprite 0 hit
-				}
-			}
-
-			uint16_t pIndex = vram[0x3F00 + ppuPixel] * 3;
-			if(spritePixel && (!spritePriority || !(ppuPixel & 0b11)))
-			{
-				pIndex = vram[0x3F10 + spritePixel] * 3;
-			}
-
-			const uint32_t renderPos = (scanlineV * 256 + (scanlineH-1)) * 3;
-			render[renderPos  ] = palette[pIndex  ];
-			render[renderPos+1] = palette[pIndex+1];
-			render[renderPos+2] = palette[pIndex+2];
-		}
-
-		PpuRenderFetches();
-		PpuOamScan();
-	}
-	else if(scanlineV == 241) //vblank scanlines
-	{
-		if(scanlineH == 1)
-		{
-			if(nmiSuppress)
-			{
-				ppuStatus |= 0x80; //VBL nmi
-				if(nmiSuppress == 3)
-				{
-					nmiLine = (ppuCtrl & ppuStatus) & 0x80;
-				}
-			}
-		}
-	}
-	else if(scanlineV == 261) //prerender scanline
-	{
-		if(scanlineH == 1)
-		{
-			ppuStatus &= 0x1F; //clear sprite overflow, sprite 0 hit and vblank
-			nmiSuppress = 3;
-		}
-		else if(scanlineH >= 280 && scanlineH <= 304 && ppuMask & 0x18)
-		{
-			ppu_address = (ppu_address & 0x41F) | (ppu_address_latch & 0x7BE0);
-		}
-
-		PpuRenderFetches();
-		PpuOamScan();
-
-		if(ppu_odd_frame && scanlineH == 339 && ppuMask & 0x18)
-		{
-			++scanlineH;
-		}
-	}
-
-	if(scanlineH++ == 340)
-	{
-		scanlineH = 0;
-		if(scanlineV++ == 261)
-		{
-			scanlineV = 0;
-			ppu_odd_frame = !ppu_odd_frame;
-			renderFrame = true;
-		}
-	}
-}
-
-
-void nes::PpuRenderFetches() //things done during visible and prerender scanlines
-{
-	if(ppuMask & 0x18) //if rendering is enabled
-	{
-		if(scanlineH == 256) //Y increment
-		{
-			if(ppu_address < 0x7000)
-			{
-				ppu_address += 0x1000;
-			}
-			else
-			{
-				ppu_address &= 0xFFF;
-				if((ppu_address & 0x3E0) == 0x3A0)
-				{
-					ppu_address &= 0xC1F;
-					ppu_address ^= 0x800;
-				}
-				else if((ppu_address & 0x3E0) == 0x3E0)
-				{
-					ppu_address &= 0xC1F;
-				}
-				else
-				{
-					ppu_address += 0x20;
-				}
-			}
-		}
-		else if(scanlineH == 257)
-		{
-			ppu_address = (ppu_address & 0x7BE0) | (ppu_address_latch & 0x41F);
-		}
-
-		if((scanlineH && scanlineH <= 256) || scanlineH >= 321)
-		{
-			switch(scanlineH & 0x07)
-			{
-				case 0: //coarse X increment
-					if((ppu_address & 0x1F) != 0x1F)
-					{
-						++ppu_address;
-					}
-					else
-					{
-						ppu_address = (ppu_address & 0x7FE0) ^ 0x400;
-					}
-					break;
-
-				//value is determined on the first cycle of each fetch (1,3,5,7)
-				case 1: //NT
-					if(scanlineH != 1 && scanlineH != 321) 
-					{
-						ppu_bg_low |= ppu_bg_low_latch;
-						ppu_bg_high |= ppu_bg_high_latch;
-						ppu_attribute |= (ppu_attribute_latch & 0x03) * 0x5555; //2-bit splat
-					}
-					ppu_nametable = vram[0x2000 | (ppu_address & 0xFFF)];
-					break;
-				case 3: //AT
-					if(scanlineH != 339)
-					{
-						ppu_attribute_latch = vram[0x23C0 | (ppu_address & 0xC00) | (ppu_address >> 4 & 0x38) | (ppu_address >> 2 & 0x07)];
-						ppu_attribute_latch >>= (((ppu_address >> 1) & 0x01) | ((ppu_address >> 5) & 0x02)) * 2;
-					}
-					else
-					{
-						ppu_nametable = vram[0x2000 | (ppu_address & 0xFFF)];
-					}
-					break;
-				case 5: //low
-					ppu_bg_address = ppu_nametable*16 + (ppu_address >> 12) | ((ppuCtrl & 0x10) << 8);
-					ppu_bg_low_latch = vram[ppu_bg_address];
-					break;
-				case 7: //high
-					ppu_bg_high_latch = vram[ppu_bg_address + 8];
-					break;
-			}
-
-			if(scanlineH <= 256)
-			{
-				for(uint8_t &x : ppu_sprite_Xpos)
-				{
-					if(x)
-					{
-						--x;
-					}
-				}
-			}
-
-			if(scanlineH <= 336)
-			{
-				ppu_bg_low <<= 1;
-				ppu_bg_high <<= 1;
-				ppu_attribute <<= 2;
-			}
-		}
-		else //257-320
-		{
-			oamAddr = 0;
-
-			//sprite fetching
-			switch(scanlineH & 0x07)
-			{
-				//set ppu_address for this?
-				case 3: //load sprite attr
-					ppu_sprite_attribute[spriteIndex] = oam2[spriteIndex * 4 + 2];
-					break;
-				case 4: //load sprite X
-					ppu_sprite_Xpos[spriteIndex] = oam2[spriteIndex * 4 + 3];
-					break;
-				case 5: //sprite low
-					ppu_bg_address = oam2[spriteIndex * 4 + 1] * 0x10 | (ppu_address >> 12) | ((ppuCtrl & 0b1000) << 9);
-					ppu_sprite_bitmap_low[spriteIndex] = vram[ppu_bg_address];
-					if(ppu_sprite_attribute[spriteIndex] & 0b01000000) //flip H
-					{
-						ReverseBits(ppu_sprite_bitmap_low[spriteIndex]);
-					}
-					break;
-				case 7: //sprite high
-					ppu_sprite_bitmap_high[spriteIndex] = vram[ppu_bg_address + 8];
-					if(ppu_sprite_attribute[spriteIndex] & 0b01000000) //flip H
-					{
-						ReverseBits(ppu_sprite_bitmap_high[spriteIndex]);
-					}
-					if(++spriteIndex == 8)
-					{
-						spriteIndex = 0;
-					}
-					break;
-			}
-		}
-	}
-}
-
-
-void nes::PpuOamScan()
-{
-	if(scanlineH && !(scanlineH & 1))
-	{
-		if(scanlineH <= 64)
-		{
-			oam2[(scanlineH >> 1) - 1] = 0xFF;
-		}
-		else if(scanlineH <= 256)
-		{
-			if(!oam_eval_pattern)
-			{
-				oam2[oam2Index] = oam[oam_spritenum]; //oam search starts at oam[oamAddr]
-				if(scanlineV >= oam[oam_spritenum] && scanlineV < oam[oam_spritenum] + 8 + (ppuCtrl >> 2 & 8))
-				{
-					++oam_eval_pattern;
-					++oam2Index;
-				}
-				else
-				{
-					PpuOamUpdateIndex();
-				}
-			}
-			else if(oam_eval_pattern <= 3)
-			{
-				oam2[oam2Index++] = oam[oam_spritenum + oam_eval_pattern++];
-				if(oam_eval_pattern > 3)
-				{
-					PpuOamUpdateIndex();						
-				}
-			}
-			else
-			{
-				oam_spritenum += 4;
-			}
-		}
-		else
-		{
-			oam2Index = 0;
-			oam_spritenum = 0;
-			oam_eval_pattern = 0;			
-		}
-	}
-}
-
-
-void nes::PpuOamUpdateIndex()
-{
-	oam_spritenum += 4;
-	if(!oam_spritenum)
-	{
-		oam_eval_pattern = 4;
-	}
-	else if(oam2Index < 32)
-	{
-		oam_eval_pattern = 0;
-	}
-	else if(oam2Index == 32)
-	{
-		oam_block_writes = true; //use this
-		// if we find 8 sprites in range, keep scanning to set spr overflow
-	}
-}
-
-
-void nes::ReverseBits(uint8_t &b)
-{
-	b = b >> 4 | b << 4;
-	b = (b & 0b11001100) >> 2 | (b & 0b00110011) << 2;
-	b = (b & 0b10101010) >> 1 | (b & 0b01010101) << 1;
 }
 
 
@@ -1705,7 +1331,7 @@ void nes::DebugCpu()
 			  << " X:" << std::setw(2) << +rX
 			  << " Y:" << std::setw(2) << +rY
 			  << " P:" << std::setw(2) << (rP.to_ulong() & ~0x10)
-			  << " SP:" << std::setw(2) << +rS
-			  << " PPU:" << std::setw(3) << std::dec << scanlineH
-			  << " SL:" << std::setw(3) << scanlineV << std::endl;
+			  << " SP:" << std::setw(2) << +rS;
+			  // << " PPU:" << std::setw(3) << std::dec << scanlineH
+			  // << " SL:" << std::setw(3) << scanlineV << std::endl;
 }
