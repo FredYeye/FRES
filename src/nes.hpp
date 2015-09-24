@@ -12,7 +12,6 @@ class nes
 	public:
 		nes(std::string inFile);
 		void AdvanceFrame(uint8_t input);
-		const std::array<uint8_t, 256*240*3>* const GetPixelPtr() const;
 
 		ppu ppu;
 
@@ -36,6 +35,8 @@ class nes
 		uint8_t dataBus;
 		uint8_t controller_reg;
 		bool readJoy1 = false;
+
+		bool nmiLine = false;
 
 		apu apu;
 };

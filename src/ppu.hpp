@@ -22,8 +22,7 @@ class ppu
 
 		void Tick();
 
-		bool GetNmiLine();
-		void ClearNmiLine();
+		bool PollNmi();
 		uint8_t GetNmiSuppress();
 
 		const bool RenderFrame();
@@ -62,7 +61,6 @@ class ppu
 		uint16_t ppuAddress, ppuAddressLatch;
 		uint16_t ppuBgLow, ppuBgHigh;
 
-		bool nmiLine = false;
 		bool wToggle = false;
 
 		bool oddFrame = false;
@@ -87,4 +85,6 @@ class ppu
 		std::array<uint8_t, 8> spriteAttribute;
 		std::array<uint8_t, 8> spriteXpos;
 		uint8_t spriteIndex = 0;
+
+		bool oldNmi = false;
 };

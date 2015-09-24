@@ -124,16 +124,16 @@ void nes::RunOpcode()
 
 
 	#ifdef DEBUG
-	DebugCpu();
+		DebugCpu();
 	#endif
 	// #ifdef DUMP_VRAM
-	// if(scanlineV == 261)
-	// {
-		// std::string outfile = "vram.txt";
-		// std::ofstream result(outfile.c_str(), std::ios::out | std::ios::binary);
-		// result.write((char*)&vram[0],0x4000);
-		// result.close();
-	// }
+		// if(scanlineV == 261)
+		// {
+			// std::string outfile = "vram.txt";
+			// std::ofstream result(outfile.c_str(), std::ios::out | std::ios::binary);
+			// result.write((char*)&vram[0],0x4000);
+			// result.close();
+		// }
 	// #endif
 
 
@@ -154,11 +154,12 @@ void nes::RunOpcode()
 			CpuWrite();
 
 			addressBus = 0x0100 | uint8_t(addressBus - 1);
-			dataBus = rP.to_ulong() | 0x10;
+			dataBus = rP.to_ulong() | 0b00010000;
 			CpuWrite();
 
 			rS -= 3;
 			addressBus = 0xFFFE;
+			rP.set(2);
 			CpuRead();
 
 			++addressBus;
@@ -1145,6 +1146,9 @@ void nes::RunOpcode()
 			break;
 	}
 
+	//interrupt checking here?
+	nmiLine = ppu.PollNmi();
+
 	addressBus = PC; //fetch next opcode
 	CpuRead();       //
 
@@ -1263,35 +1267,37 @@ void nes::CpuTick()
 
 void nes::CpuOpDone()
 {
-	if(ppu.GetNmiLine() && ppu.GetNmiSuppress() == 3)
+	if(nmiLine)
 	{
-		addressBus = PC;
-		CpuRead();
+		// ++PC;         //fetch op1, increment suppressed
+		// ++addressBus; //
+		CpuRead();       //
 
-		CpuRead();
+		addressBus = 0x100 | rS; //push PC high on stack
+		dataBus = PC >> 8;       //
+		CpuWrite();              //
 
-		addressBus = 0x0100 | rS;
-		dataBus = PC >> 8;
-		CpuWrite();
+		addressBus = 0x100 | addressBus - 1; //push PC low on stack
+		dataBus = PC;                        //
+		CpuWrite();                          //
 
-		addressBus = 0x0100 | uint8_t(addressBus - 1);
-		dataBus = PC;
-		CpuWrite();
+		addressBus = 0x100 | addressBus - 1;  //push flags on stack with B flag clear
+		dataBus = rP.to_ulong() & 0b11101111; //
+		CpuWrite();                           //
 
-		addressBus = 0x0100 | uint8_t(addressBus - 1);
-		dataBus = rP.to_ulong();
-		CpuWrite();
+		addressBus = 0xFFFA; //read nmi vector low, set I flag
+		rS -= 3;             //
+		rP.set(2);           //
+		CpuRead();           //
 
-		rS -= 3;
-		addressBus = 0xFFFA;
-		CpuRead();
+		++addressBus; //read nmi vector high
+		CpuRead();    //
 
-		++addressBus;
-		CpuRead();
+		PC = cpuMem[0xFFFA] | (dataBus << 8); //fetch next opcode
+		addressBus = PC;                      //
+		CpuRead();                            //
 
-		PC = cpuMem[0xFFFA] | (dataBus << 8);
-
-		ppu.ClearNmiLine();
+		nmiLine = false;
 	}
 }
 

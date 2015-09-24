@@ -182,10 +182,6 @@ void ppu::Tick()
 			if(nmiSuppress)
 			{
 				ppuStatus |= 0x80; //VBL nmi
-				if(nmiSuppress == 3)
-				{
-					nmiLine = (ppuCtrl & ppuStatus) & 0x80;
-				}
 			}
 		}
 	}
@@ -423,15 +419,19 @@ void ppu::OamUpdateIndex()
 }
 
 
-bool ppu::GetNmiLine()
+bool ppu::PollNmi()
 {
-	return nmiLine;
-}
-
-
-void ppu::ClearNmiLine()
-{
-	nmiLine = false;
+	bool nmi = ppuStatus & ppuCtrl & 0x80;
+	if(nmi & !oldNmi)
+	{
+		oldNmi = nmi;
+		return true;
+	}
+	else
+	{
+		oldNmi = nmi;
+		return false;
+	}
 }
 
 
