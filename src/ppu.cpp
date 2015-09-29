@@ -124,35 +124,37 @@ void ppu::Tick()
 			uint8_t spritePixel = 0;
 			bool spritePriority = true; //false puts sprite in front of BG
 
-			for(uint8_t x = 0; x < 8; ++x)
+			if(ppuMask & 0b00010000)
 			{
-				if(!spriteXpos[x] && !spritePixel)
+				for(uint8_t x = 0; x < 8; ++x)
 				{
-					spritePixel = spriteBitmapLow[x] >> 7;
-					spritePixel |= (spriteBitmapHigh[x] >> 6) & 0b10;
-
-					spriteBitmapLow[x] <<= 1;
-					spriteBitmapHigh[x] <<= 1;
-					spritePriority = spriteAttribute[x] & 0b00100000;
-
-					if(spritePixel)
+					if(!spriteXpos[x] && !spritePixel)
 					{
-						spritePixel |= (spriteAttribute[x] & 0b11) << 2;
+						spritePixel = spriteBitmapLow[x] >> 7;
+						spritePixel |= (spriteBitmapHigh[x] >> 6) & 0b10;
+
+						spriteBitmapLow[x] <<= 1;
+						spriteBitmapHigh[x] <<= 1;
+						spritePriority = spriteAttribute[x] & 0b00100000;
+
+						if(spritePixel)
+						{
+							spritePixel |= (spriteAttribute[x] & 0b11) << 2;
+						}
+					}
+					else if(!spriteXpos[x])
+					{
+						spriteBitmapLow[x] <<= 1;
+						spriteBitmapHigh[x] <<= 1;
 					}
 				}
-				else if(!spriteXpos[x])
-				{
-					spriteBitmapLow[x] <<= 1;
-					spriteBitmapHigh[x] <<= 1;
-				}
 			}
-			
 
-			uint8_t ppuPixel = (ppuBgLow >> (15 - fineX)) & 1;
-			ppuPixel |= (ppuBgHigh >> (14 - fineX)) & 2;
+			uint8_t ppuPixel = (bgLow >> (15 - fineX)) & 1;
+			ppuPixel |= (bgHigh >> (14 - fineX)) & 2;
 			if(ppuPixel)
 			{
-				ppuPixel |= (ppuAttribute >> (28 - fineX * 2)) & 0x0C;
+				ppuPixel |= (attribute >> (28 - fineX * 2)) & 0x0C;
 
 				if(spritePixel)
 				{
@@ -271,17 +273,17 @@ void ppu::RenderFetches() //things done during visible and prerender scanlines
 				case 1: //NT
 					if(scanlineH != 1 && scanlineH != 321) 
 					{
-						ppuBgLow |= ppuBgLowLatch;
-						ppuBgHigh |= ppuBgHighLatch;
-						ppuAttribute |= (ppuAttributeLatch & 0x03) * 0x5555; //2-bit splat
+						bgLow |= bgLowLatch;
+						bgHigh |= bgHighLatch;
+						attribute |= (attributeLatch & 0x03) * 0x5555; //2-bit splat
 					}
 					nametable = vram[0x2000 | (ppuAddress & 0xFFF)];
 					break;
 				case 3: //AT
 					if(scanlineH != 339)
 					{
-						ppuAttributeLatch = vram[0x23C0 | (ppuAddress & 0xC00) | (ppuAddress >> 4 & 0x38) | (ppuAddress >> 2 & 0x07)];
-						ppuAttributeLatch >>= (((ppuAddress >> 1) & 0x01) | ((ppuAddress >> 5) & 0x02)) * 2;
+						attributeLatch = vram[0x23C0 | (ppuAddress & 0xC00) | (ppuAddress >> 4 & 0x38) | (ppuAddress >> 2 & 0x07)];
+						attributeLatch >>= (((ppuAddress >> 1) & 0x01) | ((ppuAddress >> 5) & 0x02)) * 2;
 					}
 					else
 					{
@@ -289,11 +291,11 @@ void ppu::RenderFetches() //things done during visible and prerender scanlines
 					}
 					break;
 				case 5: //low
-					ppuBgAddress = nametable*16 + (ppuAddress >> 12) | ((ppuCtrl & 0x10) << 8);
-					ppuBgLowLatch = vram[ppuBgAddress];
+					bgAddress = nametable*16 + (ppuAddress >> 12) | ((ppuCtrl & 0x10) << 8);
+					bgLowLatch = vram[bgAddress];
 					break;
 				case 7: //high
-					ppuBgHighLatch = vram[ppuBgAddress + 8];
+					bgHighLatch = vram[bgAddress + 8];
 					break;
 			}
 
@@ -310,9 +312,9 @@ void ppu::RenderFetches() //things done during visible and prerender scanlines
 
 			if(scanlineH <= 336)
 			{
-				ppuBgLow <<= 1;
-				ppuBgHigh <<= 1;
-				ppuAttribute <<= 2;
+				bgLow <<= 1;
+				bgHigh <<= 1;
+				attribute <<= 2;
 			}
 		}
 		else //257-320
@@ -330,15 +332,15 @@ void ppu::RenderFetches() //things done during visible and prerender scanlines
 					spriteXpos[spriteIndex] = oam2[spriteIndex * 4 + 3];
 					break;
 				case 5: //sprite low
-					ppuBgAddress = oam2[spriteIndex * 4 + 1] * 0x10 | (ppuAddress >> 12) | ((ppuCtrl & 0b1000) << 9);
-					spriteBitmapLow[spriteIndex] = vram[ppuBgAddress];
+					bgAddress = ((ppuCtrl & 0b1000) << 9) | (oam2[spriteIndex * 4 + 1] << 4) | (ppuAddress >> 12);
+					spriteBitmapLow[spriteIndex] = vram[bgAddress];
 					if(spriteAttribute[spriteIndex] & 0b01000000) //flip H
 					{
 						ReverseBits(spriteBitmapLow[spriteIndex]);
 					}
 					break;
 				case 7: //sprite high
-					spriteBitmapHigh[spriteIndex] = vram[ppuBgAddress + 8];
+					spriteBitmapHigh[spriteIndex] = vram[bgAddress + 8];
 					if(spriteAttribute[spriteIndex] & 0b01000000) //flip H
 					{
 						ReverseBits(spriteBitmapHigh[spriteIndex]);
@@ -466,4 +468,16 @@ std::array<uint8_t, 0x4000>::iterator ppu::VramIterator()
 const std::array<uint8_t, 256*240*3>* const ppu::GetPixelPtr() const
 {
 	return &render;
+}
+
+
+uint16_t ppu::GetScanlineH()
+{
+	return scanlineH;
+}
+
+
+uint16_t ppu::GetScanlineV()
+{
+	return scanlineV;
 }

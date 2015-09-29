@@ -29,6 +29,9 @@ class ppu
 		std::array<uint8_t, 0x4000>::iterator VramIterator();
 		const std::array<uint8_t, 256*240*3>* const GetPixelPtr() const;
 
+		uint16_t GetScanlineH();
+		uint16_t GetScanlineV();
+
 	private:
 		void RenderFetches();
 		void OamScan();
@@ -59,17 +62,18 @@ class ppu
 
 		uint16_t scanlineH = 0, scanlineV = 0;
 		uint16_t ppuAddress, ppuAddressLatch;
-		uint16_t ppuBgLow, ppuBgHigh;
+
+		uint16_t bgAddress;
+		uint8_t nametable;
+		uint32_t attribute;
+		uint8_t attributeLatch;
+		uint16_t bgLow, bgHigh;
+		uint8_t bgLowLatch, bgHighLatch;
 
 		bool wToggle = false;
 
 		bool oddFrame = false;
 		uint8_t fineX = 0;
-		uint8_t ppuBgLowLatch, ppuBgHighLatch;
-		uint8_t nametable;
-		uint8_t ppuAttributeLatch;
-		uint32_t ppuAttribute;
-		uint16_t ppuBgAddress;
 		uint8_t ppuDataLatch;
 		uint16_t ppuNtMirroring;
 		uint8_t oam2Index = 0;

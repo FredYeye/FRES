@@ -1337,7 +1337,7 @@ void nes::DebugCpu()
 			  << " X:" << std::setw(2) << +rX
 			  << " Y:" << std::setw(2) << +rY
 			  << " P:" << std::setw(2) << (rP.to_ulong() & ~0x10)
-			  << " SP:" << std::setw(2) << +rS;
-			  // << " PPU:" << std::setw(3) << std::dec << scanlineH
-			  // << " SL:" << std::setw(3) << scanlineV << std::endl;
+			  << " SP:" << std::setw(2) << +rS
+			  << " PPU:" << std::setw(3) << std::dec << ppu.GetScanlineH()
+			  << " SL:" << std::setw(3) << ppu.GetScanlineV() << std::endl;
 }
