@@ -126,15 +126,15 @@ void nes::RunOpcode()
 	#ifdef DEBUG
 		DebugCpu();
 	#endif
-	// #ifdef DUMP_VRAM
-		// if(scanlineV == 261)
-		// {
-			// std::string outfile = "vram.txt";
-			// std::ofstream result(outfile.c_str(), std::ios::out | std::ios::binary);
-			// result.write((char*)&vram[0],0x4000);
-			// result.close();
-		// }
-	// #endif
+	#ifdef DUMP_VRAM
+		if(ppu.GetScanlineV() == 261)
+		{
+			std::string outfile = "vram.txt";
+			std::ofstream result(outfile.c_str(), std::ios::out | std::ios::binary);
+			result.write((char*)&ppu.GetVram()[0],0x4000);
+			result.close();
+		}
+	#endif
 
 
 	++PC;         //fetch op1
@@ -176,7 +176,7 @@ void nes::RunOpcode()
 
 		case 0x08: //PHP
 			addressBus = 0x0100 | rS;
-			dataBus = rP.to_ulong();
+			dataBus = rP.to_ulong() | 0b00010000;
 			CpuWrite();
 
 			--rS;
@@ -1160,6 +1160,11 @@ void nes::CpuRead()
 {
 	dataBus = cpuMem[addressBus];
 
+	if((addressBus & 0xE000) == 0x2000) //ppu register mirrors
+	{
+		addressBus &= 0x2007;
+	}
+
 	switch(addressBus)
 	{
 		case 0x2002:
@@ -1185,6 +1190,11 @@ void nes::CpuRead()
 void nes::CpuWrite() // block writes to ppu on the first screen
 {
 	cpuMem[addressBus] = dataBus;
+
+	if((addressBus & 0xE000) == 0x2000)
+	{
+		addressBus &= 0x2007;
+	}
 
 	switch(addressBus)
 	{

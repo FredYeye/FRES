@@ -1,4 +1,5 @@
 #include "ppu.hpp"
+#include <cstring>
 
 
 ppu::ppu()
@@ -11,9 +12,9 @@ uint8_t ppu::StatusRead() //2002
 {
 	if(scanlineV == 241)
 	{
-		if(scanlineH <= 2)
+		if(scanlineH == 0)
 		{
-			nmiSuppress = scanlineH;
+			nmiSuppress = true;
 			//   -1: reads it as clear and never sets the flag or generates NMI for that frame
 			//  0-1: reads it as set, clears it, and suppresses the NMI for that frame
 			// -2,2: behaves normally (reads flag's value, clears it, and doesn't affect NMI operation)
@@ -39,8 +40,9 @@ uint8_t ppu::DataRead() //2007
 		ppuDataLatch = vram[ppuAddress];
 		ppuAddress += (ppuCtrl & 0x04) ? 0x20 : 0x01;
 		return currentLatch;
-
 	}
+
+	return 0;
 }
 
 
@@ -114,13 +116,13 @@ void ppu::DataWrite(uint8_t dataBus) //2007
 }
 
 
-
 void ppu::Tick()
 {
 	if(scanlineV < 240) //visible scanlines
 	{
 		if(scanlineH && scanlineH <= 256)
 		{
+			uint8_t bgPixel = 0;
 			uint8_t spritePixel = 0;
 			bool spritePriority = true; //false puts sprite in front of BG
 
@@ -150,28 +152,30 @@ void ppu::Tick()
 				}
 			}
 
-			uint8_t ppuPixel = (bgLow >> (15 - fineX)) & 1;
-			ppuPixel |= (bgHigh >> (14 - fineX)) & 2;
-			if(ppuPixel)
+			if(ppuMask & 0b00001000)
 			{
-				ppuPixel |= (attribute >> (28 - fineX * 2)) & 0x0C;
+				bgPixel = (bgLow >> (15 - fineX)) & 1;
+				bgPixel |= (bgHigh >> (14 - fineX)) & 2;
 
-				if(spritePixel)
+				if(bgPixel)
 				{
-					ppuStatus |= 0b01000000; //sprite 0 hit
+					bgPixel |= (attribute >> (28 - fineX * 2)) & 0x0C;
+
+					if(spritePixel)
+					{
+						ppuStatus |= 0b01000000; //sprite 0 hit
+					}
 				}
 			}
 
-			uint16_t pIndex = vram[0x3F00 + ppuPixel] * 3;
-			if(spritePixel && (!spritePriority || !(ppuPixel & 0b11)))
+			uint16_t pIndex = vram[0x3F00 + bgPixel] * 3;
+			if(spritePixel && (!spritePriority || !(bgPixel & 0b11)))
 			{
 				pIndex = vram[0x3F10 + spritePixel] * 3;
 			}
 
-			const uint32_t renderPos = (scanlineV * 256 + (scanlineH-1)) * 3;
-			render[renderPos  ] = palette[pIndex  ];
-			render[renderPos+1] = palette[pIndex+1];
-			render[renderPos+2] = palette[pIndex+2];
+			const uint32_t renderPos = (scanlineV * 256 + (scanlineH - 1)) * 3;
+			std::memcpy(&render[renderPos], &palette[pIndex], 3);
 		}
 
 		RenderFetches();
@@ -181,10 +185,10 @@ void ppu::Tick()
 	{
 		if(scanlineH == 1)
 		{
-			if(nmiSuppress)
-			{
+			// if(nmiSuppress == false)
+			// {
 				ppuStatus |= 0x80; //VBL nmi
-			}
+			// }
 		}
 	}
 	else if(scanlineV == 261) //prerender scanline
@@ -192,7 +196,7 @@ void ppu::Tick()
 		if(scanlineH == 1)
 		{
 			ppuStatus &= 0x1F; //clear sprite overflow, sprite 0 hit and vblank
-			nmiSuppress = 3;
+			nmiSuppress = false;
 		}
 		else if(scanlineH >= 280 && scanlineH <= 304 && ppuMask & 0x18)
 		{
@@ -200,7 +204,6 @@ void ppu::Tick()
 		}
 
 		RenderFetches();
-		OamScan();
 
 		if(oddFrame && scanlineH == 339 && ppuMask & 0x18)
 		{
@@ -223,7 +226,7 @@ void ppu::Tick()
 
 void ppu::RenderFetches() //things done during visible and prerender scanlines
 {
-	if(ppuMask & 0x18) //if rendering is enabled
+	if(ppuMask & 0b00011000) //if rendering is enabled
 	{
 		if(scanlineH == 256) //Y increment
 		{
@@ -437,10 +440,10 @@ bool ppu::PollNmi()
 }
 
 
-uint8_t ppu::GetNmiSuppress()
-{
-	return nmiSuppress;
-}
+// uint8_t ppu::GetNmiSuppress()
+// {
+	// return nmiSuppress;
+// }
 
 
 void ppu::ReverseBits(uint8_t &b)
@@ -480,4 +483,10 @@ uint16_t ppu::GetScanlineH()
 uint16_t ppu::GetScanlineV()
 {
 	return scanlineV;
+}
+
+
+const std::array<uint8_t, 0x4000>& ppu::GetVram()
+{
+	return vram;
 }

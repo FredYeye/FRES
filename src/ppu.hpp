@@ -23,7 +23,7 @@ class ppu
 		void Tick();
 
 		bool PollNmi();
-		uint8_t GetNmiSuppress();
+		// uint8_t GetNmiSuppress();
 
 		const bool RenderFrame();
 		std::array<uint8_t, 0x4000>::iterator VramIterator();
@@ -31,6 +31,7 @@ class ppu
 
 		uint16_t GetScanlineH();
 		uint16_t GetScanlineV();
+		const std::array<uint8_t, 0x4000>& GetVram();
 
 	private:
 		void RenderFetches();
@@ -82,7 +83,7 @@ class ppu
 		bool oamBlockWrites = false;
 
 		bool renderFrame = false;
-		uint8_t nmiSuppress = 3;
+		bool nmiSuppress = false;
 
 		std::array<uint8_t, 8> spriteBitmapLow;
 		std::array<uint8_t, 8> spriteBitmapHigh;
