@@ -335,7 +335,16 @@ void ppu::RenderFetches() //things done during visible and prerender scanlines
 					spriteXpos[spriteIndex] = oam2[spriteIndex * 4 + 3];
 					break;
 				case 5: //sprite low
-					bgAddress = ((ppuCtrl & 0b1000) << 9) | (oam2[spriteIndex * 4 + 1] << 4) | (ppuAddress >> 12);
+					bgAddress = ((ppuCtrl & 0b1000) << 9) | (oam2[spriteIndex * 4 + 1] << 4);
+					{
+					uint8_t yOffset = (scanlineV - oam2[spriteIndex * 4]);
+					if(spriteAttribute[spriteIndex] & 0b10000000) //flip V
+					{
+						yOffset = ~yOffset;
+					}
+					bgAddress |= yOffset & 7;
+					}
+
 					spriteBitmapLow[spriteIndex] = vram[bgAddress];
 					if(spriteAttribute[spriteIndex] & 0b01000000) //flip H
 					{
@@ -343,7 +352,7 @@ void ppu::RenderFetches() //things done during visible and prerender scanlines
 					}
 					break;
 				case 7: //sprite high
-					spriteBitmapHigh[spriteIndex] = vram[bgAddress + 8];
+					spriteBitmapHigh[spriteIndex] = vram[bgAddress | 8];
 					if(spriteAttribute[spriteIndex] & 0b01000000) //flip H
 					{
 						ReverseBits(spriteBitmapHigh[spriteIndex]);
