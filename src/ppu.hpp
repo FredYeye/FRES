@@ -23,7 +23,6 @@ class ppu
 		void Tick();
 
 		bool PollNmi();
-		// uint8_t GetNmiSuppress();
 
 		const bool RenderFrame();
 		std::array<uint8_t, 0x4000>::iterator VramIterator();
@@ -83,7 +82,8 @@ class ppu
 		bool oamBlockWrites = false;
 
 		bool renderFrame = false;
-		bool nmiSuppress = false;
+		bool suppressNmi = false;
+		bool suppressNmiFlag = false;
 
 		std::array<uint8_t, 8> spriteBitmapLow;
 		std::array<uint8_t, 8> spriteBitmapHigh;

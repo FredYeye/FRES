@@ -28,8 +28,8 @@ int main(int argc, char* argv[])
 		exit(1);
 	}
 
-	GLFWwindow* window = glfwCreateWindow(256, 240, "FRES++", NULL, NULL);
-	// GLFWwindow* window = glfwCreateWindow(512, 480, "FRES++", NULL, NULL);
+	// GLFWwindow* window = glfwCreateWindow(256, 240, "FRES++", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(512, 480, "FRES++", NULL, NULL);
 	if (!window)
 	{
 		glfwTerminate();
@@ -79,7 +79,7 @@ int main(int argc, char* argv[])
 		++frames;
 		if(frameTime >= 1000000)
 		{
-			std::cout << frames << " fps" << std::endl;
+			// std::cout << frames << " fps" << std::endl;
 			frameTime = 0;
 			frames = 0;
 		}

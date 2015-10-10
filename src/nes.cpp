@@ -84,7 +84,7 @@ void nes::LoadRom(std::string inFile)
 	const std::vector<uint8_t> contentVec(contentStr.begin(), contentStr.end());
 
 
-	//header stuff
+	//ines header stuff
 	std::array<uint8_t, 16> header;
 	std::copy_n(contentVec.begin(), 16, header.begin());
 
@@ -143,6 +143,21 @@ void nes::RunOpcode()
 
 	switch(opcode)
 	{
+		// opcodes left
+		// 0B ANC
+		// 2B ANC
+		// 4B ALR
+		// 6B ARR
+		// 8B XAA
+		// 93 AHX
+		// 9B TAS
+		// 9C SHY
+		// 9E SHX
+		// 9F AHX
+		// AB LAX
+		// BB LAS
+		// CB AXS
+
 		case 0x00: //BRK
 			++PC;
 			addressBus = 0x0100 | rS;
@@ -704,7 +719,10 @@ void nes::RunOpcode()
 			rP[7] = rX & 0x80;
 			break;
 
-		// case 0x1A: case 0x3A: case 0x5A: case 0x7A: case 0xDA: case 0xEA: case 0xFA: //NOP
+		// case 0x1A: case 0x3A: case 0x5A: case 0x7A: case 0xDA: case 0xEA: case 0xFA: //NOP (1 byte)
+		// case 0x04: case 0x14: case 0x34: case 0x44: case 0x54: case 0x64: case 0x74: //NOP (2 bytes)
+		// case 0x80: case 0x82: case 0x89: case 0xC2: case 0xD4: case 0xE2: case 0xF4:
+		// case 0x0C: case 0x1C: case 0x3C: case 0x5C: case 0x7C: case 0xDC: case 0xFC: //NOP (3 bytes)
 			// break;
 
 		case 0x06: case 0x07: case 0x26: case 0x27: case 0x46: case 0x47: //z RW
@@ -825,6 +843,7 @@ void nes::RunOpcode()
 			break;
 		case 0x09: case 0x29: case 0x49: case 0x69: case 0x80: case 0xA0: //immediate R
 		case 0xA2: case 0xA9: case 0xC0: case 0xC9: case 0xE0: case 0xE9: case 0xEB:
+		case 0x82: case 0x89: case 0xC2: case 0xE2:
 			++PC;
 			break;
 		case 0x0C: case 0x0D: case 0x2C: case 0x2D: case 0x4D: case 0x6D: //absolute R

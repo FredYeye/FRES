@@ -12,12 +12,16 @@ uint8_t ppu::StatusRead() //2002
 {
 	if(scanlineV == 241)
 	{
-		if(scanlineH == 0)
+		if(scanlineH == 1) //nmi checks get offset by +1
 		{
-			nmiSuppress = true;
-			//   -1: reads it as clear and never sets the flag or generates NMI for that frame
-			//  0-1: reads it as set, clears it, and suppresses the NMI for that frame
-			// -2,2: behaves normally (reads flag's value, clears it, and doesn't affect NMI operation)
+			suppressNmiFlag = true;
+			//     0: reads it as clear and never sets the flag or generates NMI for that frame
+		}
+		else if(scanlineH == 2 || scanlineH == 3)
+		{
+			suppressNmi = true;
+			//   1-2: reads it as set, clears it, and suppresses the NMI for that frame
+			// 340,3: behaves normally (reads flag's value, clears it, and doesn't affect NMI operation)
 		}
 	}
 
@@ -185,10 +189,10 @@ void ppu::Tick()
 	{
 		if(scanlineH == 1)
 		{
-			// if(nmiSuppress == false)
-			// {
+			if(suppressNmiFlag == false)
+			{
 				ppuStatus |= 0x80; //VBL nmi
-			// }
+			}
 		}
 	}
 	else if(scanlineV == 261) //prerender scanline
@@ -196,7 +200,8 @@ void ppu::Tick()
 		if(scanlineH == 1)
 		{
 			ppuStatus &= 0x1F; //clear sprite overflow, sprite 0 hit and vblank
-			nmiSuppress = false;
+			suppressNmi = false;
+			suppressNmiFlag = false;
 		}
 		else if(scanlineH >= 280 && scanlineH <= 304 && ppuMask & 0x18)
 		{
@@ -435,6 +440,11 @@ void ppu::OamUpdateIndex()
 
 bool ppu::PollNmi()
 {
+	if(suppressNmi)
+	{
+		return false;
+	}
+
 	bool nmi = ppuStatus & ppuCtrl & 0x80;
 	if(nmi & !oldNmi)
 	{
@@ -447,12 +457,6 @@ bool ppu::PollNmi()
 		return false;
 	}
 }
-
-
-// uint8_t ppu::GetNmiSuppress()
-// {
-	// return nmiSuppress;
-// }
 
 
 void ppu::ReverseBits(uint8_t &b)
