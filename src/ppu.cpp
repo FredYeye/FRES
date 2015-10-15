@@ -154,6 +154,11 @@ void ppu::Tick()
 						spriteBitmapHigh[x] <<= 1;
 					}
 				}
+
+				if(scanlineH <= 8 && !(ppuMask & 0b00000100))
+				{
+					spritePixel = 0;
+				}
 			}
 
 			if(ppuMask & 0b00001000)
@@ -165,7 +170,11 @@ void ppu::Tick()
 				{
 					bgPixel |= (attribute >> (28 - fineX * 2)) & 0x0C;
 
-					if(spritePixel)
+					if(scanlineH <= 8 && !(ppuMask & 0b00000010))
+					{
+						bgPixel = 0;
+					}
+					else if(spritePixel && scanlineH != 256)
 					{
 						ppuStatus |= 0b01000000; //sprite 0 hit
 					}
@@ -332,7 +341,6 @@ void ppu::RenderFetches() //things done during visible and prerender scanlines
 			//sprite fetching
 			switch(scanlineH & 0x07)
 			{
-				//set ppu_address for this?
 				case 3: //load sprite attr
 					spriteAttribute[spriteIndex] = oam2[spriteIndex * 4 + 2];
 					break;
