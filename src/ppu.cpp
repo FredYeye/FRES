@@ -1,5 +1,6 @@
 #include "ppu.hpp"
 #include <cstring>
+#include <iostream>
 
 
 ppu::ppu()
@@ -30,6 +31,13 @@ uint8_t ppu::StatusRead() //2002
 	wToggle = false;
 
 	return status;
+}
+
+
+uint8_t ppu::OamDataRead()
+{
+	//do more stuff (reads while sprite eval is running)
+	return oam[oamAddr];
 }
 
 
@@ -192,7 +200,10 @@ void ppu::Tick()
 		}
 
 		RenderFetches();
-		OamScan();
+		if(ppuMask & 0b00011000)
+		{
+			OamScan();
+		}
 	}
 	else if(scanlineV == 241) //vblank scanlines
 	{
@@ -391,7 +402,7 @@ void ppu::OamScan()
 		}
 		else if(scanlineH <= 256)
 		{
-			if(!oamEvalPattern)
+			if(!oamEvalPattern) //search for sprites in range
 			{
 				oam2[oam2Index] = oam[oamSpritenum]; //oam search starts at oam[oamAddr]
 				if(scanlineV >= oam[oamSpritenum] && scanlineV < oam[oamSpritenum] + 8 + (ppuCtrl >> 2 & 8))
@@ -412,9 +423,22 @@ void ppu::OamScan()
 					OamUpdateIndex();						
 				}
 			}
-			else
+			else if(oamEvalPattern == 4) //entire oam searched
 			{
 				oamSpritenum += 4;
+			}
+			else //search for overflow
+			{
+				if(scanlineV >= oam[oamSpritenum] && scanlineV < oam[oamSpritenum] + 8 + (ppuCtrl >> 2 & 8))
+				{
+					ppuStatus |= 0x20;
+					// std::cout << "OF ";
+				}
+				oamSpritenum += 5; //incorrect, should be +=4, +0-3 (inc n and m w/o carry)
+				if(oamSpritenum <= 4) //stop searching. <= 4 instead of 0 since increment is bugged
+				{
+					oamEvalPattern = 4;
+				}
 			}
 		}
 		else
@@ -430,7 +454,7 @@ void ppu::OamScan()
 void ppu::OamUpdateIndex()
 {
 	oamSpritenum += 4;
-	if(!oamSpritenum)
+	if(!oamSpritenum) //entire oam searched
 	{
 		oamEvalPattern = 4;
 	}
@@ -438,10 +462,9 @@ void ppu::OamUpdateIndex()
 	{
 		oamEvalPattern = 0;
 	}
-	else if(oam2Index == 32)
+	else if(oam2Index == 32) //8 sprites found
 	{
-		oamBlockWrites = true; //use this
-		// if we find 8 sprites in range, keep scanning to set spr overflow
+		oamEvalPattern = 5;
 	}
 }
 

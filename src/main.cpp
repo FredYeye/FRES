@@ -69,7 +69,7 @@ int main(int argc, char* argv[])
 		std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
 		std::chrono::microseconds tus = std::chrono::duration_cast<std::chrono::microseconds>(t2-t1);
 
-		//16667
+		//16667 for 60hz, 16639 for 60.0988hz
 		if(tus < std::chrono::microseconds(15000)) {
 			std::this_thread::sleep_for(std::chrono::microseconds(15000) - tus);
 		}
@@ -79,7 +79,7 @@ int main(int argc, char* argv[])
 		++frames;
 		if(frameTime >= 1000000)
 		{
-			// std::cout << frames << " fps" << std::endl;
+			std::cout << frames << " fps" << std::endl;
 			frameTime = 0;
 			frames = 0;
 		}
@@ -87,52 +87,6 @@ int main(int argc, char* argv[])
 
 	glfwTerminate();
 	return 0;
-}
-
-
-GLuint load_and_compile_shader(std::string sname, GLenum shaderType) {
-	std::vector<char> buffer(sname.begin(), sname.end());
-	buffer.push_back(0);
-	const char *src = &buffer[0];
-
-	// Compile the shader
-	GLuint shader = glCreateShader(shaderType);
-	glShaderSource(shader, 1, &src, NULL);
-	glCompileShader(shader);
-	// Check the result of the compilation
-	GLint test;
-	glGetShaderiv(shader, GL_COMPILE_STATUS, &test);
-	if(!test) {
-		std::cerr << "Shader compilation failed with this message:" << std::endl;
-		std::vector<char> compilation_log(512);
-		glGetShaderInfoLog(shader, compilation_log.size(), NULL, &compilation_log[0]);
-		std::cerr << &compilation_log[0] << std::endl;
-		glfwTerminate();
-		exit(-1);
-	}
-	return shader;
-}
-
-
-GLuint create_program(std::string vertex, std::string fragment) {
-	// Load and compile the vertex and fragment shaders
-	GLuint vertexShader = load_and_compile_shader(vertex, GL_VERTEX_SHADER);
-	GLuint fragmentShader = load_and_compile_shader(fragment, GL_FRAGMENT_SHADER);
-
-	// Attach the above shader to a program
-	GLuint shaderProgram = glCreateProgram();
-	glAttachShader(shaderProgram, vertexShader);
-	glAttachShader(shaderProgram, fragmentShader);
-
-	// Flag the shaders for deletion
-	glDeleteShader(vertexShader);
-	glDeleteShader(fragmentShader);
-
-	// Link and use the program
-	glLinkProgram(shaderProgram);
-	glUseProgram(shaderProgram);
-
-	return shaderProgram;
 }
 
 
@@ -196,6 +150,53 @@ void initialize(GLuint &vao, const std::array<uint8_t, 256*240*3> *pixelPtr) {
 	GLint texture_coord_attribute = glGetAttribLocation(shaderProgram, "texture_coord");
 	glVertexAttribPointer(texture_coord_attribute, 2, GL_FLOAT, GL_FALSE, 0, (GLvoid *)sizeof(vertices_position));
 	glEnableVertexAttribArray(texture_coord_attribute);
+}
+
+
+GLuint create_program(std::string vertex, std::string fragment) {
+	// Load and compile the vertex and fragment shaders
+	GLuint vertexShader = load_and_compile_shader(vertex, GL_VERTEX_SHADER);
+	GLuint fragmentShader = load_and_compile_shader(fragment, GL_FRAGMENT_SHADER);
+
+	// Attach the above shader to a program
+	GLuint shaderProgram = glCreateProgram();
+	glAttachShader(shaderProgram, vertexShader);
+	glAttachShader(shaderProgram, fragmentShader);
+
+	// Flag the shaders for deletion
+	glDeleteShader(vertexShader);
+	glDeleteShader(fragmentShader);
+
+	// Link and use the program
+	glLinkProgram(shaderProgram);
+	glUseProgram(shaderProgram);
+
+	return shaderProgram;
+}
+
+
+GLuint load_and_compile_shader(std::string &sName, GLenum shaderType) {
+	std::vector<char> buffer(sName.begin(), sName.end());
+	buffer.push_back(0);
+	const char *src = &buffer[0];
+
+	// Compile the shader
+	GLuint shader = glCreateShader(shaderType);
+	glShaderSource(shader, 1, &src, NULL);
+	glCompileShader(shader);
+
+	// Check the result of the compilation
+	GLint test;
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &test);
+	if(!test) {
+		std::cerr << "Shader compilation failed with this message:" << std::endl;
+		std::vector<char> compilation_log(512);
+		glGetShaderInfoLog(shader, compilation_log.size(), NULL, &compilation_log[0]);
+		std::cerr << &compilation_log[0] << std::endl;
+		glfwTerminate();
+		exit(-1);
+	}
+	return shader;
 }
 
 
