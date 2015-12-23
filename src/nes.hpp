@@ -19,7 +19,7 @@ class nes
 		void LoadRom(std::string inFile);
 		void RunOpcode();
 		void CpuRead(uint16_t address);
-		void CpuWrite();
+		void CpuWrite(uint16_t address, uint8_t data);
 		void CpuTick();
 		void CpuOpDone();
 
