@@ -183,16 +183,13 @@ void nes::RunOpcode()
 		case 0x28: //PLP
 			CpuRead(0x0100 | rS++);
 			CpuRead(0x0100 | rS);
-
 			rP = dataBus | 0x20;
 			break;
 		case 0x48: //PHA
 			CpuWrite(0x0100 | rS--, rA);
 			break;
 		case 0x68: //PLA
-			CpuRead(0x0100 | rS);
-
-			++rS;
+			CpuRead(0x0100 | rS++);
 			CpuRead(0x0100 | rS);
 
 			rA = dataBus;
@@ -388,7 +385,6 @@ void nes::RunOpcode()
 		case 0x40: //RTI
 			++PC;
 			CpuRead(0x0100 | rS);
-
 			CpuRead(0x0100 | uint8_t(addressBus + 1));
 
 			rP = dataBus | 0x20;
@@ -402,22 +398,18 @@ void nes::RunOpcode()
 		case 0x60: //RTS
 			++PC;
 			CpuRead(0x0100 | rS);
-
 			CpuRead(0x0100 | uint8_t(addressBus + 1));
 
 			rS += 2;
 			CpuRead(0x0100 | uint8_t(addressBus + 1));
 
 			PC = cpuMem[0x0100 | addressBus - 1] | (dataBus << 8);
-			CpuRead(PC);
-
-			++PC;
+			CpuRead(PC++);
 			break;
 
 		case 0x4C: //JMP abs
 			++PC;
 			CpuRead(addressBus + 1);
-
 			PC = op1 | (op2 << 8);
 			break;
 		case 0x6C: //JMP ind
@@ -426,7 +418,6 @@ void nes::RunOpcode()
 
 			++PC;
 			CpuRead(op1 | (op2 << 8));
-
 			CpuRead(uint8_t(op1 + 1) | (op2 << 8));
 
 			PC = cpuMem[op1 | (op2 << 8)] | (dataBus << 8);
@@ -966,7 +957,6 @@ void nes::RunOpcode()
 	nmiLine = ppu.PollNmi();
 
 	CpuRead(PC); //fetch next opcode
-
 	CpuOpDone();
 }
 
@@ -1039,16 +1029,28 @@ void nes::CpuWrite(uint16_t address, uint8_t data) // block writes to ppu on the
 			break;
 
 		case 0x4000:
-			apu.Pulse1_1Write(dataBus);
+			apu.Pulse1Write(dataBus, 0);
 			break;
 		case 0x4001:
-			apu.Pulse1_2Write(dataBus);
+			apu.Pulse2Write(dataBus, 0);
 			break;
 		case 0x4002:
-			apu.Pulse1_3Write(dataBus);
+			apu.Pulse3Write(dataBus, 0);
 			break;
 		case 0x4003:
-			apu.Pulse1_4Write(dataBus);
+			apu.Pulse4Write(dataBus, 0);
+			break;
+		case 0x4004:
+			apu.Pulse1Write(dataBus, 1);
+			break;
+		case 0x4005:
+			apu.Pulse2Write(dataBus, 1);
+			break;
+		case 0x4006:
+			apu.Pulse3Write(dataBus, 1);
+			break;
+		case 0x4007:
+			apu.Pulse4Write(dataBus, 1);
 			break;
 		case 0x4014:
 			// if(cycles & 1) cpu_tick(); //+1 cycle if dma started on an odd cycle
@@ -1062,6 +1064,9 @@ void nes::CpuWrite(uint16_t address, uint8_t data) // block writes to ppu on the
 				CpuWrite(0x2004, dataBus);
 			}
 			}
+			break;
+		case 0x4015:
+			apu.StatusWrite(dataBus);
 			break;
 		case 0x4016:
 			if(dataBus & 1)
@@ -1084,6 +1089,7 @@ void nes::CpuWrite(uint16_t address, uint8_t data) // block writes to ppu on the
 
 void nes::CpuTick()
 {
+	apu.Tick();
 	ppu.Tick();
 	ppu.Tick();
 	ppu.Tick();

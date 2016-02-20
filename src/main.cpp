@@ -1,5 +1,6 @@
 #include "gl_core_3_3.h"
 #include <GLFW/glfw3.h>
+#include "SDL2/SDL.h"
 
 #include <chrono>
 #include <iostream>
@@ -13,6 +14,9 @@
 
 uint8_t input;
 
+#ifdef main
+#undef main
+#endif
 
 int main(int argc, char* argv[])
 {
@@ -23,6 +27,23 @@ int main(int argc, char* argv[])
 	}
 	const std::string infile = argv[1];
 
+	// init audio
+	if (SDL_Init(SDL_INIT_AUDIO) < 0)
+	{
+		std::cout << "audio init failed\n";
+		return 1;
+	}
+
+	SDL_AudioSpec desired = {44100, AUDIO_S8, 1, 0, 4096, 0, 0, 0};
+	SDL_AudioDeviceID dev = SDL_OpenAudioDevice(0, 0, &desired, 0, SDL_AUDIO_ALLOW_ANY_CHANGE);
+	if(dev == 0)
+	{
+		std::cout << "Failed to open audio: " << SDL_GetError() << "\n";
+		return 1;
+	}
+	SDL_PauseAudioDevice(dev, 0);
+
+	// init video
 	if(!glfwInit())
 	{
 		exit(1);
@@ -54,7 +75,8 @@ int main(int argc, char* argv[])
 	uint32_t frameTime = 0;
 	uint16_t frames = 0;
 
-	while (!glfwWindowShouldClose(window)) {
+	while (!glfwWindowShouldClose(window))
+	{
 		std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
 		nes.AdvanceFrame(input);
@@ -66,12 +88,16 @@ int main(int argc, char* argv[])
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 
+		//audio
+		SDL_QueueAudio(dev, nes.apu.GetOutput(), nes.apu.sampleCount);
+		nes.apu.ClearOutput();
+
 		std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
 		std::chrono::microseconds tus = std::chrono::duration_cast<std::chrono::microseconds>(t2-t1);
 
-		//16667 for 60hz, 16639 for 60.0988hz
-		if(tus < std::chrono::microseconds(15000)) {
-			std::this_thread::sleep_for(std::chrono::microseconds(15000) - tus);
+		if(tus < std::chrono::microseconds(16639)) //16667 for 60hz, 16639 for 60.0988hz
+		{
+			std::this_thread::sleep_for(std::chrono::microseconds(16639) - tus);
 		}
 
 		std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
@@ -85,12 +111,14 @@ int main(int argc, char* argv[])
 		}
 	}
 
+	SDL_CloseAudioDevice(dev);
 	glfwTerminate();
 	return 0;
 }
 
 
-void initialize(GLuint &vao, const std::array<uint8_t, 256*240*3> *pixelPtr) {
+void initialize(GLuint &vao, const std::array<uint8_t, 256*240*3> *pixelPtr)
+{
 	// Use a Vertex Array Object
 	glGenVertexArrays(1, &vao);
 	glBindVertexArray(vao);
@@ -153,7 +181,8 @@ void initialize(GLuint &vao, const std::array<uint8_t, 256*240*3> *pixelPtr) {
 }
 
 
-GLuint create_program(std::string vertex, std::string fragment) {
+GLuint create_program(std::string vertex, std::string fragment)
+{
 	// Load and compile the vertex and fragment shaders
 	GLuint vertexShader = load_and_compile_shader(vertex, GL_VERTEX_SHADER);
 	GLuint fragmentShader = load_and_compile_shader(fragment, GL_FRAGMENT_SHADER);
@@ -175,7 +204,8 @@ GLuint create_program(std::string vertex, std::string fragment) {
 }
 
 
-GLuint load_and_compile_shader(std::string &sName, GLenum shaderType) {
+GLuint load_and_compile_shader(std::string &sName, GLenum shaderType)
+{
 	std::vector<char> buffer(sName.begin(), sName.end());
 	buffer.push_back(0);
 	const char *src = &buffer[0];

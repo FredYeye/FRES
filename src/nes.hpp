@@ -14,6 +14,7 @@ class nes
 		void AdvanceFrame(uint8_t input);
 
 		ppu ppu;
+		apu apu;
 
 	private:
 		void LoadRom(std::string inFile);
@@ -37,6 +38,4 @@ class nes
 		bool readJoy1 = false;
 
 		bool nmiLine = false;
-
-		apu apu;
 };

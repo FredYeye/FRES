@@ -11,8 +11,16 @@ include_directories(${GLFW_INCLUDE})
 include_directories(${GLFW_LIB})
 find_library(GLFW_LIBRARY "glfw3" HINTS ${GLFW_LIB})
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -march=native") #-flto
-add_definitions(-lglfw3 -lopengl32)
+
+find_path(SDL_INCLUDE SDL2/SDL.h PATHS NO_DEFAULT_PATH DOC "SDL include path")
+find_path(SDL_LIB libSDL2.a PATHS NO_DEFAULT_PATH DOC "SDL lib path")
+include_directories(${SDL_INCLUDE})
+include_directories(${SDL_LIB})
+find_library(SDL_LIBRARY "libSDL2.dll.a")
+find_library(SDL_LIBRARY2 "libSDL2main.a")
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -march=native") #-flto
+add_definitions(-lglfw3 -lopengl32 -lSDL2main -lSDL2)
 
 set(source_files
 	src/main.cpp
@@ -31,4 +39,4 @@ set(header_files
 	)
 
 add_executable(${project_name} ${header_files} ${source_files})
-target_link_libraries(nes ${GLFW_LIBRARY} opengl32)
+target_link_libraries(nes ${GLFW_LIBRARY} opengl32 ${SDL_LIBRARY} ${SDL_LIBRARY2})
