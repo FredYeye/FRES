@@ -95,7 +95,7 @@ int main(int argc, char* argv[])
 		std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
 		std::chrono::microseconds tus = std::chrono::duration_cast<std::chrono::microseconds>(t2-t1);
 
-		if(tus < std::chrono::microseconds(16639)) //16667 for 60hz, 16639 for 60.0988hz
+		if(tus < std::chrono::microseconds(16639)) //16639 for 60.0988hz
 		{
 			std::this_thread::sleep_for(std::chrono::microseconds(16639) - tus);
 		}

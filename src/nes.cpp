@@ -1029,29 +1029,48 @@ void nes::CpuWrite(uint16_t address, uint8_t data) // block writes to ppu on the
 			break;
 
 		case 0x4000:
-			apu.Pulse1Write(dataBus, 0);
+			apu.Pulse0Write(dataBus, 0);
 			break;
 		case 0x4001:
-			apu.Pulse2Write(dataBus, 0);
+			apu.Pulse1Write(dataBus, 0);
 			break;
 		case 0x4002:
-			apu.Pulse3Write(dataBus, 0);
+			apu.Pulse2Write(dataBus, 0);
 			break;
 		case 0x4003:
-			apu.Pulse4Write(dataBus, 0);
+			apu.Pulse3Write(dataBus, 0);
 			break;
 		case 0x4004:
-			apu.Pulse1Write(dataBus, 1);
+			apu.Pulse0Write(dataBus, 1);
 			break;
 		case 0x4005:
-			apu.Pulse2Write(dataBus, 1);
+			apu.Pulse1Write(dataBus, 1);
 			break;
 		case 0x4006:
-			apu.Pulse3Write(dataBus, 1);
+			apu.Pulse2Write(dataBus, 1);
 			break;
 		case 0x4007:
-			apu.Pulse4Write(dataBus, 1);
+			apu.Pulse3Write(dataBus, 1);
 			break;
+		case 0x4008:
+			apu.Triangle0Write(dataBus);
+			break;
+		case 0x400A:
+			apu.Triangle2Write(dataBus);
+			break;
+		case 0x400B:
+			apu.Triangle3Write(dataBus);
+			break;
+		case 0x400C:
+			apu.Noise0Write(dataBus);
+			break;
+		case 0x400E:
+			apu.Noise2Write(dataBus);
+			break;
+		case 0x400F:
+			apu.Noise3Write(dataBus);
+			break;
+
 		case 0x4014:
 			// if(cycles & 1) cpu_tick(); //+1 cycle if dma started on an odd cycle
 			CpuTick(); //tick or read?

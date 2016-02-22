@@ -2,7 +2,7 @@
 #include "apu.hpp"
 
 
-void apu::Pulse1Write(uint8_t dataBus, bool channel)
+void apu::Pulse0Write(uint8_t dataBus, bool channel)
 {
 	const std::array<uint8_t, 4> dutyTable{{0b0000010, 0b00000110, 0b00011110, 0b11111001}};
 	pulse[channel].duty = dutyTable[dataBus >> 6];
@@ -12,7 +12,7 @@ void apu::Pulse1Write(uint8_t dataBus, bool channel)
 }
 
 
-void apu::Pulse2Write(uint8_t dataBus, bool channel)
+void apu::Pulse1Write(uint8_t dataBus, bool channel)
 {
 	pulse[channel].sweepTimer = (dataBus >> 4) & 0b0111;
 	pulse[channel].sweepNegate = dataBus & 0b1000;
@@ -22,13 +22,13 @@ void apu::Pulse2Write(uint8_t dataBus, bool channel)
 }
 
 
-void apu::Pulse3Write(uint8_t dataBus, bool channel)
+void apu::Pulse2Write(uint8_t dataBus, bool channel)
 {
 	pulse[channel].freqTimer = (pulse[channel].freqTimer & 0x700) | dataBus; //save high 3 bits or not?
 }
 
 
-void apu::Pulse4Write(uint8_t dataBus, bool channel)
+void apu::Pulse3Write(uint8_t dataBus, bool channel)
 {
 	pulse[channel].freqTimer = (pulse[channel].freqTimer & 0xFF) | ((dataBus & 0b00000111) << 8);
 	if(pulse[channel].enable)
@@ -41,42 +41,79 @@ void apu::Pulse4Write(uint8_t dataBus, bool channel)
 }
 
 
-void apu::Noise1Write(uint8_t dataBus)
+void apu::Triangle0Write(uint8_t dataBus)
 {
-	noiseHalt     = dataBus & 0b00100000;
-	noiseConstant = dataBus & 0b00010000;
-	noiseDivider  = dataBus & 0b00001111;
+	triangle.halt = dataBus & 0b10000000;
+	triangle.linearLoad = dataBus & 0b01111111;
+}
+
+
+void apu::Triangle2Write(uint8_t dataBus)
+{
+	triangle.freqTimer = (triangle.freqTimer & 0x700) | dataBus;
+}
+
+
+void apu::Triangle3Write(uint8_t dataBus)
+{
+	triangle.freqTimer = (triangle.freqTimer & 0xFF) | ((dataBus & 0b00000111) << 8);
+	if(triangle.enable)
+	{
+		triangle.lengthCounter = lengthTable[dataBus >> 3];
+	}
+	triangle.linearReload = true;
+}
+
+
+void apu::Noise0Write(uint8_t dataBus)
+{
+	noise.halt = dataBus & 0b00100000;
+	noise.constant = dataBus & 0b00010000;
+	noise.volume = 0b00001111;
 }
 
 
 void apu::Noise2Write(uint8_t dataBus)
 {
-	noiseMode = dataBus & 0b10000000;
-	noisePeriodIndex = dataBus & 0b00001111;
+	const std::array<uint16_t, 16> noisePeriod{{4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068}};
+	noise.freqTimer = noisePeriod[dataBus & 0b1111];
+	noise.mode = dataBus & 0b10000000;
 }
 
 
 void apu::Noise3Write(uint8_t dataBus)
 {
-	if(noiseEnable)
+	if(noise.enable)
 	{
-		noiseLength = lengthTable[dataBus >> 3];
+		noise.lengthCounter = lengthTable[dataBus >> 3];
 	}
-	noiseRestartEnvelope = true;
+	noise.envelopeReset = true;
 }
 
 
 void apu::StatusWrite(uint8_t dataBus) //4015
 {
-	pulse[0].enable = dataBus & 1;
+	pulse[0].enable = dataBus & 0b0001;
 	if(!pulse[0].enable)
 	{
 		pulse[0].lengthCounter = 0;
 	}
-	pulse[1].enable = dataBus & 0b10;
+	pulse[1].enable = dataBus & 0b0010;
 	if(!pulse[1].enable)
 	{
 		pulse[1].lengthCounter = 0;
+	}
+
+	triangle.enable = dataBus & 0b0100;
+	if(!triangle.enable)
+	{
+		triangle.lengthCounter = 0;
+	}
+
+	noise.enable = dataBus & 0b1000;
+	if(!noise.enable)
+	{
+		noise.lengthCounter = 0;
 	}
 }
 
@@ -91,6 +128,10 @@ uint8_t apu::StatusRead()
 	if(pulse[1].lengthCounter)
 	{
 		data |= 0b10;
+	}
+	if(noise.lengthCounter)
+	{
+		data |= 0b1000;
 	}
 	data |= frameIRQ << 6;
 
@@ -120,6 +161,20 @@ void apu::FrameCounterWrite(uint8_t dataBus) //4017
 
 void apu::Tick()
 {
+	bool ultrasonic = false;
+	if(triangle.freqTimer < 2 && !triangle.freqCounter)
+	{
+		ultrasonic = true;
+	}
+	if(triangle.lengthCounter && triangle.linearCounter && !ultrasonic)
+	{
+		if(!triangle.freqCounter--)
+		{
+			triangle.freqCounter = triangle.freqTimer;
+			++triangle.sequencerStep &= 0b00011111;
+		}
+	}
+
 	if(oddEvenTick)
 	{
 		for(auto &p : pulse)
@@ -133,6 +188,15 @@ void apu::Tick()
 					p.dutyCounter = 1;
 				}
 			}
+		}
+
+		if(!noise.freqCounter--)
+		{
+			noise.freqCounter = noise.freqTimer;
+			bool feedback = (noise.mode) ? noise.lfsr & 0b01000000 : noise.lfsr & 0b00000010;
+			feedback ^= noise.lfsr & 1;
+			noise.lfsr >>= 1;
+			noise.lfsr |= feedback << 14;
 		}
 
 		switch(sequencerCounter)
@@ -181,37 +245,43 @@ void apu::Tick()
 			break;
 		}
 
-		// if(!noiseTimer--)
-		// {
-			// noiseTimer = noisePeriod[noisePeriodIndex];
-			// bool feedback = (noiseMode) ? noiseShiftReg & 0b01000000 : noiseShiftReg & 0b00000010;
-			// feedback ^= noiseShiftReg & 1;
-			// noiseShiftReg >>= 1;
-			// noiseShiftReg |= feedback << 14;
-		// }
-
-		uint8_t output = 0;
+		uint8_t pulseOutput = 0;
 		for(auto &p : pulse)
 		{
 			if(p.duty & p.dutyCounter && p.lengthCounter && !SweepForcingSilence(p))
 			{
 				if(p.constant)
 				{
-					output += p.volume;
+					pulseOutput += p.volume;
 				}
 				else
 				{
-					output += p.envelopeVolume;
+					pulseOutput += p.envelopeVolume;
 				}
+			}
+		}
+
+		uint8_t triangleOutput = (ultrasonic) ? 7 : triangle.sequencerTable[triangle.sequencerStep]; //should be 7.5. HMM set to 0?
+
+		uint8_t noiseOutput = 0;
+		if(!(noise.lfsr & 1) && noise.lengthCounter)
+		{
+			if(noise.constant)
+			{
+				noiseOutput = noise.volume;
+			}
+			else
+			{
+				noiseOutput = noise.envelopeVolume;
 			}
 		}
 
 		if(++nearestCounter == 20)
 		{
 			// uint8_t asd = uint8_t((95.88 / (8128.0f / output + 100.0f)) * 255.0f);
-			// noiseOutput.push_back(asd);
 			
-			noiseOutput.push_back(output);
+			apuSamples.push_back(mixer.pulse[pulseOutput] + mixer.tnd[triangleOutput + noiseOutput*2]);
+			// apuSamples.push_back(pulseOutput + noiseOutput);
 			++sampleCount;
 			nearestCounter = 0;
 		}
@@ -224,13 +294,13 @@ void apu::Tick()
 
 uint8_t* apu::GetOutput() //734 samples/frame = 60.0817), use as timer?
 {
-	return noiseOutput.data();
+	return apuSamples.data();
 }
 
 
 void apu::ClearOutput()
 {
-	noiseOutput.clear();
+	apuSamples.clear();
 	sampleCount = 0;
 }
 
@@ -245,20 +315,50 @@ void apu::QuarterFrame()
 			p.envelopeVolume = 15;
 			p.envelopeCounter = p.volume;
 		}
-		else
+		else if(!p.envelopeCounter--)
 		{
-			if(!p.envelopeCounter--)
+			p.envelopeCounter = p.volume;
+			if(p.envelopeVolume)
 			{
-				p.envelopeCounter = p.volume;
-				if(p.envelopeVolume)
-				{
-					--p.envelopeVolume;
-				}
-				else if(p.halt)
-				{
-					p.envelopeVolume = 15;
-				}
+				--p.envelopeVolume;
 			}
+			else if(p.halt)
+			{
+				p.envelopeVolume = 15;
+			}
+		}
+	}
+
+	if(triangle.linearReload)
+	{
+		triangle.linearCounter = triangle.linearLoad;
+	}
+	else if(triangle.linearCounter)
+	{
+		--triangle.linearCounter;
+	}
+
+	if(!triangle.halt)
+	{
+		triangle.linearReload = false;
+	}
+
+	if(noise.envelopeReset)
+	{
+		noise.envelopeReset = false;
+		noise.envelopeVolume = 15;
+		noise.envelopeCounter = noise.volume;
+	}
+	else if(!noise.envelopeCounter--)
+	{
+		noise.envelopeCounter = noise.volume;
+		if(noise.envelopeVolume)
+		{
+			--noise.envelopeVolume;
+		}
+		else if(noise.halt)
+		{
+			noise.envelopeVolume = 15;
 		}
 	}
 }
@@ -293,6 +393,16 @@ void apu::HalfFrame()
 		{
 			--pulse[x].lengthCounter;
 		}
+	}
+
+	if(!triangle.halt && triangle.lengthCounter)
+	{
+		--triangle.lengthCounter;
+	}
+
+	if(!noise.halt && noise.lengthCounter)
+	{
+		--noise.lengthCounter;
 	}
 }
 
