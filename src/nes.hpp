@@ -7,10 +7,10 @@
 #include "ppu.hpp"
 
 
-class nes
+class Nes
 {
 	public:
-		nes(std::string inFile);
+		Nes(std::string inFile);
 		void AdvanceFrame(uint8_t input);
 
 		Ppu ppu;

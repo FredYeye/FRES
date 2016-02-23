@@ -66,7 +66,7 @@ int main(int argc, char* argv[])
 		exit(1);
 	}
 
-	nes nes(infile);
+	Nes nes(infile);
 
 	GLuint vao;
 	initialize(vao, nes.ppu.GetPixelPtr());

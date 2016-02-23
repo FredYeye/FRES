@@ -3,7 +3,7 @@
 #include <iostream>
 
 
-Ppu::ppu()
+Ppu::Ppu()
 {
 	oam.fill(0xFF);
 }

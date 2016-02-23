@@ -7,7 +7,7 @@
 class Ppu
 {
 	public:
-		ppu();
+		Ppu();
 		uint8_t StatusRead();
 		uint8_t OamDataRead();
 		uint8_t DataRead();

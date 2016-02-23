@@ -13,7 +13,7 @@
 #include "ppu.hpp"
 
 
-nes::nes(std::string inFile)
+Nes::Nes(std::string inFile)
 {
 	LoadRom(inFile);
 
@@ -53,7 +53,7 @@ nes::nes(std::string inFile)
 }
 
 
-void nes::AdvanceFrame(uint8_t input)
+void Nes::AdvanceFrame(uint8_t input)
 {
 	while(!ppu.RenderFrame())
 	{
@@ -67,7 +67,7 @@ void nes::AdvanceFrame(uint8_t input)
 }
 
 
-void nes::LoadRom(std::string inFile)
+void Nes::LoadRom(std::string inFile)
 {
 	std::ifstream iFile(inFile.c_str(), std::ios::in | std::ios::binary);
 	if(iFile.is_open() == false)
@@ -116,7 +116,7 @@ void nes::LoadRom(std::string inFile)
 }
 
 
-void nes::RunOpcode()
+void Nes::RunOpcode()
 {
 	const uint8_t opcode = cpuMem[PC];
 	const uint8_t op1 = cpuMem[PC+1];
@@ -961,7 +961,7 @@ void nes::RunOpcode()
 }
 
 
-void nes::CpuRead(uint16_t address)
+void Nes::CpuRead(uint16_t address)
 {
 	addressBus = address;
 	dataBus = cpuMem[addressBus];
@@ -993,7 +993,7 @@ void nes::CpuRead(uint16_t address)
 }
 
 
-void nes::CpuWrite(uint16_t address, uint8_t data) // block writes to ppu on the first screen
+void Nes::CpuWrite(uint16_t address, uint8_t data) // block writes to ppu on the first screen
 {
 	addressBus = address;
 	dataBus = data;
@@ -1106,7 +1106,7 @@ void nes::CpuWrite(uint16_t address, uint8_t data) // block writes to ppu on the
 }
 
 
-void nes::CpuTick()
+void Nes::CpuTick()
 {
 	apu.Tick();
 	ppu.Tick();
@@ -1115,7 +1115,7 @@ void nes::CpuTick()
 }
 
 
-void nes::CpuOpDone()
+void Nes::CpuOpDone()
 {
 	if(nmiLine)
 	{
@@ -1138,7 +1138,7 @@ void nes::CpuOpDone()
 }
 
 
-void nes::DebugCpu()
+void Nes::DebugCpu()
 {
 	const std::array<std::string, 256> opName
 	{
