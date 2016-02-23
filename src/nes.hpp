@@ -13,8 +13,8 @@ class nes
 		nes(std::string inFile);
 		void AdvanceFrame(uint8_t input);
 
-		ppu ppu;
-		apu apu;
+		Ppu ppu;
+		Apu apu;
 
 	private:
 		void LoadRom(std::string inFile);

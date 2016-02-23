@@ -3,13 +3,13 @@
 #include <iostream>
 
 
-ppu::ppu()
+Ppu::ppu()
 {
 	oam.fill(0xFF);
 }
 
 
-uint8_t ppu::StatusRead() //2002
+uint8_t Ppu::StatusRead() //2002
 {
 	if(scanlineV == 241)
 	{
@@ -34,14 +34,14 @@ uint8_t ppu::StatusRead() //2002
 }
 
 
-uint8_t ppu::OamDataRead()
+uint8_t Ppu::OamDataRead()
 {
 	//do more stuff (reads while sprite eval is running)
 	return oam[oamAddr];
 }
 
 
-uint8_t ppu::DataRead() //2007
+uint8_t Ppu::DataRead() //2007
 {
 	if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18)) //figure out what happens otherwise
 	{
@@ -58,32 +58,32 @@ uint8_t ppu::DataRead() //2007
 }
 
 
-void ppu::CtrlWrite(uint8_t dataBus) //2000
+void Ppu::CtrlWrite(uint8_t dataBus) //2000
 {
 	ppuCtrl = dataBus;
 	ppuAddressLatch = (ppuAddressLatch & 0x73FF) | ((ppuCtrl & 0x03) << 10);
 }
 
 
-void ppu::MaskWrite(uint8_t dataBus) //2001
+void Ppu::MaskWrite(uint8_t dataBus) //2001
 {
 	ppuMask = dataBus;
 }
 
 
-void ppu::OamAddrWrite(uint8_t dataBus) //2003
+void Ppu::OamAddrWrite(uint8_t dataBus) //2003
 {
 	oamAddr = dataBus;
 }
 
 
-void ppu::OamDataWrite(uint8_t dataBus) //2004
+void Ppu::OamDataWrite(uint8_t dataBus) //2004
 {
 	oam[oamAddr++] = dataBus;
 }
 
 
-void ppu::ScrollWrite(uint8_t dataBus) //2005
+void Ppu::ScrollWrite(uint8_t dataBus) //2005
 {
 	if(!wToggle)
 	{
@@ -98,7 +98,7 @@ void ppu::ScrollWrite(uint8_t dataBus) //2005
 }
 
 
-void ppu::AddrWrite(uint8_t dataBus) //2006
+void Ppu::AddrWrite(uint8_t dataBus) //2006
 {
 	if(!wToggle)
 	{
@@ -113,7 +113,7 @@ void ppu::AddrWrite(uint8_t dataBus) //2006
 }
 
 
-void ppu::DataWrite(uint8_t dataBus) //2007
+void Ppu::DataWrite(uint8_t dataBus) //2007
 {
 	if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18))
 	{
@@ -128,7 +128,7 @@ void ppu::DataWrite(uint8_t dataBus) //2007
 }
 
 
-void ppu::Tick()
+void Ppu::Tick()
 {
 	if(scanlineV < 240) //visible scanlines
 	{
@@ -249,7 +249,7 @@ void ppu::Tick()
 }
 
 
-void ppu::RenderFetches() //things done during visible and prerender scanlines
+void Ppu::RenderFetches() //things done during visible and prerender scanlines
 {
 	if(ppuMask & 0b00011000) //if rendering is enabled
 	{
@@ -392,7 +392,7 @@ void ppu::RenderFetches() //things done during visible and prerender scanlines
 }
 
 
-void ppu::OamScan()
+void Ppu::OamScan()
 {
 	if(scanlineH && !(scanlineH & 1))
 	{
@@ -451,7 +451,7 @@ void ppu::OamScan()
 }
 
 
-void ppu::OamUpdateIndex()
+void Ppu::OamUpdateIndex()
 {
 	oamSpritenum += 4;
 	if(!oamSpritenum) //entire oam searched
@@ -469,7 +469,7 @@ void ppu::OamUpdateIndex()
 }
 
 
-bool ppu::PollNmi()
+bool Ppu::PollNmi()
 {
 	if(suppressNmi)
 	{
@@ -490,7 +490,7 @@ bool ppu::PollNmi()
 }
 
 
-void ppu::ReverseBits(uint8_t &b)
+void Ppu::ReverseBits(uint8_t &b)
 {
 	b = b >> 4 | b << 4;
 	b = (b & 0b11001100) >> 2 | (b & 0b00110011) << 2;
@@ -498,7 +498,7 @@ void ppu::ReverseBits(uint8_t &b)
 }
 
 
-const bool ppu::RenderFrame()
+const bool Ppu::RenderFrame()
 {
 	const bool currentRenderFrame = renderFrame;
 	renderFrame = false;
@@ -506,31 +506,31 @@ const bool ppu::RenderFrame()
 }
 
 
-std::array<uint8_t, 0x4000>::iterator ppu::VramIterator()
+std::array<uint8_t, 0x4000>::iterator Ppu::VramIterator()
 {
 	return vram.begin();
 }
 
 
-const std::array<uint8_t, 256*240*3>* const ppu::GetPixelPtr() const
+const std::array<uint8_t, 256*240*3>* const Ppu::GetPixelPtr() const
 {
 	return &render;
 }
 
 
-uint16_t ppu::GetScanlineH()
+uint16_t Ppu::GetScanlineH()
 {
 	return scanlineH;
 }
 
 
-uint16_t ppu::GetScanlineV()
+uint16_t Ppu::GetScanlineV()
 {
 	return scanlineV;
 }
 
 
-const std::array<uint8_t, 0x4000>& ppu::GetVram()
+const std::array<uint8_t, 0x4000>& Ppu::GetVram()
 {
 	return vram;
 }

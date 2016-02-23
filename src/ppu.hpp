@@ -4,7 +4,7 @@
 #include <array>
 
 
-class ppu
+class Ppu
 {
 	public:
 		ppu();

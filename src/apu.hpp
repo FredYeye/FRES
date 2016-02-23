@@ -87,7 +87,7 @@ struct Mixer
 };
 
 
-class apu
+class Apu
 {
 	public:
 		void Pulse0Write(uint8_t dataBus, bool channel); //4000 / 4004

@@ -2,7 +2,7 @@
 #include "apu.hpp"
 
 
-void apu::Pulse0Write(uint8_t dataBus, bool channel)
+void Apu::Pulse0Write(uint8_t dataBus, bool channel)
 {
 	const std::array<uint8_t, 4> dutyTable{{0b0000010, 0b00000110, 0b00011110, 0b11111001}};
 	pulse[channel].duty = dutyTable[dataBus >> 6];
@@ -12,7 +12,7 @@ void apu::Pulse0Write(uint8_t dataBus, bool channel)
 }
 
 
-void apu::Pulse1Write(uint8_t dataBus, bool channel)
+void Apu::Pulse1Write(uint8_t dataBus, bool channel)
 {
 	pulse[channel].sweepTimer = (dataBus >> 4) & 0b0111;
 	pulse[channel].sweepNegate = dataBus & 0b1000;
@@ -22,13 +22,13 @@ void apu::Pulse1Write(uint8_t dataBus, bool channel)
 }
 
 
-void apu::Pulse2Write(uint8_t dataBus, bool channel)
+void Apu::Pulse2Write(uint8_t dataBus, bool channel)
 {
 	pulse[channel].freqTimer = (pulse[channel].freqTimer & 0x700) | dataBus; //save high 3 bits or not?
 }
 
 
-void apu::Pulse3Write(uint8_t dataBus, bool channel)
+void Apu::Pulse3Write(uint8_t dataBus, bool channel)
 {
 	pulse[channel].freqTimer = (pulse[channel].freqTimer & 0xFF) | ((dataBus & 0b00000111) << 8);
 	if(pulse[channel].enable)
@@ -41,20 +41,20 @@ void apu::Pulse3Write(uint8_t dataBus, bool channel)
 }
 
 
-void apu::Triangle0Write(uint8_t dataBus)
+void Apu::Triangle0Write(uint8_t dataBus)
 {
 	triangle.halt = dataBus & 0b10000000;
 	triangle.linearLoad = dataBus & 0b01111111;
 }
 
 
-void apu::Triangle2Write(uint8_t dataBus)
+void Apu::Triangle2Write(uint8_t dataBus)
 {
 	triangle.freqTimer = (triangle.freqTimer & 0x700) | dataBus;
 }
 
 
-void apu::Triangle3Write(uint8_t dataBus)
+void Apu::Triangle3Write(uint8_t dataBus)
 {
 	triangle.freqTimer = (triangle.freqTimer & 0xFF) | ((dataBus & 0b00000111) << 8);
 	if(triangle.enable)
@@ -65,7 +65,7 @@ void apu::Triangle3Write(uint8_t dataBus)
 }
 
 
-void apu::Noise0Write(uint8_t dataBus)
+void Apu::Noise0Write(uint8_t dataBus)
 {
 	noise.halt = dataBus & 0b00100000;
 	noise.constant = dataBus & 0b00010000;
@@ -73,7 +73,7 @@ void apu::Noise0Write(uint8_t dataBus)
 }
 
 
-void apu::Noise2Write(uint8_t dataBus)
+void Apu::Noise2Write(uint8_t dataBus)
 {
 	const std::array<uint16_t, 16> noisePeriod{{4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068}};
 	noise.freqTimer = noisePeriod[dataBus & 0b1111];
@@ -81,7 +81,7 @@ void apu::Noise2Write(uint8_t dataBus)
 }
 
 
-void apu::Noise3Write(uint8_t dataBus)
+void Apu::Noise3Write(uint8_t dataBus)
 {
 	if(noise.enable)
 	{
@@ -91,7 +91,7 @@ void apu::Noise3Write(uint8_t dataBus)
 }
 
 
-void apu::StatusWrite(uint8_t dataBus) //4015
+void Apu::StatusWrite(uint8_t dataBus) //4015
 {
 	pulse[0].enable = dataBus & 0b0001;
 	if(!pulse[0].enable)
@@ -118,7 +118,7 @@ void apu::StatusWrite(uint8_t dataBus) //4015
 }
 
 
-uint8_t apu::StatusRead()
+uint8_t Apu::StatusRead()
 {
 	uint8_t data = 0;
 	if(pulse[0].lengthCounter)
@@ -144,7 +144,7 @@ uint8_t apu::StatusRead()
 }
 
 
-void apu::FrameCounterWrite(uint8_t dataBus) //4017
+void Apu::FrameCounterWrite(uint8_t dataBus) //4017
 {
 	sequencerMode = dataBus & 0b10000000;
 	blockIRQ = dataBus & 0b01000000;
@@ -163,7 +163,7 @@ void apu::FrameCounterWrite(uint8_t dataBus) //4017
 }
 
 
-void apu::Tick()
+void Apu::Tick()
 {
 	bool ultrasonic = false;
 	if(triangle.freqTimer < 2 && !triangle.freqCounter)
@@ -292,20 +292,20 @@ void apu::Tick()
 }
 
 
-uint8_t* apu::GetOutput() //734 samples/frame = 60.0817), use as timer?
+uint8_t* Apu::GetOutput() //734 samples/frame = 60.0817), use as timer?
 {
 	return apuSamples.data();
 }
 
 
-// void apu::ClearOutput()
+// void Apu::ClearOutput()
 // {
 	// apuSamples.Clear();
 	// sampleCount = 0;
 // }
 
 
-void apu::QuarterFrame()
+void Apu::QuarterFrame()
 {
 	for(auto &p : pulse)
 	{
@@ -364,7 +364,7 @@ void apu::QuarterFrame()
 }
 
 
-void apu::HalfFrame()
+void Apu::HalfFrame()
 {
 	for(uint8_t x = 0; x <= 1; ++x)
 	{
@@ -408,7 +408,7 @@ void apu::HalfFrame()
 
 
 
-bool apu::SweepForcingSilence(const Pulse &p)
+bool Apu::SweepForcingSilence(const Pulse &p)
 {
 	//>= 0x800 surely can be done better, also see !sweepNegate above
 	if(p.freqTimer < 8 || (!p.sweepNegate && p.freqTimer + (p.freqTimer >> p.sweepShift) >= 0x800))
