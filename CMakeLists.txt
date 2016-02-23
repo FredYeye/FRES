@@ -19,7 +19,7 @@ include_directories(${SDL_LIB})
 find_library(SDL_LIBRARY "libSDL2.dll.a")
 find_library(SDL_LIBRARY2 "libSDL2main.a")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -march=native") #-flto
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -march=native") #-flto -static
 add_definitions(-lglfw3 -lopengl32 -lSDL2main -lSDL2)
 
 set(source_files

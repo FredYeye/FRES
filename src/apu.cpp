@@ -123,11 +123,15 @@ uint8_t apu::StatusRead()
 	uint8_t data = 0;
 	if(pulse[0].lengthCounter)
 	{
-		data |= 1;
+		data |= 0b0001;
 	}
 	if(pulse[1].lengthCounter)
 	{
-		data |= 0b10;
+		data |= 0b0010;
+	}
+	if(triangle.lengthCounter)
+	{
+		data |= 0b0100;
 	}
 	if(noise.lengthCounter)
 	{
@@ -278,11 +282,7 @@ void apu::Tick()
 
 		if(++nearestCounter == 20)
 		{
-			// uint8_t asd = uint8_t((95.88 / (8128.0f / output + 100.0f)) * 255.0f);
-			
-			apuSamples.push_back(mixer.pulse[pulseOutput] + mixer.tnd[triangleOutput + noiseOutput*2]);
-			// apuSamples.push_back(pulseOutput + noiseOutput);
-			++sampleCount;
+			apuSamples[sampleCount++] = (mixer.pulse[pulseOutput] + mixer.tnd[triangleOutput*3 + noiseOutput*2]);
 			nearestCounter = 0;
 		}
 	}
@@ -298,11 +298,11 @@ uint8_t* apu::GetOutput() //734 samples/frame = 60.0817), use as timer?
 }
 
 
-void apu::ClearOutput()
-{
-	apuSamples.clear();
-	sampleCount = 0;
-}
+// void apu::ClearOutput()
+// {
+	// apuSamples.Clear();
+	// sampleCount = 0;
+// }
 
 
 void apu::QuarterFrame()

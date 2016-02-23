@@ -34,7 +34,7 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	SDL_AudioSpec desired = {44100, AUDIO_S8, 1, 0, 4096, 0, 0, 0};
+	SDL_AudioSpec desired = {44100, AUDIO_S8, 1, 0, 4096, 0, 0, 0}; //signed or unsigned?
 	SDL_AudioDeviceID dev = SDL_OpenAudioDevice(0, 0, &desired, 0, SDL_AUDIO_ALLOW_ANY_CHANGE);
 	if(dev == 0)
 	{
@@ -89,8 +89,8 @@ int main(int argc, char* argv[])
 		glfwPollEvents();
 
 		//audio
-		SDL_QueueAudio(dev, nes.apu.GetOutput(), nes.apu.sampleCount);
-		nes.apu.ClearOutput();
+		SDL_QueueAudio(dev, nes.apu.GetOutput(), 734); //try 734
+		nes.apu.sampleCount = 0; // nes.apu.ClearOutput();
 
 		std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
 		std::chrono::microseconds tus = std::chrono::duration_cast<std::chrono::microseconds>(t2-t1);
