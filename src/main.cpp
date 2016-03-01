@@ -1,6 +1,5 @@
 #include "gl_core_3_3.h"
 #include <GLFW/glfw3.h>
-#include "SDL2/SDL.h"
 
 #include <chrono>
 #include <iostream>
@@ -10,13 +9,11 @@
 
 #include "main.hpp"
 #include "nes.hpp"
+#include "audio.hpp"
 
 
 uint8_t input;
 
-#ifdef main
-#undef main
-#endif
 
 int main(int argc, char* argv[])
 {
@@ -26,22 +23,6 @@ int main(int argc, char* argv[])
 		exit(0);
 	}
 	const std::string infile = argv[1];
-
-	// init audio
-	if (SDL_Init(SDL_INIT_AUDIO) < 0)
-	{
-		std::cout << "audio init failed\n";
-		return 1;
-	}
-
-	SDL_AudioSpec desired = {44100, AUDIO_S8, 1, 0, 4096, 0, 0, 0}; //signed or unsigned?
-	SDL_AudioDeviceID dev = SDL_OpenAudioDevice(0, 0, &desired, 0, SDL_AUDIO_ALLOW_ANY_CHANGE);
-	if(dev == 0)
-	{
-		std::cout << "Failed to open audio: " << SDL_GetError() << "\n";
-		return 1;
-	}
-	SDL_PauseAudioDevice(dev, 0);
 
 	// init video
 	if(!glfwInit())
@@ -72,13 +53,16 @@ int main(int argc, char* argv[])
 	initialize(vao, nes.ppu.GetPixelPtr());
 	glfwSetKeyCallback(window, key_callback);
 
+	// init audio
+	Audio audio(nes.apu.GetOutput(), 166393);
+	audio.StartAudio();
+
+
 	uint32_t frameTime = 0;
 	uint16_t frames = 0;
 
 	while (!glfwWindowShouldClose(window))
 	{
-		std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-
 		nes.AdvanceFrame(input);
 
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -88,30 +72,11 @@ int main(int argc, char* argv[])
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 
-		//audio
-		SDL_QueueAudio(dev, nes.apu.GetOutput(), 734); //try 734
-		nes.apu.sampleCount = 0; // nes.apu.ClearOutput();
-
-		std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-		std::chrono::microseconds tus = std::chrono::duration_cast<std::chrono::microseconds>(t2-t1);
-
-		if(tus < std::chrono::microseconds(16639)) //16639 for 60.0988hz
-		{
-			std::this_thread::sleep_for(std::chrono::microseconds(16639) - tus);
-		}
-
-		std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
-		frameTime += std::chrono::duration_cast<std::chrono::microseconds>(t3-t1).count();
-		++frames;
-		if(frameTime >= 1000000)
-		{
-			std::cout << frames << " fps" << std::endl;
-			frameTime = 0;
-			frames = 0;
-		}
+		audio.StreamSource(); // framerate controlled by audio playback
+		nes.apu.sampleCount = 0;
 	}
 
-	SDL_CloseAudioDevice(dev);
+	audio.StopAudio();
 	glfwTerminate();
 	return 0;
 }

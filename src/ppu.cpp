@@ -219,7 +219,7 @@ void Ppu::Tick()
 	{
 		if(scanlineH == 1)
 		{
-			ppuStatus &= 0x1F; //clear sprite overflow, sprite 0 hit and vblank
+			ppuStatus &= 0b00011111; //clear sprite overflow, sprite 0 hit and vblank
 			suppressNmi = false;
 			suppressNmiFlag = false;
 		}

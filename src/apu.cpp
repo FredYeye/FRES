@@ -282,7 +282,9 @@ void Apu::Tick()
 
 		if(++nearestCounter == 20)
 		{
-			apuSamples[sampleCount++] = (mixer.pulse[pulseOutput] + mixer.tnd[triangleOutput*3 + noiseOutput*2]);
+			apuSamples[sampleCount*2] = mixer.pulse[pulseOutput] + mixer.tnd[triangleOutput*3 + noiseOutput*2];
+			apuSamples[sampleCount*2+1] = mixer.pulse[pulseOutput] + mixer.tnd[triangleOutput*3 + noiseOutput*2];
+			++sampleCount;
 			nearestCounter = 0;
 		}
 	}
@@ -292,17 +294,10 @@ void Apu::Tick()
 }
 
 
-uint8_t* Apu::GetOutput() //734 samples/frame = 60.0817), use as timer?
+void* Apu::GetOutput() //734 samples/frame = 60.0817), use as timer?
 {
 	return apuSamples.data();
 }
-
-
-// void Apu::ClearOutput()
-// {
-	// apuSamples.Clear();
-	// sampleCount = 0;
-// }
 
 
 void Apu::QuarterFrame()

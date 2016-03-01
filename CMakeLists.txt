@@ -14,14 +14,7 @@ if(MINGW)
 	include_directories(${GLFW_LIB})
 	find_library(GLFW_LIBRARY "glfw3" HINTS ${GLFW_LIB})
 
-	find_path(SDL_INCLUDE SDL2/SDL.h PATHS NO_DEFAULT_PATH DOC "SDL include path")
-	find_path(SDL_LIB libSDL2.a PATHS NO_DEFAULT_PATH DOC "SDL lib path")
-	include_directories(${SDL_INCLUDE})
-	include_directories(${SDL_LIB})
-	find_library(SDL_LIBRARY "libSDL2.dll.a")
-	find_library(SDL_LIBRARY2 "libSDL2main.a")
-
-	add_definitions(-lglfw3 -lopengl32 -lSDL2main -lSDL2)
+	add_definitions(-lglfw3 -lopengl32)
 endif(MINGW)
 
 if(UNIX)
@@ -47,6 +40,8 @@ set(source_files
 	src/nes.cpp
 	src/apu.cpp
 	src/ppu.cpp
+	src/audio.cpp
+	src/file.cpp
 	src/gl_core_3_3.c
 	)
 
@@ -55,13 +50,15 @@ set(header_files
 	src/nes.hpp
 	src/apu.hpp
 	src/ppu.hpp
+	src/audio.hpp
+	src/file.hpp
 	src/gl_core_3_3.h
 	)
 
 add_executable(${project_name} ${header_files} ${source_files})
 
 if(MINGW)
-	target_link_libraries(nes ${GLFW_LIBRARY} opengl32 ${SDL_LIBRARY} ${SDL_LIBRARY2})
+	target_link_libraries(nes ${GLFW_LIBRARY} opengl32 ole32 ksuser)
 endif(MINGW)
 
 if(UNIX)
