@@ -26,7 +26,7 @@ class Ppu
 
 		const bool RenderFrame();
 		std::array<uint8_t, 0x4000>::iterator VramIterator();
-		const std::array<uint8_t, 256*240*3>* const GetPixelPtr() const;
+		const uint8_t* const GetPixelPtr() const;
 
 		uint16_t GetScanlineH();
 		uint16_t GetScanlineV();
@@ -66,6 +66,8 @@ class Ppu
 		std::array<uint8_t, 0x4000> vram;
 		std::array<uint8_t, 64*4> oam;
 		std::array<uint8_t, 8*4> oam2;
+
+		uint32_t renderPos = 0;
 
 		uint8_t ppuCtrl = 0;
 		uint8_t ppuMask = 0;

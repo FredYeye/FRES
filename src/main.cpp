@@ -61,19 +61,32 @@ int main(int argc, char* argv[])
 	uint32_t frameTime = 0;
 	uint16_t frames = 0;
 
-	while (!glfwWindowShouldClose(window))
+	while(!glfwWindowShouldClose(window))
 	{
+		// nes.AdvanceFrame(input);
+
+		// audio.StreamSource(); // framerate controlled by audio playback
+		// nes.apu.sampleCount = 0;
+
+		// glClear(GL_COLOR_BUFFER_BIT);
+		// glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 240, GL_RGB, GL_UNSIGNED_BYTE, nes.ppu.GetPixelPtr());
+		// glBindVertexArray(vao);
+		// glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, 0);
+		// glfwSwapBuffers(window);
+		// glfwPollEvents();
+
+		glfwPollEvents();
 		nes.AdvanceFrame(input);
 
 		glClear(GL_COLOR_BUFFER_BIT);
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 240, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)nes.ppu.GetPixelPtr());
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 240, GL_RGB, GL_UNSIGNED_BYTE, nes.ppu.GetPixelPtr());
 		glBindVertexArray(vao);
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, 0);
-		glfwSwapBuffers(window);
-		glfwPollEvents();
 
 		audio.StreamSource(); // framerate controlled by audio playback
 		nes.apu.sampleCount = 0;
+
+		glfwSwapBuffers(window);
 	}
 
 	audio.StopAudio();
@@ -82,7 +95,7 @@ int main(int argc, char* argv[])
 }
 
 
-void initialize(GLuint &vao, const std::array<uint8_t, 256*240*3> *pixelPtr)
+void initialize(GLuint &vao, const uint8_t *const pixelPtr)
 {
 	// Use a Vertex Array Object
 	glGenVertexArrays(1, &vao);
@@ -185,8 +198,8 @@ GLuint load_and_compile_shader(std::string &sName, GLenum shaderType)
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &test);
 	if(!test) {
 		std::cerr << "Shader compilation failed with this message:" << std::endl;
-		std::vector<char> compilation_log(512);
-		glGetShaderInfoLog(shader, compilation_log.size(), NULL, &compilation_log[0]);
+		std::array<char, 512> compilation_log;
+		glGetShaderInfoLog(shader, compilation_log.size(), 0, compilation_log.data());
 		std::cerr << &compilation_log[0] << std::endl;
 		glfwTerminate();
 		exit(-1);

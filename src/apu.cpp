@@ -2,6 +2,24 @@
 #include "apu.hpp"
 
 
+Apu::Apu()
+{
+	for(uint8_t x = 0; x < 31; ++x)
+	{
+		// mixer.pulse[x] = std::round((95.52 / (8128.0 / x+100)) * 255.0); //8-bit
+		// mixer.pulse[x] = std::round((95.52 / (8128.0 / x+100)) * 65535.0); //16-bit
+		mixer.pulse[x] = 95.52 / (8128.0 / x+100); //float
+	}
+
+	for(uint8_t x = 0; x < 203; ++x)
+	{
+		// mixer.tnd[x] = std::round((163.67 / (24329.0 / x+100)) * 255.0); //8-bit
+		// mixer.tnd[x] = std::round((163.67 / (24329.0 / x+100)) * 65535.0); //16-bit
+		mixer.tnd[x] = 163.67 / (24329.0 / x+100); //float
+	}
+}
+
+
 void Apu::Pulse0Write(uint8_t dataBus, bool channel)
 {
 	const std::array<uint8_t, 4> dutyTable{{0b0000010, 0b00000110, 0b00011110, 0b11111001}};
@@ -69,7 +87,7 @@ void Apu::Noise0Write(uint8_t dataBus)
 {
 	noise.halt = dataBus & 0b00100000;
 	noise.constant = dataBus & 0b00010000;
-	noise.volume = 0b00001111;
+	noise.volume = dataBus & 0b00001111;
 }
 
 
@@ -280,8 +298,9 @@ void Apu::Tick()
 			}
 		}
 
-		if(++nearestCounter == 20)
+		if(++nearestCounter == outputCounter[outI])
 		{
+			++outI &= 0b11111;
 			apuSamples[sampleCount*2] = mixer.pulse[pulseOutput] + mixer.tnd[triangleOutput*3 + noiseOutput*2];
 			apuSamples[sampleCount*2+1] = mixer.pulse[pulseOutput] + mixer.tnd[triangleOutput*3 + noiseOutput*2];
 			++sampleCount;
@@ -400,7 +419,6 @@ void Apu::HalfFrame()
 		--noise.lengthCounter;
 	}
 }
-
 
 
 bool Apu::SweepForcingSilence(const Pulse &p)

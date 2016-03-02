@@ -131,9 +131,9 @@ void Audio::Init()
 	hr = pAudioClient->GetMixFormat(&pwfx);
 	TestHResult(hr, "GetMixFormat");
 
-	int64_t sharedLatency, exclusiveLatency;
-	pAudioClient->GetDevicePeriod(&sharedLatency, &exclusiveLatency);
-	std::cout << "shared mode latency: " << (0.0001 * sharedLatency) << "ms, exclusive mode latency: " << (0.0001 * exclusiveLatency) << "ms\n";
+	// int64_t sharedLatency, exclusiveLatency;
+	// pAudioClient->GetDevicePeriod(&sharedLatency, &exclusiveLatency);
+	// std::cout << "shared mode latency: " << (0.0001 * sharedLatency) << "ms, exclusive mode latency: " << (0.0001 * exclusiveLatency) << "ms\n";
 
 	hr = pAudioClient->Initialize(AUDCLNT_SHAREMODE_SHARED, 0, requestedDuration, 0, pwfx, 0);
 	TestHResult(hr, "Initialize");
@@ -146,7 +146,7 @@ void Audio::Init()
 	hnsActualDuration = double(referenceTimeSec) * bufferFrameCount / pwfx->nSamplesPerSec;
 	sleepTime = double(hnsActualDuration) / referenceTimeMSec / 2;
 
-	std::cout << "requested " << requestedDuration * 0.0001 << "ms, actual duration: " << hnsActualDuration * 0.0001 << "ms\n";
+	// std::cout << "requested " << requestedDuration * 0.0001 << "ms, actual duration: " << hnsActualDuration * 0.0001 << "ms\n";
 
 	const IID IID_IAudioRenderClient = __uuidof(IAudioRenderClient);
 	hr = pAudioClient->GetService(IID_IAudioRenderClient, (void**)&pRenderClient);
@@ -167,7 +167,7 @@ void Audio::SetFormat()
 		WAVEFORMATEXTENSIBLE *pwfxEx = (WAVEFORMATEXTENSIBLE*)pwfx;
 		if(pwfxEx->SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)
 		{
-			std::cout << "Float samples\n";
+			// std::cout << "Float samples\n";
 		}
 	}
 
