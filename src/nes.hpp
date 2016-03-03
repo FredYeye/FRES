@@ -2,6 +2,7 @@
 
 #include <array>
 #include <bitset>
+#include <vector>
 
 #include "apu.hpp"
 #include "ppu.hpp"
@@ -38,4 +39,8 @@ class Nes
 		bool readJoy1 = false;
 
 		bool nmiLine = false;
+
+		uint8_t mapper;
+		
+		std::vector<uint8_t> kass;
 };

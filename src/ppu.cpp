@@ -61,7 +61,7 @@ uint8_t Ppu::DataRead() //2007
 void Ppu::CtrlWrite(uint8_t dataBus) //2000
 {
 	ppuCtrl = dataBus;
-	ppuAddressLatch = (ppuAddressLatch & 0x73FF) | ((ppuCtrl & 0x03) << 10);
+	ppuAddressLatch = (ppuAddressLatch & 0x73FF) | ((ppuCtrl & 0b11) << 10);
 }
 
 
@@ -88,11 +88,11 @@ void Ppu::ScrollWrite(uint8_t dataBus) //2005
 	if(!wToggle)
 	{
 		ppuAddressLatch = (ppuAddressLatch & 0x7FE0) | (dataBus >> 3);
-		fineX = dataBus & 0x07;
+		fineX = dataBus & 0b0111;
 	}
 	else
 	{
-		ppuAddressLatch = (ppuAddressLatch & 0xC1F) | ((dataBus & 0x07) << 12) | ((dataBus & 0xF8) << 2);
+		ppuAddressLatch = (ppuAddressLatch & 0xC1F) | ((dataBus & 0b0111) << 12) | ((dataBus & 0xF8) << 2);
 	}
 	wToggle = !wToggle;
 }
@@ -408,6 +408,7 @@ void Ppu::OamScan()
 			if(!oamEvalPattern) //search for sprites in range
 			{
 				oam2[oam2Index] = oam[oamSpritenum]; //oam search starts at oam[oamAddr]
+
 				if(scanlineV >= oam[oamSpritenum] && scanlineV < oam[oamSpritenum] + 8 + (ppuCtrl >> 2 & 8))
 				{
 					++oamEvalPattern;
@@ -489,6 +490,12 @@ bool Ppu::PollNmi()
 		oldNmi = nmi;
 		return false;
 	}
+}
+
+
+void Ppu::SetNametableMirroring(uint16_t mirroring)
+{
+	nametableMirroring = ~mirroring;
 }
 
 

@@ -30,9 +30,9 @@ int main(int argc, char* argv[])
 		exit(1);
 	}
 
-	// GLFWwindow* window = glfwCreateWindow(256, 240, "FRES++", NULL, NULL);
-	GLFWwindow* window = glfwCreateWindow(512, 480, "FRES++", NULL, NULL);
-	if (!window)
+	// GLFWwindow* window = glfwCreateWindow(256, 240, "FRES++", 0, 0);
+	GLFWwindow* window = glfwCreateWindow(512, 480, "FRES++", 0, 0);
+	if(!window)
 	{
 		glfwTerminate();
 		exit(1);
@@ -54,7 +54,7 @@ int main(int argc, char* argv[])
 	glfwSetKeyCallback(window, key_callback);
 
 	// init audio
-	Audio audio(nes.apu.GetOutput(), 166393);
+	Audio audio(nes.apu.GetOutput(), 166440); //166393
 	audio.StartAudio();
 
 
@@ -102,9 +102,9 @@ void initialize(GLuint &vao, const uint8_t *const pixelPtr)
 	glBindVertexArray(vao);
 
 	// 1 square (made by 2 triangles) to be rendered
-	GLfloat vertices_position[8] = {-1.0f,1.0f,	1.0f,1.0f, 1.0f,-1.0f, -1.0f,-1.0f};
-	GLfloat texture_coord[8] = {0.0f,0.0f, 1.0f,0.0f, 1.0f,1.0f, 0.0f,1.0f};
-	uint8_t indices[6] = {0,1,2, 2,3,0};
+	const float vertices_position[8] = {-1.0f,1.0f,	1.0f,1.0f, 1.0f,-1.0f, -1.0f,-1.0f};
+	const float texture_coord[8] = {0.0f,0.0f, 1.0f,0.0f, 1.0f,1.0f, 0.0f,1.0f};
+	const uint8_t indices[6] = {0,1,2, 2,3,0};
 
 	std::string vertex = "in vec4 position; in vec2 texture_coord; out vec2 texture_coord_from_vshader; void main() {gl_Position = position; texture_coord_from_vshader = texture_coord;}";
 	std::string fragment = "in vec2 texture_coord_from_vshader; out vec4 out_color; uniform sampler2D texture_sampler; void main() {out_color = texture(texture_sampler, texture_coord_from_vshader);}";
@@ -115,7 +115,7 @@ void initialize(GLuint &vao, const uint8_t *const pixelPtr)
 
 	// Allocate space for vertex positions and texture coordinates
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices_position) + sizeof(texture_coord), NULL, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices_position) + sizeof(texture_coord), 0, GL_STATIC_DRAW);
 
 	// Transfer the vertex positions:
 	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices_position), vertices_position);
@@ -138,7 +138,7 @@ void initialize(GLuint &vao, const uint8_t *const pixelPtr)
 	// Specify that we work with a 2D texture
 	glBindTexture(GL_TEXTURE_2D, texture);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 240, 0, GL_RGB, GL_UNSIGNED_BYTE, (GLvoid*)pixelPtr);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 240, 0, GL_RGB, GL_UNSIGNED_BYTE, pixelPtr);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
@@ -154,7 +154,7 @@ void initialize(GLuint &vao, const uint8_t *const pixelPtr)
 
 	// Texture coord attribute
 	GLint texture_coord_attribute = glGetAttribLocation(shaderProgram, "texture_coord");
-	glVertexAttribPointer(texture_coord_attribute, 2, GL_FLOAT, GL_FALSE, 0, (GLvoid *)sizeof(vertices_position));
+	glVertexAttribPointer(texture_coord_attribute, 2, GL_FLOAT, GL_FALSE, 0, (GLvoid*)sizeof(vertices_position));
 	glEnableVertexAttribArray(texture_coord_attribute);
 }
 
@@ -186,11 +186,11 @@ GLuint load_and_compile_shader(std::string &sName, GLenum shaderType)
 {
 	std::vector<char> buffer(sName.begin(), sName.end());
 	buffer.push_back(0);
-	const char *src = &buffer[0];
+	const char *src = buffer.data();
 
 	// Compile the shader
 	GLuint shader = glCreateShader(shaderType);
-	glShaderSource(shader, 1, &src, NULL);
+	glShaderSource(shader, 1, &src, 0);
 	glCompileShader(shader);
 
 	// Check the result of the compilation
@@ -222,13 +222,9 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 		shift <<= 1;
 	}
 
-
-	if(action == GLFW_PRESS)
+	if(action == GLFW_PRESS && key == GLFW_KEY_ESCAPE)
 	{
-		if(key == GLFW_KEY_ESCAPE)
-		{
-			glfwSetWindowShouldClose(window, GL_TRUE);
-		}
+		glfwSetWindowShouldClose(window, GL_TRUE);
 	}
 
 	return;

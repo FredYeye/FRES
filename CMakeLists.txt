@@ -6,7 +6,7 @@ project(${project_name})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 if(MINGW)
-	message(status "bad choice")
+	message("bad choice")
 
 	find_path(GLFW_INCLUDE GLFW/glfw3.h PATHS NO_DEFAULT_PATH DOC "GLFW include path")
 	find_path(GLFW_LIB glfw3.dll PATHS NO_DEFAULT_PATH DOC "GLFW lib path")
@@ -18,7 +18,7 @@ if(MINGW)
 endif(MINGW)
 
 if(UNIX)
-	message(status "lucky! cha cha cha!")
+	message("lucky! cha cha cha!")
 
 	find_package(PkgConfig REQUIRED)
 	pkg_search_module(GLFW REQUIRED glfw3)

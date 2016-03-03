@@ -49,7 +49,6 @@ class Audio
 		const uint32_t referenceTimeSec = 10000000;
 		const uint32_t referenceTimeMSec = 10000;
 		int64_t requestedDuration = referenceTimeSec; //1 = 100ns (REFERENCE_TIME)
-		int64_t hnsActualDuration;
 
 		uint32_t bufferFrameCount;
 		uint32_t queuedFrames;
