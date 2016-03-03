@@ -83,8 +83,6 @@ void Nes::LoadRom(std::string inFile)
 
 	const std::string contentStr = contents.str();
 	const std::vector<uint8_t> contentVec(contentStr.begin(), contentStr.end());
-	kass = contentVec;
-
 
 	//ines header stuff
 	std::array<uint8_t, 16> header;
@@ -125,27 +123,9 @@ void Nes::LoadRom(std::string inFile)
 			std::cout << "Y layout\n";
 		}
 	}
-	else if(mapper == 2)
-	{
-		std::copy_n(contentVec.begin() + 0x10, 0x4000, cpuMem.begin() + 0x8000);
-		std::copy_n(contentVec.begin() + 0x10 + 0x4000 * (header[4] - 1), 0x4000, cpuMem.begin() + 0xC000);
-
-		if(header[5])
-		{
-			std::copy_n(contentVec.begin() + 0x4000 * header[4] + 0x10, 0x2000, ppu.VramIterator());
-		}
-
-		if(header[6] & 1)
-		{
-			ppu.SetNametableMirroring(0x800);
-			std::cout << "X layout\n";
-		}
-		else
-		{
-			ppu.SetNametableMirroring(0x400);
-			std::cout << "Y layout\n";
-		}
-	}
+	// else if(mapper == 2)
+	// {
+	// }
 	else
 	{
 		std::cout << "unsupported mapper\n";
@@ -1038,9 +1018,9 @@ void Nes::CpuWrite(uint16_t address, uint8_t data) // block writes to ppu on the
 
 	if(addressBus & 0x8000)
 	{
-		if(mapper == 2) //mapper 2, unrom
+		if(mapper == 2)
 		{
-			std::memcpy(&cpuMem[0x8000], &kass[0x10 + (dataBus & 0b0111)], 0x4000);
+			// = dataBus & 0b0111; //unrom
 			CpuTick();
 			return;
 		}

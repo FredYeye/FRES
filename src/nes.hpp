@@ -41,6 +41,4 @@ class Nes
 		bool nmiLine = false;
 
 		uint8_t mapper;
-		
-		std::vector<uint8_t> kass;
 };

@@ -24,7 +24,7 @@ Audio::Audio(std::vector<uint8_t> &audioData)
 Audio::Audio(void *audioSrc, int64_t requestedBufferTime)
 {
 	audioSource = audioSrc;
-	requestedDuration = requestedBufferTime * 4;
+	requestedDuration = requestedBufferTime * 2;
 	Init();
 }
 
@@ -73,7 +73,7 @@ void Audio::Stream()
 void Audio::StreamSource()
 {
 	pAudioClient->GetCurrentPadding(&queuedFrames);
-	while(queuedFrames > 734*3)
+	while(queuedFrames > 734)
 	{
 		Sleep(1);
 		pAudioClient->GetCurrentPadding(&queuedFrames);

@@ -57,24 +57,8 @@ int main(int argc, char* argv[])
 	Audio audio(nes.apu.GetOutput(), 166440); //166393
 	audio.StartAudio();
 
-
-	uint32_t frameTime = 0;
-	uint16_t frames = 0;
-
 	while(!glfwWindowShouldClose(window))
 	{
-		// nes.AdvanceFrame(input);
-
-		// audio.StreamSource(); // framerate controlled by audio playback
-		// nes.apu.sampleCount = 0;
-
-		// glClear(GL_COLOR_BUFFER_BIT);
-		// glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 240, GL_RGB, GL_UNSIGNED_BYTE, nes.ppu.GetPixelPtr());
-		// glBindVertexArray(vao);
-		// glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, 0);
-		// glfwSwapBuffers(window);
-		// glfwPollEvents();
-
 		glfwPollEvents();
 		nes.AdvanceFrame(input);
 
