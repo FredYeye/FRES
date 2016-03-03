@@ -11,17 +11,13 @@
 class Audio
 {
 	public:
-		Audio(std::string fileName);
-		Audio(std::vector<uint8_t> &audioData);
-		Audio(void *audioSrc, int64_t requestedBufferTime);
+		Audio(void *audioSrc, bool moreAccurateFramerate);
 		~Audio();
 		void StartAudio();
 		void StopAudio();
-		void Stream();
 		void StreamSource();
 
 	private:
-		void LoadData();
 		void Init();
 		void SetFormat();
 		void Release();
@@ -56,4 +52,5 @@ class Audio
 		uint32_t sleepTime;
 
 		void *audioSource;
+		uint16_t frameAmount;
 };

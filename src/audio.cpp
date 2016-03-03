@@ -7,24 +7,20 @@
 #include "mmreg.h"
 
 
-Audio::Audio(std::string fileName)
+Audio::Audio(void *audioSrc, bool moreAccurateFramerate)
 {
-	audioStream = FileToU8Vec(fileName);
-	Init();
-}
+	if(moreAccurateFramerate) // for 60.0817fps, nearest whole step with 44100hz to 60.0988 (actual nes framerate)
+	{
+		requestedDuration = 166440 * 2;
+		frameAmount = 734;
+	}
+	else
+	{
+		requestedDuration = 166667 * 2; // for 60fps (convenient framerate)
+		frameAmount = 735;
+	}
 
-
-Audio::Audio(std::vector<uint8_t> &audioData)
-{
-	audioStream = audioData;
-	Init();
-}
-
-
-Audio::Audio(void *audioSrc, int64_t requestedBufferTime)
-{
 	audioSource = audioSrc;
-	requestedDuration = requestedBufferTime * 2;
 	Init();
 }
 
@@ -49,65 +45,18 @@ void Audio::StopAudio()
 }
 
 
-void Audio::Stream()
-{
-	while(flags != AUDCLNT_BUFFERFLAGS_SILENT)
-	{
-		hr = pAudioClient->GetCurrentPadding(&queuedFrames);
-		TestHResult(hr, "GetCurrentPadding");
-
-		numFramesAvailable = bufferFrameCount - queuedFrames;
-
-		hr = pRenderClient->GetBuffer(numFramesAvailable, &pData);
-		TestHResult(hr, "GetBuffer");
-		LoadData();
-		hr = pRenderClient->ReleaseBuffer(numFramesAvailable, flags);
-		TestHResult(hr, "ReleaseBuffer");
-
-		Sleep(sleepTime);
-	}
-	flags = 0;
-}
-
-
 void Audio::StreamSource()
 {
 	pAudioClient->GetCurrentPadding(&queuedFrames);
-	while(queuedFrames > 734)
+	while(queuedFrames > frameAmount)
 	{
 		Sleep(1);
 		pAudioClient->GetCurrentPadding(&queuedFrames);
 	}
 
-	pRenderClient->GetBuffer(734, &pData);
-	std::memcpy(pData, audioSource, 734*2*4);
-	pRenderClient->ReleaseBuffer(734, flags);
-}
-
-
-void Audio::LoadData()
-{
-	const uint32_t requestAmount = frameSize * numFramesAvailable;
-	const uint32_t remainingAudio = audioStream.size() - cursor;
-	const uint8_t *audioOffset = audioStream.data() + cursor;
-
-	if(remainingAudio >= requestAmount)
-	{
-		std::memcpy(pData, audioOffset, requestAmount);
-		cursor += requestAmount;
-	}
-	else
-	{
-		if(!remainingAudio)
-		{
-			flags = AUDCLNT_BUFFERFLAGS_SILENT;
-			return;
-		}
-
-		std::memcpy(pData, audioOffset, remainingAudio);
-		std::memset(pData + remainingAudio, 0, requestAmount - remainingAudio);
-		cursor = audioStream.size();
-	}
+	pRenderClient->GetBuffer(frameAmount, &pData);
+	std::memcpy(pData, audioSource, frameAmount * 2 * 4);
+	pRenderClient->ReleaseBuffer(frameAmount, flags);
 }
 
 

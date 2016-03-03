@@ -54,7 +54,7 @@ int main(int argc, char* argv[])
 	glfwSetKeyCallback(window, key_callback);
 
 	// init audio
-	Audio audio(nes.apu.GetOutput(), 166440); //166393
+	Audio audio(nes.apu.GetOutput(), false);
 	audio.StartAudio();
 
 	while(!glfwWindowShouldClose(window))
