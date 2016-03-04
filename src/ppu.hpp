@@ -26,7 +26,7 @@ class Ppu
 		void SetNametableMirroring(uint16_t mirroring);
 
 		const bool RenderFrame();
-		std::array<uint8_t, 0x4000>::iterator VramIterator();
+		uint8_t* GetVramPtr();
 		const uint8_t* const GetPixelPtr() const;
 
 		uint16_t GetScanlineH();

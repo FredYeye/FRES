@@ -515,9 +515,9 @@ const bool Ppu::RenderFrame()
 }
 
 
-std::array<uint8_t, 0x4000>::iterator Ppu::VramIterator()
+uint8_t* Ppu::GetVramPtr()
 {
-	return vram.begin();
+	return vram.data();
 }
 
 
