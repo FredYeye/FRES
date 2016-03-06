@@ -24,6 +24,6 @@ class Audio
 		int err;
 		uint32_t rate = 44100;
 		uint32_t requestedDuration = 17000 * 4;
-		uint32_t bufferSize;
+		snd_pcm_uframes_t bufferSize;
 		uint8_t channels = 2;
 };

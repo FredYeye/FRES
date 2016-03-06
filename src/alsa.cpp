@@ -95,7 +95,7 @@ void Audio::Init()
 }
 
 
-void Release()
+void Audio::Release()
 {
 	if(pcmHandle)
 	{
@@ -108,7 +108,7 @@ void Release()
 }
 
 
-void TestReturn(int err, std::string functionName)
+void Audio::TestReturn(int err, std::string functionName)
 {
 	if(err < 0)
 	{
