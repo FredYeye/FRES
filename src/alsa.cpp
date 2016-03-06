@@ -75,7 +75,6 @@ void Audio::Init()
 	err = snd_pcm_hw_params(pcmHandle, params);
 	TestReturn(err, "snd_pcm_hw_params");
 
-	snd_pcm_uframes_t bufferSize;
 	err = snd_pcm_hw_params_get_buffer_size(params, &bufferSize);
 	TestReturn(err, "snd_pcm_hw_params_get_buffer_size");
 

@@ -15,7 +15,7 @@ class Audio
 	private:
 		void Init();
 		void Release();
-		void TestReturn();
+		void TestReturn(int err, std::string functionName);
 
 		snd_pcm_t *pcmHandle = 0;
 		snd_pcm_hw_params_t *params = 0;
@@ -24,5 +24,6 @@ class Audio
 		int err;
 		uint32_t rate = 44100;
 		uint32_t requestedDuration = 17000 * 4;
+		uint32_t bufferSize;
 		uint8_t channels = 2;
 };
