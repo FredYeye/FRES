@@ -9,7 +9,12 @@
 
 #include "main.hpp"
 #include "nes.hpp"
-#include "audio.hpp"
+
+#ifdef WINDOWS
+	#include "wasapi.hpp"
+#else
+	#include "alsa.hpp"
+#endif
 
 
 uint8_t input;
@@ -57,8 +62,13 @@ int main(int argc, char* argv[])
 	Audio audio(nes.apu.GetOutput(), false);
 	audio.StartAudio();
 
+	// uint32_t frameTime = 0;
+	// uint16_t frames = 0;
+
 	while(!glfwWindowShouldClose(window))
 	{
+		// std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+
 		glfwPollEvents();
 		nes.AdvanceFrame(input);
 
@@ -71,6 +81,16 @@ int main(int argc, char* argv[])
 		nes.apu.sampleCount = 0;
 
 		glfwSwapBuffers(window);
+
+		// std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
+		// frameTime += std::chrono::duration_cast<std::chrono::microseconds>(t3-t1).count();
+		// ++frames;
+		// if(frameTime >= 1000000)
+		// {
+			// std::cout << frames << " fps" << std::endl;
+			// frameTime = 0;
+			// frames = 0;
+		// }
 	}
 
 	audio.StopAudio();

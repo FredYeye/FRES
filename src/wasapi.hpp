@@ -47,7 +47,6 @@ class Audio
 		int64_t requestedDuration = referenceTimeSec; //1 = 100ns (REFERENCE_TIME)
 
 		uint32_t bufferFrameCount;
-		uint32_t queuedFrames;
 		uint32_t numFramesAvailable;
 		uint32_t sleepTime;
 

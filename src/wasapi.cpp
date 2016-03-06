@@ -1,8 +1,7 @@
 #include <iostream>
 #include <cstring>
 
-#include "audio.hpp"
-#include "file.hpp"
+#include "wasapi.hpp"
 
 #include "mmreg.h"
 
@@ -47,6 +46,7 @@ void Audio::StopAudio()
 
 void Audio::StreamSource()
 {
+	uint32_t queuedFrames;
 	pAudioClient->GetCurrentPadding(&queuedFrames);
 	while(queuedFrames > frameAmount)
 	{
