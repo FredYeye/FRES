@@ -46,7 +46,7 @@ if(UNIX)
 
 	find_package(OpenGL)
 
-	add_definitions(-DLINUX -lglfw3 -lasound)
+	add_definitions(-DLINUX -lglfw3)
 
 	set(source_files
 		src/main.cpp
@@ -76,5 +76,5 @@ if(WIN32)
 endif(WIN32)
 
 if(UNIX)
-	target_link_libraries(nes ${GLFW_LIBRARIES} ${OPENGL_LIBRARIES})
+	target_link_libraries(nes ${GLFW_LIBRARIES} ${OPENGL_LIBRARIES} lasound)
 endif(UNIX)
