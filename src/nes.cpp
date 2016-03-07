@@ -97,12 +97,10 @@ void Nes::LoadRom(std::string inFile)
 		if(header[6] & 1)
 		{
 			ppu.SetNametableMirroring(0x800);
-			std::cout << "X layout (2000+2400)\n";
 		}
 		else
 		{
 			ppu.SetNametableMirroring(0x400);
-			std::cout << "Y layout (2000+2800)\n";
 		}
 	}
 	else if(mapper == 2)
@@ -118,12 +116,10 @@ void Nes::LoadRom(std::string inFile)
 		if(header[6] & 1)
 		{
 			ppu.SetNametableMirroring(0x800);
-			std::cout << "X layout\n";
 		}
 		else
 		{
 			ppu.SetNametableMirroring(0x400);
-			std::cout << "Y layout\n";
 		}
 	}
 	else

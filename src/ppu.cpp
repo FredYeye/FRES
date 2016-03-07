@@ -45,10 +45,16 @@ uint8_t Ppu::DataRead() //2007
 {
 	if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18)) //figure out what happens otherwise
 	{
-		//perform NT mirroring here?
-
 		uint8_t currentLatch = (ppuAddress >= 0x3F00) ? vram[ppuAddress & 0x3F1F] : ppuDataLatch;
-		ppuDataLatch = vram[ppuAddress]; //should be & 0x2FFF? but breaks mario title screen, probably NT related
+
+		if(ppuAddress >= 0x2000)
+		{
+			ppuDataLatch = vram[ppuAddress & nametableMirroring];
+		}
+		else
+		{
+			ppuDataLatch = vram[ppuAddress];
+		}
 		ppuAddress += (ppuCtrl & 0x04) ? 0x20 : 0x01;
 		return currentLatch;
 	}
@@ -116,17 +122,22 @@ void Ppu::DataWrite(uint8_t dataBus) //2007
 {
 	if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18))
 	{
-		if(ppuAddress >= 0x3F00)
+		if(ppuAddress >= 0x2000)
 		{
-			uint16_t tempPpuAddress = ppuAddress & 0x3F1F;
-			vram[tempPpuAddress] = dataBus;
-			if(!(tempPpuAddress & 0b11)) //sprite palette mirror write
+			vram[ppuAddress & nametableMirroring] = dataBus;
+			if(ppuAddress >= 0x3F00)
 			{
-				vram[tempPpuAddress ^ 0x10] = dataBus;
+				vram[ppuAddress & 0x3F1F] = dataBus;
+				if(!(ppuAddress & 0b11)) //sprite palette mirror write
+				{
+					vram[(ppuAddress & 0x3F1F) ^ 0x10] = dataBus;
+				}
 			}
 		}
-
-		vram[ppuAddress] = dataBus; //perform NT mirroring here?
+		else
+		{
+			vram[ppuAddress] = dataBus;
+		}
 		ppuAddress += (ppuCtrl & 0x04) ? 0x20 : 0x01;
 	}
 }
@@ -311,19 +322,19 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 				{
 					bgLow |= bgLowLatch;
 					bgHigh |= bgHighLatch;
-					attribute |= (attributeLatch & 0x03) * 0x5555; //2-bit splat
+					attribute |= (attributeLatch & 0b11) * 0x5555; //2-bit splat
 				}
-				nametable = vram[0x2000 | (ppuAddress & 0xFFF)];
+				nametable = vram[0x2000 | (ppuAddress & nametableMirroring)];
 				break;
 			case 3: //AT
 				if(scanlineH != 339)
 				{
-					attributeLatch = vram[0x23C0 | (ppuAddress & 0xC00) | (ppuAddress >> 4 & 0x38) | (ppuAddress >> 2 & 0x07)];
-					attributeLatch >>= (((ppuAddress >> 1) & 0x01) | ((ppuAddress >> 5) & 0x02)) * 2;
+					attributeLatch = vram[0x23C0 | (ppuAddress & nametableMirroring & 0xC00) | (ppuAddress >> 4 & 0x38) | (ppuAddress >> 2 & 0b0111)];
+					attributeLatch >>= (((ppuAddress >> 1) & 1) | ((ppuAddress >> 5) & 0b10)) * 2;
 				}
 				else
 				{
-					nametable = vram[0x2000 | (ppuAddress & 0xFFF)];
+					nametable = vram[0x2000 | (ppuAddress & nametableMirroring)];
 				}
 				break;
 			case 5: //low
@@ -499,7 +510,7 @@ bool Ppu::PollNmi()
 
 void Ppu::SetNametableMirroring(uint16_t mirroring)
 {
-	nametableMirroring = ~mirroring;
+	nametableMirroring = 0x2FFF ^ mirroring;
 }
 
 
