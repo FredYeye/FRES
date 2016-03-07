@@ -13,7 +13,7 @@ uint8_t Ppu::StatusRead() //2002
 {
 	if(scanlineV == 241)
 	{
-		if(scanlineH == 1) //nmi checks get offset by +1
+		if(scanlineH == 1) //nmi checks get offset by +1. other ppu communication also needs to be offset?
 		{
 			suppressNmiFlag = true;
 			//     0: reads it as clear and never sets the flag or generates NMI for that frame
@@ -45,11 +45,16 @@ uint8_t Ppu::DataRead() //2007
 {
 	if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18)) //figure out what happens otherwise
 	{
-		//if in palette range, reload latch(mirrored down) but send palette byte immediately
-		//perform NT mirroring here?
+		uint8_t currentLatch = (ppuAddress >= 0x3F00) ? vram[ppuAddress & 0x3F1F] : ppuDataLatch;
 
-		uint8_t currentLatch = ppuDataLatch;
-		ppuDataLatch = vram[ppuAddress];
+		if(ppuAddress >= 0x2000)
+		{
+			ppuDataLatch = vram[ppuAddress & nametableMirroring];
+		}
+		else
+		{
+			ppuDataLatch = vram[ppuAddress];
+		}
 		ppuAddress += (ppuCtrl & 0x04) ? 0x20 : 0x01;
 		return currentLatch;
 	}
@@ -61,7 +66,7 @@ uint8_t Ppu::DataRead() //2007
 void Ppu::CtrlWrite(uint8_t dataBus) //2000
 {
 	ppuCtrl = dataBus;
-	ppuAddressLatch = (ppuAddressLatch & 0x73FF) | ((ppuCtrl & 0x03) << 10);
+	ppuAddressLatch = (ppuAddressLatch & 0x73FF) | ((ppuCtrl & 0b11) << 10);
 }
 
 
@@ -88,11 +93,11 @@ void Ppu::ScrollWrite(uint8_t dataBus) //2005
 	if(!wToggle)
 	{
 		ppuAddressLatch = (ppuAddressLatch & 0x7FE0) | (dataBus >> 3);
-		fineX = dataBus & 0x07;
+		fineX = dataBus & 0b0111;
 	}
 	else
 	{
-		ppuAddressLatch = (ppuAddressLatch & 0xC1F) | ((dataBus & 0x07) << 12) | ((dataBus & 0xF8) << 2);
+		ppuAddressLatch = (ppuAddressLatch & 0xC1F) | ((dataBus & 0b0111) << 12) | ((dataBus & 0xF8) << 2);
 	}
 	wToggle = !wToggle;
 }
@@ -117,12 +122,22 @@ void Ppu::DataWrite(uint8_t dataBus) //2007
 {
 	if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18))
 	{
-		if(ppuAddress >= 0x3F10 && !(ppuAddress & 3)) //sprite palette mirror write
+		if(ppuAddress >= 0x2000)
 		{
-			vram[ppuAddress & ~0x10] = dataBus; //need else after this?
+			vram[ppuAddress & nametableMirroring] = dataBus;
+			if(ppuAddress >= 0x3F00)
+			{
+				vram[ppuAddress & 0x3F1F] = dataBus;
+				if(!(ppuAddress & 0b11)) //sprite palette mirror write
+				{
+					vram[(ppuAddress & 0x3F1F) ^ 0x10] = dataBus;
+				}
+			}
 		}
-
-		vram[ppuAddress] = dataBus; //perform NT mirroring here?
+		else
+		{
+			vram[ppuAddress] = dataBus;
+		}
 		ppuAddress += (ppuCtrl & 0x04) ? 0x20 : 0x01;
 	}
 }
@@ -134,10 +149,8 @@ void Ppu::Tick()
 	{
 		if(scanlineH && scanlineH <= 256)
 		{
-			uint8_t bgPixel = 0;
 			uint8_t spritePixel = 0;
 			bool spritePriority = true; //false puts sprite in front of BG
-
 			if(ppuMask & 0b00010000)
 			{
 				for(uint8_t x = 0; x < 8; ++x)
@@ -169,6 +182,7 @@ void Ppu::Tick()
 				}
 			}
 
+			uint8_t bgPixel = 0;
 			if(ppuMask & 0b00001000)
 			{
 				bgPixel = (bgLow >> (15 - fineX)) & 1;
@@ -189,19 +203,23 @@ void Ppu::Tick()
 				}
 			}
 
-			uint16_t pIndex = vram[0x3F00 + bgPixel] * 3;
-			if(spritePixel && (!spritePriority || !(bgPixel & 0b11)))
+			uint8_t pIndex;
+			if(spritePixel && (!spritePriority || !bgPixel))
 			{
 				pIndex = vram[0x3F10 + spritePixel] * 3;
 			}
+			else
+			{
+				pIndex = vram[0x3F00 + bgPixel] * 3;
+			}
 
-			const uint32_t renderPos = (scanlineV * 256 + (scanlineH - 1)) * 3;
 			std::memcpy(&render[renderPos], &palette[pIndex], 3);
+			renderPos += 3;
 		}
 
-		RenderFetches();
 		if(ppuMask & 0b00011000)
 		{
+			RenderFetches();
 			OamScan();
 		}
 	}
@@ -219,7 +237,7 @@ void Ppu::Tick()
 	{
 		if(scanlineH == 1)
 		{
-			ppuStatus &= 0x1F; //clear sprite overflow, sprite 0 hit and vblank
+			ppuStatus &= 0b00011111; //clear sprite overflow, sprite 0 hit and vblank
 			suppressNmi = false;
 			suppressNmiFlag = false;
 		}
@@ -228,11 +246,13 @@ void Ppu::Tick()
 			ppuAddress = (ppuAddress & 0x41F) | (ppuAddressLatch & 0x7BE0);
 		}
 
-		RenderFetches();
-
-		if(oddFrame && scanlineH == 339 && ppuMask & 0x18)
+		if(ppuMask & 0b00011000)
 		{
-			++scanlineH;
+			RenderFetches();
+			if(oddFrame && scanlineH == 339)
+			{
+				++scanlineH;
+			}
 		}
 	}
 
@@ -244,6 +264,7 @@ void Ppu::Tick()
 			scanlineV = 0;
 			oddFrame = !oddFrame;
 			renderFrame = true;
+			renderPos = 0;
 		}
 	}
 }
@@ -251,142 +272,139 @@ void Ppu::Tick()
 
 void Ppu::RenderFetches() //things done during visible and prerender scanlines
 {
-	if(ppuMask & 0b00011000) //if rendering is enabled
+	if(scanlineH == 256) //Y increment
 	{
-		if(scanlineH == 256) //Y increment
+		if(ppuAddress < 0x7000)
 		{
-			if(ppuAddress < 0x7000)
+			ppuAddress += 0x1000;
+		}
+		else
+		{
+			ppuAddress &= 0xFFF;
+			if((ppuAddress & 0x3E0) == 0x3A0)
 			{
-				ppuAddress += 0x1000;
+				ppuAddress &= 0xC1F;
+				ppuAddress ^= 0x800;
+			}
+			else if((ppuAddress & 0x3E0) == 0x3E0)
+			{
+				ppuAddress &= 0xC1F;
 			}
 			else
 			{
-				ppuAddress &= 0xFFF;
-				if((ppuAddress & 0x3E0) == 0x3A0)
+				ppuAddress += 0x20;
+			}
+		}
+	}
+	else if(scanlineH == 257)
+	{
+		ppuAddress = (ppuAddress & 0x7BE0) | (ppuAddressLatch & 0x41F);
+	}
+
+	if((scanlineH && scanlineH <= 256) || scanlineH >= 321)
+	{
+		switch(scanlineH & 0x07)
+		{
+			case 0: //coarse X increment
+				if((ppuAddress & 0x1F) != 0x1F)
 				{
-					ppuAddress &= 0xC1F;
-					ppuAddress ^= 0x800;
-				}
-				else if((ppuAddress & 0x3E0) == 0x3E0)
-				{
-					ppuAddress &= 0xC1F;
+					++ppuAddress;
 				}
 				else
 				{
-					ppuAddress += 0x20;
+					ppuAddress = (ppuAddress & 0x7FE0) ^ 0x400;
 				}
-			}
-		}
-		else if(scanlineH == 257)
-		{
-			ppuAddress = (ppuAddress & 0x7BE0) | (ppuAddressLatch & 0x41F);
-		}
+				break;
 
-		if((scanlineH && scanlineH <= 256) || scanlineH >= 321)
-		{
-			switch(scanlineH & 0x07)
-			{
-				case 0: //coarse X increment
-					if((ppuAddress & 0x1F) != 0x1F)
-					{
-						++ppuAddress;
-					}
-					else
-					{
-						ppuAddress = (ppuAddress & 0x7FE0) ^ 0x400;
-					}
-					break;
-
-				//value is determined on the first cycle of each fetch (1,3,5,7)
-				case 1: //NT
-					if(scanlineH != 1 && scanlineH != 321) 
-					{
-						bgLow |= bgLowLatch;
-						bgHigh |= bgHighLatch;
-						attribute |= (attributeLatch & 0x03) * 0x5555; //2-bit splat
-					}
-					nametable = vram[0x2000 | (ppuAddress & 0xFFF)];
-					break;
-				case 3: //AT
-					if(scanlineH != 339)
-					{
-						attributeLatch = vram[0x23C0 | (ppuAddress & 0xC00) | (ppuAddress >> 4 & 0x38) | (ppuAddress >> 2 & 0x07)];
-						attributeLatch >>= (((ppuAddress >> 1) & 0x01) | ((ppuAddress >> 5) & 0x02)) * 2;
-					}
-					else
-					{
-						nametable = vram[0x2000 | (ppuAddress & 0xFFF)];
-					}
-					break;
-				case 5: //low
-					bgAddress = nametable*16 + (ppuAddress >> 12) | ((ppuCtrl & 0x10) << 8);
-					bgLowLatch = vram[bgAddress];
-					break;
-				case 7: //high
-					bgHighLatch = vram[bgAddress + 8];
-					break;
-			}
-
-			if(scanlineH <= 256)
-			{
-				for(uint8_t &x : spriteXpos)
+			//value is determined on the first cycle of each fetch (1,3,5,7)
+			case 1: //NT
+				if(scanlineH != 1 && scanlineH != 321) 
 				{
-					if(x)
-					{
-						--x;
-					}
+					bgLow |= bgLowLatch;
+					bgHigh |= bgHighLatch;
+					attribute |= (attributeLatch & 0b11) * 0x5555; //2-bit splat
+				}
+				nametable = vram[0x2000 | (ppuAddress & nametableMirroring)];
+				break;
+			case 3: //AT
+				if(scanlineH != 339)
+				{
+					attributeLatch = vram[0x23C0 | (ppuAddress & nametableMirroring & 0xC00) | (ppuAddress >> 4 & 0x38) | (ppuAddress >> 2 & 0b0111)];
+					attributeLatch >>= (((ppuAddress >> 1) & 1) | ((ppuAddress >> 5) & 0b10)) * 2;
+				}
+				else
+				{
+					nametable = vram[0x2000 | (ppuAddress & nametableMirroring)];
+				}
+				break;
+			case 5: //low
+				bgAddress = nametable*16 + (ppuAddress >> 12) | ((ppuCtrl & 0x10) << 8);
+				bgLowLatch = vram[bgAddress];
+				break;
+			case 7: //high
+				bgHighLatch = vram[bgAddress + 8];
+				break;
+		}
+
+		if(scanlineH <= 256)
+		{
+			for(uint8_t &x : spriteXpos)
+			{
+				if(x)
+				{
+					--x;
 				}
 			}
-
-			if(scanlineH <= 336)
-			{
-				bgLow <<= 1;
-				bgHigh <<= 1;
-				attribute <<= 2;
-			}
 		}
-		else //257-320
+
+		if(scanlineH <= 336)
 		{
-			oamAddr = 0;
+			bgLow <<= 1;
+			bgHigh <<= 1;
+			attribute <<= 2;
+		}
+	}
+	else //257-320
+	{
+		oamAddr = 0;
 
-			//sprite fetching
-			switch(scanlineH & 0x07)
-			{
-				case 3: //load sprite attr
-					spriteAttribute[spriteIndex] = oam2[spriteIndex * 4 + 2];
-					break;
-				case 4: //load sprite X
-					spriteXpos[spriteIndex] = oam2[spriteIndex * 4 + 3];
-					break;
-				case 5: //sprite low
-					bgAddress = ((ppuCtrl & 0b1000) << 9) | (oam2[spriteIndex * 4 + 1] << 4);
-					{
-					uint8_t yOffset = (scanlineV - oam2[spriteIndex * 4]);
-					if(spriteAttribute[spriteIndex] & 0b10000000) //flip V
-					{
-						yOffset = ~yOffset;
-					}
-					bgAddress |= yOffset & 7;
-					}
+		//sprite fetching
+		switch(scanlineH & 0x07)
+		{
+			case 3: //load sprite attr
+				spriteAttribute[spriteIndex] = oam2[spriteIndex * 4 + 2];
+				break;
+			case 4: //load sprite X
+				spriteXpos[spriteIndex] = oam2[spriteIndex * 4 + 3];
+				break;
+			case 5: //sprite low
+				bgAddress = ((ppuCtrl & 0b1000) << 9) | (oam2[spriteIndex * 4 + 1] << 4);
+				{
+				uint8_t yOffset = (scanlineV - oam2[spriteIndex * 4]);
+				if(spriteAttribute[spriteIndex] & 0b10000000) //flip V
+				{
+					yOffset = ~yOffset;
+				}
+				bgAddress |= yOffset & 7;
+				}
 
-					spriteBitmapLow[spriteIndex] = vram[bgAddress];
-					if(spriteAttribute[spriteIndex] & 0b01000000) //flip H
-					{
-						ReverseBits(spriteBitmapLow[spriteIndex]);
-					}
-					break;
-				case 7: //sprite high
-					spriteBitmapHigh[spriteIndex] = vram[bgAddress | 8];
-					if(spriteAttribute[spriteIndex] & 0b01000000) //flip H
-					{
-						ReverseBits(spriteBitmapHigh[spriteIndex]);
-					}
-					if(++spriteIndex == 8)
-					{
-						spriteIndex = 0;
-					}
-					break;
-			}
+				spriteBitmapLow[spriteIndex] = vram[bgAddress];
+				if(spriteAttribute[spriteIndex] & 0b01000000) //flip H
+				{
+					ReverseBits(spriteBitmapLow[spriteIndex]);
+				}
+				break;
+			case 7: //sprite high
+				spriteBitmapHigh[spriteIndex] = vram[bgAddress | 8];
+				if(spriteAttribute[spriteIndex] & 0b01000000) //flip H
+				{
+					ReverseBits(spriteBitmapHigh[spriteIndex]);
+				}
+				if(++spriteIndex == 8)
+				{
+					spriteIndex = 0;
+				}
+				break;
 		}
 	}
 }
@@ -405,6 +423,7 @@ void Ppu::OamScan()
 			if(!oamEvalPattern) //search for sprites in range
 			{
 				oam2[oam2Index] = oam[oamSpritenum]; //oam search starts at oam[oamAddr]
+
 				if(scanlineV >= oam[oamSpritenum] && scanlineV < oam[oamSpritenum] + 8 + (ppuCtrl >> 2 & 8))
 				{
 					++oamEvalPattern;
@@ -432,7 +451,6 @@ void Ppu::OamScan()
 				if(scanlineV >= oam[oamSpritenum] && scanlineV < oam[oamSpritenum] + 8 + (ppuCtrl >> 2 & 8))
 				{
 					ppuStatus |= 0x20;
-					// std::cout << "OF ";
 				}
 				oamSpritenum += 5; //incorrect, should be +=4, +0-3 (inc n and m w/o carry)
 				if(oamSpritenum <= 4) //stop searching. <= 4 instead of 0 since increment is bugged
@@ -490,6 +508,12 @@ bool Ppu::PollNmi()
 }
 
 
+void Ppu::SetNametableMirroring(uint16_t mirroring)
+{
+	nametableMirroring = 0x2FFF ^ mirroring;
+}
+
+
 void Ppu::ReverseBits(uint8_t &b)
 {
 	b = b >> 4 | b << 4;
@@ -506,15 +530,15 @@ const bool Ppu::RenderFrame()
 }
 
 
-std::array<uint8_t, 0x4000>::iterator Ppu::VramIterator()
+uint8_t* Ppu::GetVramPtr()
 {
-	return vram.begin();
+	return vram.data();
 }
 
 
-const std::array<uint8_t, 256*240*3>* const Ppu::GetPixelPtr() const
+const uint8_t* const Ppu::GetPixelPtr() const
 {
-	return &render;
+	return render.data();
 }
 
 

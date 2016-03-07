@@ -2,6 +2,7 @@
 
 #include <array>
 #include <bitset>
+#include <vector>
 
 #include "apu.hpp"
 #include "ppu.hpp"
@@ -28,6 +29,8 @@ class Nes
 
 		std::array<uint8_t, 0x10000> cpuMem;
 
+		std::vector<uint8_t> fileContent;
+
 		uint16_t PC;
 		uint8_t rA = 0, rX = 0, rY = 0, rS = 0;
 		std::bitset<8> rP; //0:C | 1:Z | 2:I | 3:D | 4:B | 5:1 | 6:V | 7:N
@@ -38,4 +41,6 @@ class Nes
 		bool readJoy1 = false;
 
 		bool nmiLine = false;
+
+		uint8_t mapper;
 };

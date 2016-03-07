@@ -23,10 +23,11 @@ class Ppu
 		void Tick();
 
 		bool PollNmi();
+		void SetNametableMirroring(uint16_t mirroring);
 
 		const bool RenderFrame();
-		std::array<uint8_t, 0x4000>::iterator VramIterator();
-		const std::array<uint8_t, 256*240*3>* const GetPixelPtr() const;
+		uint8_t* GetVramPtr();
+		const uint8_t* const GetPixelPtr() const;
 
 		uint16_t GetScanlineH();
 		uint16_t GetScanlineV();
@@ -67,6 +68,8 @@ class Ppu
 		std::array<uint8_t, 64*4> oam;
 		std::array<uint8_t, 8*4> oam2;
 
+		uint32_t renderPos = 0;
+
 		uint8_t ppuCtrl = 0;
 		uint8_t ppuMask = 0;
 		uint8_t ppuStatus = 0;
@@ -87,7 +90,7 @@ class Ppu
 		bool oddFrame = false;
 		uint8_t fineX = 0;
 		uint8_t ppuDataLatch;
-		uint16_t ppuNtMirroring;
+		uint16_t nametableMirroring;
 		uint8_t oam2Index = 0;
 		uint8_t oamEvalPattern = 0;
 		uint8_t oamSpritenum = 0; //0-3 = sprite0, 4-7 = sprite1 [...] 252-255 = sprite63
