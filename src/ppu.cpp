@@ -45,11 +45,10 @@ uint8_t Ppu::DataRead() //2007
 {
 	if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18)) //figure out what happens otherwise
 	{
-		//if in palette range, reload latch(mirrored down) but send palette byte immediately
 		//perform NT mirroring here?
 
-		uint8_t currentLatch = ppuDataLatch;
-		ppuDataLatch = vram[ppuAddress];
+		uint8_t currentLatch = (ppuAddress >= 0x3F00) ? vram[ppuAddress & 0x3F1F] : ppuDataLatch;
+		ppuDataLatch = vram[ppuAddress & 0x2FFF];
 		ppuAddress += (ppuCtrl & 0x04) ? 0x20 : 0x01;
 		return currentLatch;
 	}

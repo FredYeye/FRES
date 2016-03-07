@@ -97,12 +97,12 @@ void Nes::LoadRom(std::string inFile)
 		if(header[6] & 1)
 		{
 			ppu.SetNametableMirroring(0x800);
-			std::cout << "X layout\n";
+			std::cout << "X layout (2000+2400)\n";
 		}
 		else
 		{
 			ppu.SetNametableMirroring(0x400);
-			std::cout << "Y layout\n";
+			std::cout << "Y layout (2000+2800)\n";
 		}
 	}
 	else if(mapper == 2)
@@ -994,7 +994,10 @@ void Nes::CpuRead(uint16_t address)
 		case 0x2002:
 			dataBus = ppu.StatusRead();
 			break;
-		case 0x2007: //ppuData
+		case 0x2004:
+			dataBus = ppu.OamDataRead();
+			break;
+		case 0x2007:
 			dataBus = ppu.DataRead();
 			break;
 
@@ -1047,19 +1050,19 @@ void Nes::CpuWrite(uint16_t address, uint8_t data) // block writes to ppu on the
 		case 0x2001:
 			ppu.MaskWrite(dataBus);
 			break;
-		case 0x2003: //oamAddr
+		case 0x2003:
 			ppu.OamAddrWrite(dataBus);
 			break;
-		case 0x2004: //oamData
+		case 0x2004:
 			ppu.OamDataWrite(dataBus);
 			break;
-		case 0x2005: //ppuScroll
+		case 0x2005:
 			ppu.ScrollWrite(dataBus);
 			break;
 		case 0x2006:
 			ppu.AddrWrite(dataBus);
 			break;
-		case 0x2007: //ppuData
+		case 0x2007:
 			ppu.DataWrite(dataBus);
 			break;
 
