@@ -48,7 +48,7 @@ uint8_t Ppu::DataRead() //2007
 		//perform NT mirroring here?
 
 		uint8_t currentLatch = (ppuAddress >= 0x3F00) ? vram[ppuAddress & 0x3F1F] : ppuDataLatch;
-		ppuDataLatch = vram[ppuAddress & 0x2FFF];
+		ppuDataLatch = vram[ppuAddress]; //should be & 0x2FFF? but breaks mario title screen, probably NT related
 		ppuAddress += (ppuCtrl & 0x04) ? 0x20 : 0x01;
 		return currentLatch;
 	}
@@ -116,9 +116,14 @@ void Ppu::DataWrite(uint8_t dataBus) //2007
 {
 	if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18))
 	{
-		if(ppuAddress >= 0x3F10 && !(ppuAddress & 3)) //sprite palette mirror write
+		if(ppuAddress >= 0x3F00)
 		{
-			vram[ppuAddress & ~0x10] = dataBus; //need else after this?
+			uint16_t tempPpuAddress = ppuAddress & 0x3F1F;
+			vram[tempPpuAddress] = dataBus;
+			if(!(tempPpuAddress & 0b11)) //sprite palette mirror write
+			{
+				vram[tempPpuAddress ^ 0x10] = dataBus;
+			}
 		}
 
 		vram[ppuAddress] = dataBus; //perform NT mirroring here?
