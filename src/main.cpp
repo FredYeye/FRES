@@ -110,8 +110,8 @@ void initialize(GLuint &vao, const uint8_t *const pixelPtr)
 	const float texture_coord[8] = {0.0f,0.0f, 1.0f,0.0f, 1.0f,1.0f, 0.0f,1.0f};
 	const uint8_t indices[6] = {0,1,2, 2,3,0};
 
-	std::string vertex = "in vec4 position; in vec2 texture_coord; out vec2 texture_coord_from_vshader; void main() {gl_Position = position; texture_coord_from_vshader = texture_coord;}";
-	std::string fragment = "in vec2 texture_coord_from_vshader; out vec4 out_color; uniform sampler2D texture_sampler; void main() {out_color = texture(texture_sampler, texture_coord_from_vshader);}";
+	std::string vertex = "#version 130\n in vec4 position; in vec2 texture_coord; out vec2 texture_coord_from_vshader; void main() {gl_Position = position; texture_coord_from_vshader = texture_coord;}";
+	std::string fragment = "#version 130\n in vec2 texture_coord_from_vshader; out vec4 out_color; uniform sampler2D texture_sampler; void main() {out_color = texture(texture_sampler, texture_coord_from_vshader);}";
 
 	// Create a Vector Buffer Object that will store the vertices on video memory
 	GLuint vbo;
