@@ -82,16 +82,17 @@ void Nes::LoadRom(std::string inFile)
 		std::cout << "Not a valid .nes file" << std::endl;
 		exit(0);
 	}
+	fileContent.erase(fileContent.begin(), fileContent.begin() + 0x10);
 
 	mapper = (header[6] >> 4) | (header[7] & 0b11110000);
 	if(mapper == 0)
 	{
-		std::memcpy(&cpuMem[0x8000], &fileContent[0x10], 0x4000);
-		std::memcpy(&cpuMem[0xC000], &fileContent[0x10 + 0x4000 * (header[4] - 1)], 0x4000);
+		std::memcpy(&cpuMem[0x8000], &fileContent[0], 0x4000);
+		std::memcpy(&cpuMem[0xC000], &fileContent[0x4000 * (header[4] - 1)], 0x4000);
 
 		if(header[5])
 		{
-			std::memcpy(ppu.GetVramPtr(), &fileContent[0x10 + 0x4000 * header[4]], 0x2000);
+			std::memcpy(ppu.GetVramPtr(), &fileContent[0x4000 * header[4]], 0x2000);
 		}
 
 		if(header[6] & 1)
@@ -105,12 +106,12 @@ void Nes::LoadRom(std::string inFile)
 	}
 	else if(mapper == 2)
 	{
-		std::memcpy(&cpuMem[0x8000], &fileContent[0x10], 0x4000);
-		std::memcpy(&cpuMem[0xC000], &fileContent[0x10 + 0x4000 * (header[4] - 1)], 0x4000);
+		std::memcpy(&cpuMem[0x8000], &fileContent[0], 0x4000);
+		std::memcpy(&cpuMem[0xC000], &fileContent[0x4000 * (header[4] - 1)], 0x4000);
 
 		if(header[5])
 		{
-			std::memcpy(ppu.GetVramPtr(), &fileContent[0x10 + 0x4000 * header[4]], 0x2000);
+			std::memcpy(ppu.GetVramPtr(), &fileContent[0x4000 * header[4]], 0x2000);
 		}
 
 		if(header[6] & 1)
@@ -967,9 +968,6 @@ void Nes::RunOpcode()
 			break;
 	}
 
-	//interrupt checking here?
-	nmiLine = ppu.PollNmi();
-
 	CpuRead(PC); //fetch next opcode
 	CpuOpDone();
 }
@@ -982,35 +980,31 @@ void Nes::CpuRead(uint16_t address)
 
 	if((addressBus & 0xE000) == 0x2000) //ppu register mirrors
 	{
-		addressBus &= 0x2007;
+		switch(addressBus & 7)
+		{
+			case 2: dataBus = ppu.StatusRead();  break;
+			case 4: dataBus = ppu.OamDataRead(); break;
+			case 7: dataBus = ppu.DataRead();    break;
+		}
 	}
-
-	switch(addressBus)
+	else
 	{
-		case 0x2002:
-			dataBus = ppu.StatusRead();
-			break;
-		case 0x2004:
-			dataBus = ppu.OamDataRead();
-			break;
-		case 0x2007:
-			dataBus = ppu.DataRead();
-			break;
+		switch(addressBus)
+		{
+			case 0x4015: dataBus = apu.StatusRead(); break;
 
-		case 0x4015:
-			dataBus = apu.StatusRead();
+			case 0x4016:
+				dataBus = (addressBus & 0xE0) | (controller_reg & 1); //addressBus = open bus?
+				controller_reg >>= 1; //if we have read 4016 8 times, start returning 1s
 			break;
-		case 0x4016:
-			dataBus = (addressBus & 0xE0) | (controller_reg & 1); //addressBus = open bus?
-			controller_reg >>= 1; //if we have read 4016 8 times, start returning 1s
-			break;
+		}
 	}
 
 	CpuTick();
 }
 
 
-void Nes::CpuWrite(uint16_t address, uint8_t data) // block writes to ppu on the first screen
+void Nes::CpuWrite(uint16_t address, uint8_t data) // todo: block writes to ppu on the first screen
 {
 	addressBus = address;
 	dataBus = data;
@@ -1020,7 +1014,7 @@ void Nes::CpuWrite(uint16_t address, uint8_t data) // block writes to ppu on the
 		if(mapper == 2)
 		{
 			// unrom & uorom for now
-			std::memcpy(&cpuMem[0x8000], &fileContent[0x10 + 0x4000 * (dataBus & 0b1111)], 0x4000);
+			std::memcpy(&cpuMem[0x8000], &fileContent[0x4000 * (dataBus & 0b1111)], 0x4000);
 			CpuTick();
 			return;
 		}
@@ -1035,105 +1029,57 @@ void Nes::CpuWrite(uint16_t address, uint8_t data) // block writes to ppu on the
 
 	if((addressBus & 0xE000) == 0x2000)
 	{
-		addressBus &= 0x2007;
+		switch(addressBus & 7)
+		{
+			case 0: ppu.CtrlWrite(dataBus);    break;
+			case 1: ppu.MaskWrite(dataBus);    break;
+			case 3: ppu.OamAddrWrite(dataBus); break;
+			case 4: ppu.OamDataWrite(dataBus); break;
+			case 5: ppu.ScrollWrite(dataBus);  break;
+			case 6: ppu.AddrWrite(dataBus);    break;
+			case 7: ppu.DataWrite(dataBus);    break;
+		}
 	}
-
-	switch(addressBus)
+	else
 	{
-		case 0x2000:
-			ppu.CtrlWrite(dataBus);
-			break;
-		case 0x2001:
-			ppu.MaskWrite(dataBus);
-			break;
-		case 0x2003:
-			ppu.OamAddrWrite(dataBus);
-			break;
-		case 0x2004:
-			ppu.OamDataWrite(dataBus);
-			break;
-		case 0x2005:
-			ppu.ScrollWrite(dataBus);
-			break;
-		case 0x2006:
-			ppu.AddrWrite(dataBus);
-			break;
-		case 0x2007:
-			ppu.DataWrite(dataBus);
-			break;
+		switch(addressBus)
+		{
+			case 0x4000: apu.Pulse0Write(dataBus, 0); break;
+			case 0x4001: apu.Pulse1Write(dataBus, 0); break;
+			case 0x4002: apu.Pulse2Write(dataBus, 0); break;
+			case 0x4003: apu.Pulse3Write(dataBus, 0); break;
 
-		case 0x4000:
-			apu.Pulse0Write(dataBus, 0);
-			break;
-		case 0x4001:
-			apu.Pulse1Write(dataBus, 0);
-			break;
-		case 0x4002:
-			apu.Pulse2Write(dataBus, 0);
-			break;
-		case 0x4003:
-			apu.Pulse3Write(dataBus, 0);
-			break;
-		case 0x4004:
-			apu.Pulse0Write(dataBus, 1);
-			break;
-		case 0x4005:
-			apu.Pulse1Write(dataBus, 1);
-			break;
-		case 0x4006:
-			apu.Pulse2Write(dataBus, 1);
-			break;
-		case 0x4007:
-			apu.Pulse3Write(dataBus, 1);
-			break;
-		case 0x4008:
-			apu.Triangle0Write(dataBus);
-			break;
-		case 0x400A:
-			apu.Triangle2Write(dataBus);
-			break;
-		case 0x400B:
-			apu.Triangle3Write(dataBus);
-			break;
-		case 0x400C:
-			apu.Noise0Write(dataBus);
-			break;
-		case 0x400E:
-			apu.Noise2Write(dataBus);
-			break;
-		case 0x400F:
-			apu.Noise3Write(dataBus);
-			break;
+			case 0x4004: apu.Pulse0Write(dataBus, 1); break;
+			case 0x4005: apu.Pulse1Write(dataBus, 1); break;
+			case 0x4006: apu.Pulse2Write(dataBus, 1); break;
+			case 0x4007: apu.Pulse3Write(dataBus, 1); break;
 
-		case 0x4014:
-			// if(cycles & 1) cpu_tick(); //+1 cycle if dma started on an odd cycle
-			CpuTick(); //tick or read?
-			{
-			uint16_t dmaOffset = dataBus << 8;
+			case 0x4008: apu.Triangle0Write(dataBus); break;
+			case 0x400A: apu.Triangle2Write(dataBus); break;
+			case 0x400B: apu.Triangle3Write(dataBus); break;
 
-			for(uint16_t x=0; x<=255; ++x) //only toggle bool here, move this to CpuOpDone?
-			{
-				CpuRead(dmaOffset++);
-				CpuWrite(0x2004, dataBus);
-			}
-			}
-			break;
-		case 0x4015:
-			apu.StatusWrite(dataBus);
-			break;
-		case 0x4016:
-			if(dataBus & 1)
-			{
-				readJoy1 = true;
-			}
-			else
-			{
-				readJoy1 = false;
-			}
-			break;
-		case 0x4017:
-			apu.FrameCounterWrite(dataBus);
-			break;
+			case 0x400C: apu.Noise0Write(dataBus);    break;
+			case 0x400E: apu.Noise2Write(dataBus);    break;
+			case 0x400F: apu.Noise3Write(dataBus);    break;
+
+			case 0x4014:
+				// only toggle bool here, move this to CpuOpDone?
+				// if(cycles & 1) cpu_tick(); //+1 cycle if dma started on an odd cycle
+				CpuTick(); //tick or read?
+				{
+				uint16_t dmaOffset = dataBus << 8;
+
+				for(uint16_t x=0; x<=255; ++x)
+				{
+					CpuRead(dmaOffset + x);
+					CpuWrite(0x2004, dataBus);
+				}
+				}
+				break;
+			case 0x4015: apu.StatusWrite(dataBus);       break;
+			case 0x4016: readJoy1 = dataBus & 1;         break;
+			case 0x4017: apu.FrameCounterWrite(dataBus); break;
+		}
 	}
 
 	CpuTick();
@@ -1169,6 +1115,15 @@ void Nes::CpuOpDone()
 
 		nmiLine = false;
 	}
+	PollNmi();
+}
+
+
+void Nes::PollNmi()
+{
+	oldNmi = nmi;
+	nmi = ppu.PollNmi();
+	nmiLine = !oldNmi & nmi;
 }
 
 

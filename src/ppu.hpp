@@ -22,7 +22,7 @@ class Ppu
 
 		void Tick();
 
-		bool PollNmi();
+		bool PollNmi() const;
 		void SetNametableMirroring(uint16_t mirroring);
 
 		const bool RenderFrame();
@@ -104,6 +104,4 @@ class Ppu
 		std::array<uint8_t, 8> spriteAttribute;
 		std::array<uint8_t, 8> spriteXpos;
 		uint8_t spriteIndex = 0;
-
-		bool oldNmi = false;
 };

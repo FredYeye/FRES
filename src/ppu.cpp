@@ -1,6 +1,7 @@
-#include "ppu.hpp"
 #include <cstring>
 #include <iostream>
+
+#include "ppu.hpp"
 
 
 Ppu::Ppu()
@@ -13,12 +14,13 @@ uint8_t Ppu::StatusRead() //2002
 {
 	if(scanlineV == 241)
 	{
-		if(scanlineH == 1) //nmi checks get offset by +1. other ppu communication also needs to be offset?
+		// nmi checks get offset by +1. see if this is actually stupid later.
+		if(scanlineH == 0+1)
 		{
 			suppressNmiFlag = true;
 			//     0: reads it as clear and never sets the flag or generates NMI for that frame
 		}
-		else if(scanlineH == 2 || scanlineH == 3)
+		else if(scanlineH == 1+1 || scanlineH == 2+1)
 		{
 			suppressNmi = true;
 			//   1-2: reads it as set, clears it, and suppresses the NMI for that frame
@@ -34,7 +36,7 @@ uint8_t Ppu::StatusRead() //2002
 }
 
 
-uint8_t Ppu::OamDataRead()
+uint8_t Ppu::OamDataRead() //2004
 {
 	//do more stuff (reads while sprite eval is running)
 	return oam[oamAddr];
@@ -55,7 +57,7 @@ uint8_t Ppu::DataRead() //2007
 		{
 			ppuDataLatch = vram[ppuAddress];
 		}
-		ppuAddress += (ppuCtrl & 0x04) ? 0x20 : 0x01;
+		ppuAddress += (ppuCtrl & 0b0100) ? 0x20 : 0x01;
 		return currentLatch;
 	}
 
@@ -66,7 +68,8 @@ uint8_t Ppu::DataRead() //2007
 void Ppu::CtrlWrite(uint8_t dataBus) //2000
 {
 	ppuCtrl = dataBus;
-	ppuAddressLatch = (ppuAddressLatch & 0x73FF) | ((ppuCtrl & 0b11) << 10);
+	ppuAddressLatch &= 0x73FF;
+	ppuAddressLatch |= (dataBus & 0b11) << 10;
 }
 
 
@@ -92,12 +95,14 @@ void Ppu::ScrollWrite(uint8_t dataBus) //2005
 {
 	if(!wToggle)
 	{
-		ppuAddressLatch = (ppuAddressLatch & 0x7FE0) | (dataBus >> 3);
+		ppuAddressLatch &= 0x7FE0;
+		ppuAddressLatch |= dataBus >> 3;
 		fineX = dataBus & 0b0111;
 	}
 	else
 	{
-		ppuAddressLatch = (ppuAddressLatch & 0xC1F) | ((dataBus & 0b0111) << 12) | ((dataBus & 0xF8) << 2);
+		ppuAddressLatch &= 0xC1F;
+		ppuAddressLatch |= ((dataBus & 0b0111) << 12) | ((dataBus & 0b11111000) << 2);
 	}
 	wToggle = !wToggle;
 }
@@ -107,12 +112,14 @@ void Ppu::AddrWrite(uint8_t dataBus) //2006
 {
 	if(!wToggle)
 	{
-		ppuAddressLatch = (ppuAddressLatch & 0xFF) | ((dataBus & 0x3F) << 8);
+		ppuAddressLatch &= 0xFF;
+		ppuAddressLatch |= (dataBus & 0b00111111) << 8;
 	}
 	else
 	{
-		ppuAddressLatch = (ppuAddressLatch & 0x7F00) | dataBus;
-		ppuAddress = ppuAddressLatch & 0x3FFF; //assuming only the address gets mirrored down, not the latch
+		ppuAddressLatch &= 0x7F00;
+		ppuAddressLatch |= dataBus;
+		ppuAddress = ppuAddressLatch;
 	}
 	wToggle = !wToggle;
 }
@@ -122,23 +129,23 @@ void Ppu::DataWrite(uint8_t dataBus) //2007
 {
 	if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18))
 	{
-		if(ppuAddress >= 0x2000)
-		{
-			vram[ppuAddress & nametableMirroring] = dataBus;
-			if(ppuAddress >= 0x3F00)
-			{
-				vram[ppuAddress & 0x3F1F] = dataBus;
-				if(!(ppuAddress & 0b11)) //sprite palette mirror write
-				{
-					vram[(ppuAddress & 0x3F1F) ^ 0x10] = dataBus;
-				}
-			}
-		}
-		else
+		if(ppuAddress < 0x2000)
 		{
 			vram[ppuAddress] = dataBus;
 		}
-		ppuAddress += (ppuCtrl & 0x04) ? 0x20 : 0x01;
+		else if(ppuAddress < 0x3F00)
+		{
+			vram[ppuAddress & nametableMirroring] = dataBus;
+		}
+		else
+		{
+			vram[ppuAddress & 0x3F1F] = dataBus;
+			if(!(ppuAddress & 0b11)) //sprite palette mirror write
+			{
+				vram[(ppuAddress & 0x3F1F) ^ 0x10] = dataBus;
+			}
+		}
+		ppuAddress += (ppuCtrl & 0b0100) ? 0x20 : 0x01;
 	}
 }
 
@@ -151,7 +158,7 @@ void Ppu::Tick()
 		{
 			uint8_t spritePixel = 0;
 			bool spritePriority = true; //false puts sprite in front of BG
-			if(ppuMask & 0b00010000)
+			if(ppuMask & 0b00010000 && scanlineV) //slV >=1 correct solution?
 			{
 				for(uint8_t x = 0; x < 8; ++x)
 				{
@@ -225,12 +232,9 @@ void Ppu::Tick()
 	}
 	else if(scanlineV == 241) //vblank scanlines
 	{
-		if(scanlineH == 1)
+		if(scanlineH == 1 && !suppressNmiFlag)
 		{
-			if(suppressNmiFlag == false)
-			{
-				ppuStatus |= 0x80; //VBL nmi
-			}
+			ppuStatus |= 0x80; //VBL nmi
 		}
 	}
 	else if(scanlineV == 261) //prerender scanline
@@ -241,9 +245,10 @@ void Ppu::Tick()
 			suppressNmi = false;
 			suppressNmiFlag = false;
 		}
-		else if(scanlineH >= 280 && scanlineH <= 304 && ppuMask & 0x18)
+		else if(scanlineH >= 280 && scanlineH <= 304 && ppuMask & 0b00011000)
 		{
-			ppuAddress = (ppuAddress & 0x41F) | (ppuAddressLatch & 0x7BE0);
+			ppuAddress &= 0x41F;
+			ppuAddress |= ppuAddressLatch & 0x7BE0;
 		}
 
 		if(ppuMask & 0b00011000)
@@ -298,7 +303,8 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 	}
 	else if(scanlineH == 257)
 	{
-		ppuAddress = (ppuAddress & 0x7BE0) | (ppuAddressLatch & 0x41F);
+		ppuAddress &= 0x7BE0;
+		ppuAddress |= ppuAddressLatch & 0x41F;
 	}
 
 	if((scanlineH && scanlineH <= 256) || scanlineH >= 321)
@@ -324,21 +330,23 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 					bgHigh |= bgHighLatch;
 					attribute |= (attributeLatch & 0b11) * 0x5555; //2-bit splat
 				}
-				nametable = vram[0x2000 | (ppuAddress & nametableMirroring)];
+				nametable = vram[0x2000 | ppuAddress & nametableMirroring];
 				break;
 			case 3: //AT
 				if(scanlineH != 339)
 				{
-					attributeLatch = vram[0x23C0 | (ppuAddress & nametableMirroring & 0xC00) | (ppuAddress >> 4 & 0x38) | (ppuAddress >> 2 & 0b0111)];
+					uint16_t attributeAddr = 0x23C0 | (ppuAddress & 0xC00);
+					attributeAddr |= (ppuAddress >> 4 & 0x38) | (ppuAddress >> 2 & 0b0111);
+					attributeLatch = vram[attributeAddr & nametableMirroring];
 					attributeLatch >>= (((ppuAddress >> 1) & 1) | ((ppuAddress >> 5) & 0b10)) * 2;
 				}
 				else
 				{
-					nametable = vram[0x2000 | (ppuAddress & nametableMirroring)];
+					nametable = vram[0x2000 | ppuAddress & nametableMirroring];
 				}
 				break;
 			case 5: //low
-				bgAddress = nametable*16 + (ppuAddress >> 12) | ((ppuCtrl & 0x10) << 8);
+				bgAddress = (nametable << 4) + (ppuAddress >> 12) | ((ppuCtrl & 0x10) << 8);
 				bgLowLatch = vram[bgAddress];
 				break;
 			case 7: //high
@@ -378,6 +386,7 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 				spriteXpos[spriteIndex] = oam2[spriteIndex * 4 + 3];
 				break;
 			case 5: //sprite low
+				// do 8x16 stuff here probably
 				bgAddress = ((ppuCtrl & 0b1000) << 9) | (oam2[spriteIndex * 4 + 1] << 4);
 				{
 				uint8_t yOffset = (scanlineV - oam2[spriteIndex * 4]);
@@ -424,7 +433,7 @@ void Ppu::OamScan()
 			{
 				oam2[oam2Index] = oam[oamSpritenum]; //oam search starts at oam[oamAddr]
 
-				if(scanlineV >= oam[oamSpritenum] && scanlineV < oam[oamSpritenum] + 8 + (ppuCtrl >> 2 & 8))
+				if(scanlineV >= oam[oamSpritenum] && scanlineV < oam[oamSpritenum] + 8 + ((ppuCtrl & 0b00100000) >> 2))
 				{
 					++oamEvalPattern;
 					++oam2Index;
@@ -448,9 +457,9 @@ void Ppu::OamScan()
 			}
 			else //search for overflow
 			{
-				if(scanlineV >= oam[oamSpritenum] && scanlineV < oam[oamSpritenum] + 8 + (ppuCtrl >> 2 & 8))
+				if(scanlineV >= oam[oamSpritenum] && scanlineV < oam[oamSpritenum] + 8 + ((ppuCtrl & 0b00100000) >> 2))
 				{
-					ppuStatus |= 0x20;
+					ppuStatus |= 0b00100000;
 				}
 				oamSpritenum += 5; //incorrect, should be +=4, +0-3 (inc n and m w/o carry)
 				if(oamSpritenum <= 4) //stop searching. <= 4 instead of 0 since increment is bugged
@@ -487,24 +496,9 @@ void Ppu::OamUpdateIndex()
 }
 
 
-bool Ppu::PollNmi()
+bool Ppu::PollNmi() const
 {
-	if(suppressNmi)
-	{
-		return false;
-	}
-
-	bool nmi = ppuStatus & ppuCtrl & 0x80;
-	if(nmi & !oldNmi)
-	{
-		oldNmi = nmi;
-		return true;
-	}
-	else
-	{
-		oldNmi = nmi;
-		return false;
-	}
+	return (!suppressNmi) ? ppuStatus & ppuCtrl & 0x80 : false;
 }
 
 
