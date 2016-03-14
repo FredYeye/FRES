@@ -158,6 +158,7 @@ void Ppu::Tick()
 		{
 			uint8_t spritePixel = 0;
 			bool spritePriority = true; //false puts sprite in front of BG
+			bool isSprite0 = false;
 			if(ppuMask & 0b00010000 && scanlineV) //slV >=1 correct solution?
 			{
 				for(uint8_t x = 0; x < 8; ++x)
@@ -174,6 +175,10 @@ void Ppu::Tick()
 						if(spritePixel)
 						{
 							spritePixel |= (spriteAttribute[x] & 0b11) << 2;
+						}
+						if(!x)
+						{
+							isSprite0 = sprite0OnCurrent;
 						}
 					}
 					else if(!spriteXpos[x])
@@ -203,7 +208,7 @@ void Ppu::Tick()
 					{
 						bgPixel = 0;
 					}
-					else if(spritePixel && scanlineH != 256)
+					else if(isSprite0 && spritePixel && scanlineH != 256)
 					{
 						ppuStatus |= 0b01000000; //sprite 0 hit
 					}
@@ -375,6 +380,7 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 	}
 	else //257-320
 	{
+		sprite0OnCurrent = sprite0OnNext;
 		oamAddr = 0;
 
 		//sprite fetching
@@ -438,9 +444,17 @@ void Ppu::OamScan()
 				{
 					++oamEvalPattern;
 					++oam2Index;
+					if(!oamSpritenum)
+					{
+						sprite0OnNext = true;
+					}
 				}
 				else
 				{
+					if(!oamSpritenum)
+					{
+						sprite0OnNext = false;
+					}
 					OamUpdateIndex();
 				}
 			}
@@ -473,7 +487,7 @@ void Ppu::OamScan()
 		{
 			oam2Index = 0;
 			oamSpritenum = 0;
-			oamEvalPattern = 0;			
+			oamEvalPattern = 0;
 		}
 	}
 }
