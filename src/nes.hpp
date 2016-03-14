@@ -24,7 +24,7 @@ class Nes
 		void CpuWrite(uint16_t address, uint8_t data);
 		void CpuTick();
 		void CpuOpDone();
-		void PollNmi();
+		bool PollNmi();
 
 		void DebugCpu();
 
@@ -42,8 +42,10 @@ class Nes
 		bool readJoy1 = false;
 
 		bool nmiLine = false;
+		bool delayedNmi = false;
 		bool nmi = false;
 		bool oldNmi = false;
+		bool nmiPending = false;
 
 		uint8_t mapper;
 };

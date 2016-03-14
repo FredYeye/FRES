@@ -318,7 +318,8 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 				}
 				else
 				{
-					ppuAddress = (ppuAddress & 0x7FE0) ^ 0x400;
+					ppuAddress &= 0x7FE0;
+					ppuAddress ^= 0x400;
 				}
 				break;
 

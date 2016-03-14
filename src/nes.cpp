@@ -20,7 +20,8 @@ Nes::Nes(std::string inFile)
 	LoadRom(inFile);
 
 	addressBus = PC;
-	dataBus = cpuMem[addressBus]; // CpuRead();
+	dataBus = cpuMem[addressBus];
+	// CpuRead(addressBus);
 
 	++PC;
 	++addressBus;
@@ -142,7 +143,7 @@ void Nes::RunOpcode()
 		DebugCpu();
 	#endif
 	#ifdef DUMP_VRAM
-		if(ppu.GetScanlineV() == 261)
+		if(ppu.GetScanlineV() == 261 && ppu.GetScanlineH() == 0)
 		{
 			std::string outfile = "vram.txt";
 			std::ofstream result(outfile.c_str(), std::ios::out | std::ios::binary);
@@ -674,7 +675,6 @@ void Nes::RunOpcode()
 		case 0xAD: case 0xAE: case 0xAF: case 0xCC: case 0xCD: case 0xEC: case 0xED:
 			++PC;
 			CpuRead(addressBus + 1);
-
 			++PC;
 			CpuRead(op1 | (op2 << 8));
 			break;
@@ -968,6 +968,7 @@ void Nes::RunOpcode()
 			break;
 	}
 
+	delayedNmi |= nmiPending;
 	CpuRead(PC); //fetch next opcode
 	CpuOpDone();
 }
@@ -1090,6 +1091,7 @@ void Nes::CpuTick()
 {
 	apu.Tick();
 	ppu.Tick();
+	nmiPending |= PollNmi();
 	ppu.Tick();
 	ppu.Tick();
 }
@@ -1114,16 +1116,19 @@ void Nes::CpuOpDone()
 		CpuRead(PC);                          //
 
 		nmiLine = false;
+		delayedNmi = false;
+		nmiPending = false;
 	}
-	PollNmi();
+	nmiLine = delayedNmi;
 }
 
 
-void Nes::PollNmi()
+bool Nes::PollNmi()
 {
 	oldNmi = nmi;
 	nmi = ppu.PollNmi();
-	nmiLine = !oldNmi & nmi;
+	// nmiLine |= !oldNmi & nmi;
+	return !oldNmi & nmi;
 }
 
 
