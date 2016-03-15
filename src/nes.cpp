@@ -124,6 +124,11 @@ void Nes::LoadRom(std::string inFile)
 			ppu.SetNametableMirroring(0x400);
 		}
 	}
+	else if(mapper == 7)
+	{
+		std::memcpy(&cpuMem[0x8000], &fileContent[0], 0x8000);
+		ppu.SetNametableMirroring(0xC00);
+	}
 	else
 	{
 		std::cout << "unsupported mapper\n";
@@ -1016,14 +1021,21 @@ void Nes::CpuWrite(uint16_t address, uint8_t data) // todo: block writes to ppu 
 		{
 			// unrom & uorom for now
 			std::memcpy(&cpuMem[0x8000], &fileContent[0x4000 * (dataBus & 0b1111)], 0x4000);
-			CpuTick();
-			return;
 		}
-		else
+		else if(mapper == 7)
 		{
-			CpuTick();
-			return;
+			std::memcpy(&cpuMem[0x8000], &fileContent[0x8000 * (dataBus & 0b0111)], 0x8000);
+			if(dataBus & 0b00010000)
+			{
+				ppu.SetNametableMirroring(0xC00);
+			}
+			else
+			{
+				ppu.SetNametableMirroring(0x400); //fix: only use 0x2400
+			}
 		}
+		CpuTick();
+		return;
 	}
 
 	cpuMem[addressBus] = dataBus;
