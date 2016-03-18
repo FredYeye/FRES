@@ -109,6 +109,26 @@ void Apu::Noise3Write(uint8_t dataBus)
 }
 
 
+void Apu::Dmc0Write(uint8_t dataBus)
+{
+}
+
+
+void Apu::Dmc1Write(uint8_t dataBus)
+{
+}
+
+
+void Apu::Dmc2Write(uint8_t dataBus)
+{
+}
+
+
+void Apu::Dmc3Write(uint8_t dataBus)
+{
+}
+
+
 void Apu::StatusWrite(uint8_t dataBus) //4015
 {
 	pulse[0].enable = dataBus & 0b0001;

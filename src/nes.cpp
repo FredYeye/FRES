@@ -98,11 +98,11 @@ void Nes::LoadRom(std::string inFile)
 
 		if(header[6] & 1)
 		{
-			ppu.SetNametableMirroring(0x800);
+			ppu.SetNametableMirroring(0x800, 0);
 		}
 		else
 		{
-			ppu.SetNametableMirroring(0x400);
+			ppu.SetNametableMirroring(0x400, 0);
 		}
 	}
 	else if(mapper == 2)
@@ -117,17 +117,17 @@ void Nes::LoadRom(std::string inFile)
 
 		if(header[6] & 1)
 		{
-			ppu.SetNametableMirroring(0x800);
+			ppu.SetNametableMirroring(0x800, 0);
 		}
 		else
 		{
-			ppu.SetNametableMirroring(0x400);
+			ppu.SetNametableMirroring(0x400, 0);
 		}
 	}
 	else if(mapper == 7)
 	{
 		std::memcpy(&cpuMem[0x8000], &fileContent[0], 0x8000);
-		ppu.SetNametableMirroring(0xC00);
+		ppu.SetNametableMirroring(0xC00, 0);
 	}
 	else
 	{
@@ -737,6 +737,10 @@ void Nes::RunOpcode()
 	switch(opcode)
 	{
 		//R
+		case 0xE1: case 0xE5: case 0xE9: case 0xEB: case 0xED: //sbc
+		case 0xF1: case 0xF5: case 0xF9: case 0xFD:
+			dataBus ^= 0xFF; // sbc(value) = adc(~value)
+
 		case 0x61: case 0x65: case 0x69: case 0x6D: //adc
 		case 0x71: case 0x75: case 0x79: case 0x7D:
 			{
@@ -781,18 +785,6 @@ void Nes::RunOpcode()
 		case 0x11: case 0x15: case 0x19: case 0x1D:
 			rA |= dataBus;
 			rP[1] = !rA;
-			rP[7] = rA & 0x80;
-			break;
-
-		case 0xE1: case 0xE5: case 0xE9: case 0xEB: case 0xED: //sbc
-		case 0xF1: case 0xF5: case 0xF9: case 0xFD:
-			{
-			const uint8_t prevrA = rA;
-			rA = (rA - dataBus) - !rP[0];
-			rP[0] = !((prevrA - dataBus) - !rP[0] & 0x0100);
-			rP[1] = !rA;
-			rP[6] = (prevrA ^ rA) & (~dataBus ^ rA) & 0x80;
-			}
 			rP[7] = rA & 0x80;
 			break;
 
@@ -973,7 +965,6 @@ void Nes::RunOpcode()
 			break;
 	}
 
-	delayedNmi |= nmiPending;
 	CpuRead(PC); //fetch next opcode
 	CpuOpDone();
 }
@@ -1027,11 +1018,11 @@ void Nes::CpuWrite(uint16_t address, uint8_t data) // todo: block writes to ppu 
 			std::memcpy(&cpuMem[0x8000], &fileContent[0x8000 * (dataBus & 0b0111)], 0x8000);
 			if(dataBus & 0b00010000)
 			{
-				ppu.SetNametableMirroring(0xC00);
+				ppu.SetNametableMirroring(0xC00, 0);
 			}
 			else
 			{
-				ppu.SetNametableMirroring(0x400); //fix: only use 0x2400
+				ppu.SetNametableMirroring(0x400, 0x400); //fix: only use 0x2400
 			}
 		}
 		CpuTick();
@@ -1128,10 +1119,9 @@ void Nes::CpuOpDone()
 		CpuRead(PC);                          //
 
 		nmiLine = false;
-		delayedNmi = false;
 		nmiPending = false;
 	}
-	nmiLine = delayedNmi;
+	nmiLine = nmiPending;
 }
 
 
@@ -1139,7 +1129,7 @@ bool Nes::PollNmi()
 {
 	oldNmi = nmi;
 	nmi = ppu.PollNmi();
-	// nmiLine |= !oldNmi & nmi;
+
 	return !oldNmi & nmi;
 }
 

@@ -88,6 +88,11 @@ class Apu
 		void Noise2Write(uint8_t dataBus);               //400E
 		void Noise3Write(uint8_t dataBus);               //400F
 
+		void Dmc0Write(uint8_t dataBus);                 //4010
+		void Dmc1Write(uint8_t dataBus);                 //4011
+		void Dmc2Write(uint8_t dataBus);                 //4012
+		void Dmc3Write(uint8_t dataBus);                 //4013
+
 		void StatusWrite(uint8_t dataBus);               //4015
 		uint8_t StatusRead();                            //4015
 		void FrameCounterWrite(uint8_t dataBus);         //4017

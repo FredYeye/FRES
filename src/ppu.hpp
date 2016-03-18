@@ -23,7 +23,7 @@ class Ppu
 		void Tick();
 
 		bool PollNmi() const;
-		void SetNametableMirroring(uint16_t mirroring);
+		void SetNametableMirroring(uint16_t mirroring, uint16_t base);
 
 		const bool RenderFrame();
 		uint8_t* GetVramPtr();
@@ -90,7 +90,7 @@ class Ppu
 		bool oddFrame = false;
 		uint8_t fineX = 0;
 		uint8_t ppuDataLatch;
-		uint16_t nametableMirroring;
+		uint16_t nametableMirroring, nametableBase;
 		uint8_t oam2Index = 0;
 		uint8_t oamEvalPattern = 0;
 		uint8_t oamSpritenum = 0; //0-3 = sprite0, 4-7 = sprite1 [...] 252-255 = sprite63

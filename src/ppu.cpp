@@ -51,7 +51,7 @@ uint8_t Ppu::DataRead() //2007
 
 		if(ppuAddress >= 0x2000)
 		{
-			ppuDataLatch = vram[ppuAddress & nametableMirroring];
+			ppuDataLatch = vram[ppuAddress & nametableMirroring | nametableBase];
 		}
 		else
 		{
@@ -135,7 +135,7 @@ void Ppu::DataWrite(uint8_t dataBus) //2007
 		}
 		else if(ppuAddress < 0x3F00)
 		{
-			vram[ppuAddress & nametableMirroring] = dataBus;
+			vram[ppuAddress & nametableMirroring | nametableBase] = dataBus;
 		}
 		else
 		{
@@ -336,19 +336,19 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 					bgHigh |= bgHighLatch;
 					attribute |= (attributeLatch & 0b11) * 0x5555; //2-bit splat
 				}
-				nametable = vram[0x2000 | ppuAddress & nametableMirroring];
+				nametable = vram[0x2000 | ppuAddress & nametableMirroring | nametableBase];
 				break;
 			case 3: //AT
 				if(scanlineH != 339)
 				{
 					uint16_t attributeAddr = 0x23C0 | (ppuAddress & 0xC00);
 					attributeAddr |= (ppuAddress >> 4 & 0x38) | (ppuAddress >> 2 & 0b0111);
-					attributeLatch = vram[attributeAddr & nametableMirroring];
+					attributeLatch = vram[attributeAddr & nametableMirroring | nametableBase];
 					attributeLatch >>= (((ppuAddress >> 1) & 1) | ((ppuAddress >> 5) & 0b10)) * 2;
 				}
 				else
 				{
-					nametable = vram[0x2000 | ppuAddress & nametableMirroring];
+					nametable = vram[0x2000 | ppuAddress & nametableMirroring | nametableBase];
 				}
 				break;
 			case 5: //low
@@ -517,9 +517,10 @@ bool Ppu::PollNmi() const
 }
 
 
-void Ppu::SetNametableMirroring(uint16_t mirroring)
+void Ppu::SetNametableMirroring(uint16_t mirroring, uint16_t base)
 {
 	nametableMirroring = 0x2FFF ^ mirroring;
+	nametableBase = base;
 }
 
 

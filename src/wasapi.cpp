@@ -8,14 +8,16 @@
 
 Audio::Audio(void *audioSrc, bool moreAccurateFramerate)
 {
-	if(moreAccurateFramerate) // for 60.0817fps, nearest whole step with 44100hz to 60.0988 (actual nes framerate)
+	if(moreAccurateFramerate)
 	{
+		// for 60.0817fps, nearest whole step with 44100hz to 60.0988 (actual nes framerate)
 		requestedDuration = 166440 * 2;
 		frameAmount = 734;
 	}
 	else
 	{
-		requestedDuration = 166667 * 2; // for 60fps (convenient framerate)
+		// for 60fps (convenient framerate)
+		requestedDuration = 166667 * 2;
 		frameAmount = 735;
 	}
 
