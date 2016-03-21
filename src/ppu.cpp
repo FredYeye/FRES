@@ -158,44 +158,36 @@ void Ppu::Tick()
 		{
 			uint8_t spritePixel = 0;
 			bool spritePriority = true; //false puts sprite in front of BG
-			bool isSprite0 = false;
+			bool opaqueSprite0 = false;
 			if(ppuMask & 0b00010000 && scanlineV) //slV >=1 correct solution?
 			{
 				for(uint8_t x = 0; x < 8; ++x)
 				{
-					if(!spriteXpos[x] && !spritePixel)
+					if(!spriteXpos[x])
 					{
-						spritePixel = spriteBitmapLow[x] >> 7;
-						spritePixel |= (spriteBitmapHigh[x] >> 6) & 0b10;
-
-						spriteBitmapLow[x] <<= 1;
-						spriteBitmapHigh[x] <<= 1;
-						spritePriority = spriteAttribute[x] & 0b00100000;
-
-						if(spritePixel)
+						if(!spritePixel && !(scanlineH <= 8 && !(ppuMask & 0b00000100)))
 						{
-							spritePixel |= (spriteAttribute[x] & 0b11) << 2;
+							spritePixel = spriteBitmapLow[x] >> 7;
+							spritePixel |= (spriteBitmapHigh[x] >> 6) & 0b10;
+							if(spritePixel)
+							{
+								spritePixel |= (spriteAttribute[x] & 0b11) << 2;
+								if(!x)
+								{
+									opaqueSprite0 = sprite0OnCurrent;
+								}
+							}
+
+							spritePriority = spriteAttribute[x] & 0b00100000;
 						}
-						if(!x)
-						{
-							isSprite0 = sprite0OnCurrent;
-						}
-					}
-					else if(!spriteXpos[x])
-					{
 						spriteBitmapLow[x] <<= 1;
 						spriteBitmapHigh[x] <<= 1;
 					}
-				}
-
-				if(scanlineH <= 8 && !(ppuMask & 0b00000100))
-				{
-					spritePixel = 0;
 				}
 			}
 
 			uint8_t bgPixel = 0;
-			if(ppuMask & 0b00001000)
+			if(ppuMask & 0b00001000 && !(scanlineH <= 8 && !(ppuMask & 0b00000010)))
 			{
 				bgPixel = (bgLow >> (15 - fineX)) & 1;
 				bgPixel |= (bgHigh >> (14 - fineX)) & 2;
@@ -204,11 +196,7 @@ void Ppu::Tick()
 				{
 					bgPixel |= (attribute >> (28 - fineX * 2)) & 0x0C;
 
-					if(scanlineH <= 8 && !(ppuMask & 0b00000010))
-					{
-						bgPixel = 0;
-					}
-					else if(isSprite0 && spritePixel && scanlineH != 256)
+					if(opaqueSprite0 && scanlineH != 256)
 					{
 						ppuStatus |= 0b01000000; //sprite 0 hit
 					}
