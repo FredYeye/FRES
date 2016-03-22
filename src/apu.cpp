@@ -292,14 +292,7 @@ void Apu::Tick()
 		{
 			if(p.duty & p.dutyCounter && p.lengthCounter && !SweepForcingSilence(p))
 			{
-				if(p.constant)
-				{
-					pulseOutput += p.volume;
-				}
-				else
-				{
-					pulseOutput += p.envelopeVolume;
-				}
+				pulseOutput += (p.constant) ? p.volume : p.envelopeVolume;
 			}
 		}
 
@@ -308,23 +301,17 @@ void Apu::Tick()
 		uint8_t noiseOutput = 0;
 		if(!(noise.lfsr & 1) && noise.lengthCounter)
 		{
-			if(noise.constant)
-			{
-				noiseOutput = noise.volume;
-			}
-			else
-			{
-				noiseOutput = noise.envelopeVolume;
-			}
+			noiseOutput = (noise.constant) ? noise.volume : noise.envelopeVolume;
 		}
 
 		if(++nearestCounter == outputCounter[outI])
 		{
-			++outI &= 0b11111;
-			apuSamples[sampleCount*2] = mixer.pulse[pulseOutput] + mixer.tnd[triangleOutput*3 + noiseOutput*2];
-			apuSamples[sampleCount*2+1] = mixer.pulse[pulseOutput] + mixer.tnd[triangleOutput*3 + noiseOutput*2];
-			++sampleCount;
 			nearestCounter = 0;
+			++outI &= 0b11111;
+			const float output = mixer.pulse[pulseOutput] + mixer.tnd[triangleOutput*3 + noiseOutput*2];
+			apuSamples[sampleCount*2] = output;
+			apuSamples[sampleCount*2+1] = output;
+			++sampleCount;
 		}
 	}
 

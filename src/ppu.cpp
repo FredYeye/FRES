@@ -194,7 +194,7 @@ void Ppu::Tick()
 
 				if(bgPixel)
 				{
-					bgPixel |= (attribute >> (28 - fineX * 2)) & 0x0C;
+					bgPixel |= (attribute >> (28 - fineX * 2)) & 0b1100;
 
 					if(opaqueSprite0 && scanlineH != 256)
 					{
@@ -372,7 +372,7 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 		oamAddr = 0;
 
 		//sprite fetching
-		switch(scanlineH & 0x07)
+		switch(scanlineH & 7)
 		{
 			case 3: //load sprite attr
 				spriteAttribute[spriteIndex] = oam2[spriteIndex * 4 + 2];
