@@ -1094,7 +1094,7 @@ void Nes::CpuTick()
 {
 	apu.Tick();
 	ppu.Tick();
-	nmiPending |= PollNmi();
+	PollInterrupts();
 	ppu.Tick();
 	ppu.Tick();
 }
@@ -1118,19 +1118,39 @@ void Nes::CpuOpDone()
 		PC = cpuMem[0xFFFA] | (dataBus << 8); //fetch next opcode
 		CpuRead(PC);                          //
 
-		nmiLine = false;
 		nmiPending = false;
+		irqPending = false;
+	}
+	else if(irqLine)
+	{
+		// ++PC;             //fetch op1, increment suppressed
+		CpuRead(addressBus); //
+		CpuWrite(0x100 | rS, PC >> 8); //push PC high on stack
+		CpuWrite(0x100 | addressBus - 1, PC); //push PC low on stack
+		CpuWrite(0x100 | addressBus - 1, rP.to_ulong() & 0b11101111); //push flags on stack with B flag clear
+
+		rS -= 3;         //read nmi vector low, set I flag
+		rP.set(2);       //
+		CpuRead(0xFFFE); //
+		CpuRead(0xFFFF); //read nmi vector high
+
+		PC = cpuMem[0xFFFE] | (dataBus << 8); //fetch next opcode
+		CpuRead(PC);                          //
+
+		irqPending = false;
 	}
 	nmiLine = nmiPending;
+	irqLine = irqPending;
 }
 
 
-bool Nes::PollNmi()
+void Nes::PollInterrupts()
 {
-	oldNmi = nmi;
+	bool oldNmi = nmi;
 	nmi = ppu.PollNmi();
+	nmiPending |= !oldNmi & nmi;
 
-	return !oldNmi & nmi;
+	irqPending = !rP.test(2) & apu.PollFrameInterrupt();
 }
 
 

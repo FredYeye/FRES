@@ -167,6 +167,7 @@ void Ppu::Tick()
 					{
 						if(!spritePixel && !(scanlineH <= 8 && !(ppuMask & 0b00000100)))
 						{
+							spritePriority = spriteAttribute[x] & 0b00100000;
 							spritePixel = spriteBitmapLow[x] >> 7;
 							spritePixel |= (spriteBitmapHigh[x] >> 6) & 0b10;
 							if(spritePixel)
@@ -177,8 +178,6 @@ void Ppu::Tick()
 									opaqueSprite0 = sprite0OnCurrent;
 								}
 							}
-
-							spritePriority = spriteAttribute[x] & 0b00100000;
 						}
 						spriteBitmapLow[x] <<= 1;
 						spriteBitmapHigh[x] <<= 1;
@@ -372,19 +371,15 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 		oamAddr = 0;
 
 		//sprite fetching
-		switch(scanlineH & 7)
+		switch(scanlineH & 7) // do everything in case 7?
 		{
-			case 3: //load sprite attr
-				spriteAttribute[spriteIndex] = oam2[spriteIndex * 4 + 2];
-				break;
-			case 4: //load sprite X
-				spriteXpos[spriteIndex] = oam2[spriteIndex * 4 + 3];
-				break;
-			case 5: //sprite low
+			case 3: spriteAttribute[spriteIndex] = oam2[spriteIndex * 4 + 2]; break;
+			case 4: spriteXpos[spriteIndex] = oam2[spriteIndex * 4 + 3];      break;
+			case 5:
 				// do 8x16 stuff here probably
 				bgAddress = ((ppuCtrl & 0b1000) << 9) | (oam2[spriteIndex * 4 + 1] << 4);
 				{
-				uint8_t yOffset = (scanlineV - oam2[spriteIndex * 4]);
+				uint8_t yOffset = scanlineV - oam2[spriteIndex * 4];
 				if(spriteAttribute[spriteIndex] & 0b10000000) //flip V
 				{
 					yOffset = ~yOffset;
@@ -398,16 +393,20 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 					ReverseBits(spriteBitmapLow[spriteIndex]);
 				}
 				break;
-			case 7: //sprite high
+			case 7:
 				spriteBitmapHigh[spriteIndex] = vram[bgAddress | 8];
 				if(spriteAttribute[spriteIndex] & 0b01000000) //flip H
 				{
 					ReverseBits(spriteBitmapHigh[spriteIndex]);
 				}
-				if(++spriteIndex == 8)
+
+				if(oam2[spriteIndex*4] >= 0xEF)
 				{
-					spriteIndex = 0;
+					// correct solution? sprite 63's Y coord check, does it need to be a range check?
+					spriteBitmapLow[spriteIndex] = 0;
+					spriteBitmapHigh[spriteIndex] = 0;
 				}
+				++spriteIndex &= 0b0111;
 				break;
 		}
 	}

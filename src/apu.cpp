@@ -23,6 +23,7 @@ Apu::Apu()
 void Apu::Pulse0Write(uint8_t dataBus, bool channel)
 {
 	const std::array<uint8_t, 4> dutyTable{{0b0000010, 0b00000110, 0b00011110, 0b11111001}};
+
 	pulse[channel].duty = dutyTable[dataBus >> 6];
 	pulse[channel].halt = dataBus & 0b00100000;
 	pulse[channel].constant = dataBus & 0b00010000; //constant volume or envelope flag?
@@ -93,7 +94,11 @@ void Apu::Noise0Write(uint8_t dataBus)
 
 void Apu::Noise2Write(uint8_t dataBus)
 {
-	const std::array<uint16_t, 16> noisePeriod{{4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068}};
+	const std::array<uint16_t, 16> noisePeriod
+	{{
+		4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068
+	}};
+
 	noise.freqTimer = noisePeriod[dataBus & 0b1111];
 	noise.mode = dataBus & 0b10000000;
 }
@@ -111,21 +116,37 @@ void Apu::Noise3Write(uint8_t dataBus)
 
 void Apu::Dmc0Write(uint8_t dataBus)
 {
+	const std::array<uint16_t, 16> rateIndex
+	{{
+		428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106, 84, 72, 54
+	}};
+
+	dmc.enableIrq = dataBus & 0b10000000;
+	dmc.loop = dataBus & 0b01000000;
+	dmc.freqTimer = dataBus & 0b1111;
+
+	if(!dmc.enableIrq)
+	{
+		dmc.irqPending = false;
+	}
 }
 
 
 void Apu::Dmc1Write(uint8_t dataBus)
 {
+	dmc.output = dataBus & 0b01111111; //todo: timer quirk
 }
 
 
 void Apu::Dmc2Write(uint8_t dataBus)
 {
+	dmc.addressLoad = 0xC000 | (dataBus << 6);
 }
 
 
 void Apu::Dmc3Write(uint8_t dataBus)
 {
+	dmc.sampleLengthLoad = (dataBus << 4) + 1;
 }
 
 
@@ -136,6 +157,7 @@ void Apu::StatusWrite(uint8_t dataBus) //4015
 	{
 		pulse[0].lengthCounter = 0;
 	}
+
 	pulse[1].enable = dataBus & 0b0010;
 	if(!pulse[1].enable)
 	{
@@ -153,10 +175,22 @@ void Apu::StatusWrite(uint8_t dataBus) //4015
 	{
 		noise.lengthCounter = 0;
 	}
+
+	dmc.enable = dataBus & 0b00010000;
+	if(dmc.enable && !dmc.sampleLength)
+	{
+		dmc.sampleLength = dmc.sampleLengthLoad;
+		dmc.address = dmc.addressLoad;
+	}
+	else
+	{
+		dmc.sampleLength = 0;
+	}
+	dmc.irqPending = false;
 }
 
 
-uint8_t Apu::StatusRead()
+uint8_t Apu::StatusRead() //4015
 {
 	uint8_t data = 0;
 	if(pulse[0].lengthCounter)
@@ -175,9 +209,15 @@ uint8_t Apu::StatusRead()
 	{
 		data |= 0b1000;
 	}
-	data |= frameIRQ << 6;
+	if(dmc.sampleLength)
+	{
+		data |= 0b00010000;
+	}
+	data |= dmc.irqPending << 7;
 
+	data |= frameIRQ << 6;
 	frameIRQ = false;
+
 	return data;
 }
 
@@ -323,6 +363,12 @@ void Apu::Tick()
 void* Apu::GetOutput() //734 samples/frame = 60.0817), use as timer?
 {
 	return apuSamples.data();
+}
+
+
+bool Apu::PollFrameInterrupt()
+{
+	return frameIRQ;
 }
 
 

@@ -7,38 +7,22 @@
 
 struct Pulse
 {
-	uint16_t freqTimer;
-	uint16_t freqCounter;
-	uint8_t duty;
-	uint8_t dutyCounter;
-	uint8_t volume;
-	uint8_t envelopeVolume;
-	uint8_t envelopeCounter;
-	uint8_t lengthCounter;
-	bool enable;
-	bool halt; //name?
-	bool constant; //rename
-	bool envelopeReset;
-
-	uint8_t sweepTimer;
-	uint8_t sweepCounter;
-	uint8_t sweepShift;
-	bool sweepNegate;
-	bool sweepReload;
-	bool sweepEnabled;
+	uint16_t freqTimer, freqCounter;
+	uint8_t duty, dutyCounter;
+	uint8_t volume, envelopeVolume;
+	uint8_t envelopeCounter, lengthCounter;
+	uint8_t sweepTimer, sweepCounter, sweepShift;
+	bool enable, halt, constant, envelopeReset;
+	bool sweepNegate, sweepReload, sweepEnabled;
 };
 
 struct Triangle
 {
-	uint16_t freqTimer;
-	uint16_t freqCounter;
-	uint8_t linearLoad;
-	uint8_t linearCounter;
+	uint16_t freqTimer, freqCounter;
+	uint8_t linearLoad, linearCounter;
 	uint8_t lengthCounter;
 	uint8_t sequencerStep;
-	bool enable;
-	bool halt; //name? linear control + halt flag
-	bool linearReload;
+	bool enable, halt, linearReload;
 
 	const std::array<uint8_t, 32> sequencerTable
 	{{
@@ -50,17 +34,17 @@ struct Triangle
 struct Noise
 {
 	uint16_t lfsr;
-	uint16_t freqTimer;
-	uint16_t freqCounter;
-	uint8_t volume;
-	uint8_t envelopeVolume;
-	uint8_t envelopeCounter;
-	uint8_t lengthCounter;
-	bool enable;
-	bool halt;
-	bool constant;
-	bool mode;
-	bool envelopeReset;
+	uint16_t freqTimer, freqCounter;
+	uint8_t volume, envelopeVolume;
+	uint8_t envelopeCounter, lengthCounter;
+	bool enable, halt, constant, mode, envelopeReset;
+};
+
+struct Dmc
+{
+	uint16_t freqTimer, address, addressLoad, sampleLength, sampleLengthLoad;
+	uint8_t output;
+	bool enableIrq, irqPending, loop, enable;
 };
 
 struct Mixer
@@ -102,6 +86,8 @@ class Apu
 		void* GetOutput();
 		uint16_t sampleCount = 0;
 
+		bool PollFrameInterrupt();
+
 	private:
 		void QuarterFrame();
 		void HalfFrame();
@@ -110,6 +96,7 @@ class Apu
 		std::array<Pulse, 2> pulse{};
 		Triangle triangle{};
 		Noise noise{{1}};
+		Dmc dmc{};
 		Mixer mixer;
 
 		const std::array<uint8_t, 32> lengthTable
@@ -128,6 +115,7 @@ class Apu
 
 		std::array<float, 736*2> apuSamples{};
 		uint8_t nearestCounter = 0;
+		uint8_t outI = 0;
 
 		const std::array<uint8_t, 32> outputCounter //samples at 20 + 9/32 = 20.28125 (20.29220 ideal)
 		{{
@@ -136,5 +124,4 @@ class Apu
 			21, 20, 20, 20, 21, 20, 20, 21,
 			20, 20, 20, 21, 20, 20, 21, 20
 		}};
-		uint8_t outI = 0;
 };
