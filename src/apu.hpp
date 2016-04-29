@@ -42,9 +42,9 @@ struct Noise
 
 struct Dmc
 {
-	uint16_t freqTimer, address, addressLoad, sampleLength, sampleLengthLoad;
-	uint8_t output;
-	bool enableIrq, irqPending, loop, enable;
+	uint16_t freqTimer, freqCounter, address, addressLoad, sampleLength, sampleLengthLoad;
+	uint8_t output, outputShift, bitsRemaining, sampleBuffer;
+	bool enableIrq, irqPending, loop, enable, silence;
 };
 
 struct Mixer

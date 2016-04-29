@@ -19,40 +19,22 @@ Nes::Nes(std::string inFile)
 {
 	LoadRom(inFile);
 
-	addressBus = PC;
-	dataBus = cpuMem[addressBus];
-	// CpuRead(addressBus);
-
-	++PC;
-	++addressBus;
-	dataBus = cpuMem[addressBus]; //CpuRead();
-
-	++PC;
-	addressBus = 0x0100 | rS;
-	dataBus = PC >> 8;
-	dataBus = cpuMem[addressBus]; //CpuRead();
-
-	addressBus = 0x0100 | uint8_t(addressBus - 1);
-	dataBus = PC;
-	dataBus = cpuMem[addressBus]; //CpuRead();
-
-	addressBus = 0x0100 | uint8_t(addressBus - 1);
-	dataBus = rP.to_ulong() | 0x10;
-	dataBus = cpuMem[addressBus]; //CpuRead();
+	CpuRead(PC); //PC?
+	CpuRead(PC);
+	CpuRead(PC);
+	CpuRead(0x100);
+	CpuRead(0x1FF);
+	CpuRead(0x1FE);
 
 	rS -= 3;
-	addressBus = 0xFFFC;
-	dataBus = cpuMem[addressBus]; //CpuRead();
-
-	++addressBus;
-	dataBus = cpuMem[addressBus]; //CpuRead();
-
-	PC = cpuMem[0xFFFC] | (dataBus << 8);
-
-	addressBus = PC;              //fetch next opcode
-	dataBus = cpuMem[addressBus]; //CpuRead();
+	CpuRead(0xFFFC);
+	tempData = dataBus;
 
 	rP = 0x36;
+	CpuRead(0xFFFD);
+
+	PC = tempData | (dataBus << 8);
+	CpuRead(PC);
 }
 
 
@@ -72,7 +54,7 @@ void Nes::AdvanceFrame(uint8_t input)
 
 void Nes::LoadRom(std::string inFile)
 {
-	fileContent = FileToU8Vec(inFile);
+	std::vector<uint8_t> fileContent = FileToU8Vec(inFile);
 
 	//ines header stuff
 	std::array<uint8_t, 16> header;
@@ -88,12 +70,25 @@ void Nes::LoadRom(std::string inFile)
 	mapper = (header[6] >> 4) | (header[7] & 0b11110000);
 	if(mapper == 0)
 	{
-		std::memcpy(&cpuMem[0x8000], &fileContent[0], 0x4000);
-		std::memcpy(&cpuMem[0xC000], &fileContent[0x4000 * (header[4] - 1)], 0x4000);
+		prgRom.assign(fileContent.begin(), fileContent.begin() + header[4] * 0x4000);
+
+		bankPtr[0] = &prgRom[0];
+		bankPtr[1] = &prgRom[0x2000];
+		if(header[4] > 1)
+		{
+			bankPtr[2] = &prgRom[0x4000];
+			bankPtr[3] = &prgRom[0x6000];
+		}
+		else
+		{
+			bankPtr[2] = &prgRom[0x0000];
+			bankPtr[3] = &prgRom[0x2000];
+		}
 
 		if(header[5])
 		{
-			std::memcpy(ppu.GetVramPtr(), &fileContent[0x4000 * header[4]], 0x2000);
+			chrRom.assign(fileContent.begin() + header[4] * 0x4000, fileContent.begin() + header[4] * 0x4000 + header[5] * 0x2000);
+			std::memcpy(ppu.GetVramPtr(), &chrRom[0], 0x2000);
 		}
 
 		if(header[6] & 1)
@@ -107,12 +102,17 @@ void Nes::LoadRom(std::string inFile)
 	}
 	else if(mapper == 2)
 	{
-		std::memcpy(&cpuMem[0x8000], &fileContent[0], 0x4000);
-		std::memcpy(&cpuMem[0xC000], &fileContent[0x4000 * (header[4] - 1)], 0x4000);
+		prgRom.assign(fileContent.begin(), fileContent.begin() + header[4] * 0x4000);
+
+		bankPtr[0] = &prgRom[0];
+		bankPtr[1] = &prgRom[0x2000];
+		bankPtr[2] = &prgRom[(header[4] - 1) * 0x4000];
+		bankPtr[3] = bankPtr[2] + 0x2000;
 
 		if(header[5])
 		{
-			std::memcpy(ppu.GetVramPtr(), &fileContent[0x4000 * header[4]], 0x2000);
+			chrRom.assign(fileContent.begin() + header[4] * 0x4000, fileContent.begin() + header[4] * 0x4000 + header[5] * 0x2000);
+			std::memcpy(ppu.GetVramPtr(), &chrRom[0], 0x2000);
 		}
 
 		if(header[6] & 1)
@@ -126,7 +126,13 @@ void Nes::LoadRom(std::string inFile)
 	}
 	else if(mapper == 7)
 	{
-		std::memcpy(&cpuMem[0x8000], &fileContent[0], 0x8000);
+		prgRom.assign(fileContent.begin(), fileContent.begin() + header[4] * 0x4000);
+
+		bankPtr[0] = &prgRom[0];
+		bankPtr[1] = &prgRom[0x2000];
+		bankPtr[2] = &prgRom[0x4000];
+		bankPtr[3] = bankPtr[0x6000];
+
 		ppu.SetNametableMirroring(0xC00, 0);
 	}
 	else
@@ -139,9 +145,9 @@ void Nes::LoadRom(std::string inFile)
 
 void Nes::RunOpcode()
 {
-	const uint8_t opcode = cpuMem[PC];
-	const uint8_t op1 = cpuMem[PC+1];
-	const uint8_t op2 = cpuMem[PC+2];
+	const uint8_t opcode = dataBus;
+	// const uint8_t op1 = cpuMem[PC+1];
+	// const uint8_t op2 = cpuMem[PC+2];
 
 
 	#ifdef DEBUG
@@ -158,8 +164,9 @@ void Nes::RunOpcode()
 	#endif
 
 
-	++PC;                    //fetch op1
-	CpuRead(addressBus + 1); //
+	CpuRead(++PC); //fetch op1
+
+	const uint8_t op1 = dataBus;
 
 	switch(opcode)
 	{
@@ -187,9 +194,10 @@ void Nes::RunOpcode()
 			rS -= 3;
 			rP.set(2);
 			CpuRead(0xFFFE);
+			tempData = dataBus;
 			CpuRead(0xFFFF);
 
-			PC = cpuMem[0xFFFE] | (dataBus << 8);
+			PC = tempData | (dataBus << 8);
 			break;
 
 		case 0x02: case 0x12: case 0x22: case 0x32: case 0x42: case 0x52: //KIL
@@ -401,47 +409,46 @@ void Nes::RunOpcode()
 			CpuRead(PC);
 
 			rS -= 2;
-			PC = op1 + (op2 << 8);
+			PC = op1 + (dataBus << 8);
 			break;
 		case 0x40: //RTI
 			++PC;
-			CpuRead(0x0100 | rS);
-			CpuRead(0x0100 | uint8_t(addressBus + 1));
+			CpuRead(0x0100 | rS++);
+			CpuRead(0x0100 | rS++);
 
 			rP = dataBus | 0x20;
-			CpuRead(0x0100 | uint8_t(addressBus + 1));
+			CpuRead(0x0100 | rS++);
+			tempData = dataBus;
 
-			rS += 3;
-			CpuRead(0x0100 | uint8_t(addressBus + 1));
+			CpuRead(0x0100 | rS);
 
-			PC = cpuMem[0x0100 | uint8_t(addressBus - 1)] | (dataBus << 8);
+			PC = tempData | (dataBus << 8);
 			break;
 		case 0x60: //RTS
 			++PC;
+			CpuRead(0x0100 | rS++);
+			CpuRead(0x0100 | rS++);
+			tempData = dataBus;
+
 			CpuRead(0x0100 | rS);
-			CpuRead(0x0100 | uint8_t(addressBus + 1));
 
-			rS += 2;
-			CpuRead(0x0100 | uint8_t(addressBus + 1));
-
-			PC = cpuMem[0x0100 | addressBus - 1] | (dataBus << 8);
+			PC = tempData | (dataBus << 8);
 			CpuRead(PC++);
 			break;
 
 		case 0x4C: //JMP abs
-			++PC;
-			CpuRead(addressBus + 1);
-			PC = op1 | (op2 << 8);
+			CpuRead(++PC);
+			PC = op1 | (dataBus << 8);
 			break;
 		case 0x6C: //JMP ind
-			++PC;
-			CpuRead(addressBus + 1);
+			CpuRead(++PC);
 
 			++PC;
-			CpuRead(op1 | (op2 << 8));
-			CpuRead(uint8_t(op1 + 1) | (op2 << 8));
+			CpuRead(op1 | (dataBus << 8));
+			tempData = dataBus;
+			CpuRead((addressBus & 0xFF00) + uint8_t(addressBus + 1));
 
-			PC = cpuMem[op1 | (op2 << 8)] | (dataBus << 8);
+			PC = tempData | (dataBus << 8);
 			break;
 
 		case 0x88: //DEY
@@ -465,29 +472,30 @@ void Nes::RunOpcode()
 			rP[7] = rX & 0x80;
 			break;
 
-		case 0x81: //STA (ind,x)
+		case 0x81: //STA (ind,x) indexed indirect
 			++PC;
 			CpuRead(op1);
 			CpuRead(uint8_t(addressBus + rX));
+			tempData = dataBus;
 			CpuRead(uint8_t(addressBus + 1));
-			CpuWrite(cpuMem[uint8_t(addressBus - 1)] | (cpuMem[addressBus] << 8), rA);
+			CpuWrite(tempData | (dataBus << 8), rA);
 			break;
 		case 0x85: //STA zp
 			++PC;
 			CpuWrite(op1, rA);
 			break;
 		case 0x8D: //STA abs
+			CpuRead(++PC);
 			++PC;
-			CpuRead(addressBus + 1);
-			++PC;
-			CpuWrite(op1 | (op2 << 8), rA);
+			CpuWrite(op1 | (dataBus << 8), rA);
 			break;
-		case 0x91: //STA (ind),y
+		case 0x91: //STA (ind),y indirect indexed
 			++PC;
 			CpuRead(op1);
-			CpuRead(uint8_t(addressBus + 1));
-			CpuRead(uint8_t(cpuMem[uint8_t(addressBus - 1)] + rY) | (cpuMem[addressBus] << 8));
-			CpuWrite(addressBus + (cpuMem[op1] + rY & 0x0100), rA);
+			tempData = dataBus;
+			CpuRead(uint8_t(op1 + 1));
+			CpuRead(uint8_t(tempData + rY) | (dataBus << 8));
+			CpuWrite(addressBus + (tempData + rY & 0x0100), rA);
 			break;
 		case 0x95: //STA zp,x
 			++PC;
@@ -495,17 +503,15 @@ void Nes::RunOpcode()
 			CpuWrite(uint8_t(addressBus + rX), rA);
 			break;
 		case 0x99: //STA abs,y
+			CpuRead(++PC);
 			++PC;
-			CpuRead(addressBus + 1);
-			++PC;
-			CpuRead(uint8_t(op1 + rY) | (op2 << 8));
+			CpuRead(uint8_t(op1 + rY) | (dataBus << 8));
 			CpuWrite(addressBus + (op1 + rY & 0x0100), rA);
 			break;
 		case 0x9D: //STA abs,x
+			CpuRead(++PC);
 			++PC;
-			CpuRead(addressBus + 1);
-			++PC;
-			CpuRead(uint8_t(op1 + rX) | (op2 << 8));
+			CpuRead(uint8_t(op1 + rX) | (dataBus << 8));
 			CpuWrite(addressBus + (op1 + rX & 0x0100), rA);
 			break;
 
@@ -514,10 +520,9 @@ void Nes::RunOpcode()
 			CpuWrite(op1, rY);
 			break;
 		case 0x8C: //STY abs
+			CpuRead(++PC);
 			++PC;
-			CpuRead(addressBus + 1);
-			++PC;
-			CpuWrite(op1 | (op2 << 8), rY);
+			CpuWrite(op1 | (dataBus << 8), rY);
 			break;
 		case 0x94: //STY zp,x
 			++PC;
@@ -530,10 +535,9 @@ void Nes::RunOpcode()
 			CpuWrite(op1, rX);
 			break;
 		case 0x8E: //STX abs
+			CpuRead(++PC);
 			++PC;
-			CpuRead(addressBus + 1);
-			++PC;
-			CpuWrite(op1 | (op2 << 8), rX);
+			CpuWrite(op1 | (dataBus << 8), rX);
 			break;
 		case 0x96: //STX zp,y
 			++PC;
@@ -545,18 +549,18 @@ void Nes::RunOpcode()
 			++PC;
 			CpuRead(op1);
 			CpuRead(uint8_t(addressBus + rX));
+			tempData = dataBus;
 			CpuRead(uint8_t(addressBus + 1));
-			CpuWrite(cpuMem[uint8_t(addressBus - 1)] | (cpuMem[addressBus] << 8), rA & rX);
+			CpuWrite(tempData | (dataBus << 8), rA & rX);
 			break;
 		case 0x87: //SAX zp
 			++PC;
 			CpuWrite(op1, rA & rX);
 			break;
 		case 0x8F: //SAX abs
+			CpuRead(++PC);
 			++PC;
-			CpuRead(addressBus + 1);
-			++PC;
-			CpuWrite(op1 | (op2 << 8), rA & rX);
+			CpuWrite(op1 | (dataBus << 8), rA & rX);
 			break;
 		case 0x97: //SAX zp,y
 			++PC;
@@ -607,53 +611,52 @@ void Nes::RunOpcode()
 			break;
 		case 0x0E: case 0x0F: case 0x2E: case 0x2F: case 0x4E: case 0x4F: //abs RW
 		case 0x6E: case 0x6F: case 0xCE: case 0xCF: case 0xEE: case 0xEF:
-			++PC;
-			CpuRead(addressBus + 1);
+			CpuRead(++PC);
 
 			++PC;
-			CpuRead(op1 | (op2 << 8));
+			CpuRead(op1 | (dataBus << 8));
 			CpuWrite(addressBus, dataBus);
 			break;
 		case 0x16: case 0x17: case 0x36: case 0x37: case 0x56: case 0x57: //z,x RW
 		case 0x76: case 0x77: case 0xD6: case 0xD7: case 0xF6: case 0xF7:
 			++PC;
 			CpuRead(op1);
-			CpuRead(uint8_t(addressBus + rX));
+			CpuRead(uint8_t(op1 + rX));
 			CpuWrite(addressBus, dataBus);
 			break;
 		case 0x1E: case 0x1F: case 0x3E: case 0x3F: case 0x5E: case 0x5F: //abs,x RW
 		case 0x7E: case 0x7F: case 0xDE: case 0xDF: case 0xFE: case 0xFF:
+			CpuRead(++PC);
+			tempData = dataBus;
 			++PC;
-			CpuRead(addressBus + 1);
-
-			++PC;
-			CpuRead(uint8_t(op1 + rX) | (op2 << 8));
-			CpuRead(op1 + rX + (op2 << 8));
+			CpuRead(uint8_t(op1 + rX) | (tempData << 8));
+			CpuRead(op1 + rX + (tempData << 8));
 			CpuWrite(addressBus, dataBus);
 			break;
 		case 0x1B: case 0x3B: case 0x5B: case 0x7B: case 0xDB: case 0xFB: //abs,y RW
+			CpuRead(++PC);
+			tempData = dataBus;
 			++PC;
-			CpuRead(addressBus + 1);
-
-			++PC;
-			CpuRead(uint8_t(op1 + rY) | (op2 << 8));
-			CpuRead(op1 + rY + (op2 << 8));
+			CpuRead(uint8_t(op1 + rY) | (tempData << 8));
+			CpuRead(op1 + rY + (tempData << 8));
 			CpuWrite(addressBus, dataBus);
 			break;
 		case 0x03: case 0x23: case 0x43: case 0x63: case 0xC3: case 0xE3: //(indir,x) RW
 			++PC;
 			CpuRead(op1);
 			CpuRead(uint8_t(addressBus + rX));
+			tempData = dataBus;
 			CpuRead(uint8_t(addressBus + 1));
-			CpuRead(cpuMem[uint8_t(addressBus - 1)] | (cpuMem[addressBus] << 8));
+			CpuRead(tempData | (dataBus << 8));
 			CpuWrite(addressBus, dataBus);
 			break;
 		case 0x13: case 0x33: case 0x53: case 0x73: case 0xD3: case 0xF3: //(ind),y RW
 			++PC;
 			CpuRead(op1);
-			CpuRead(uint8_t(addressBus + 1));
-			CpuRead(uint8_t(cpuMem[uint8_t(addressBus - 1)] + rY) | (cpuMem[addressBus] << 8));
-			CpuRead(addressBus + (cpuMem[op1] + rY & 0x0100));
+			tempData = dataBus;
+			CpuRead(uint8_t(op1 + 1));
+			CpuRead(uint8_t(tempData + rY) | (dataBus << 8));
+			CpuRead(addressBus + (tempData + rY & 0x0100));
 			CpuWrite(addressBus, dataBus);
 			break;
 
@@ -662,8 +665,9 @@ void Nes::RunOpcode()
 			++PC;
 			CpuRead(op1);
 			CpuRead(uint8_t(addressBus + rX));
+			tempData = dataBus;
 			CpuRead(uint8_t(addressBus + 1));
-			CpuRead(cpuMem[uint8_t(addressBus - 1)] | (cpuMem[addressBus] << 8));
+			CpuRead(tempData | (dataBus << 8));
 			break;
 		case 0x04: case 0x05: case 0x24: case 0x25: case 0x44: case 0x45: case 0x64: //zero page R
 		case 0x65: case 0xA4: case 0xA5: case 0xA6: case 0xA7: case 0xC4: case 0xC5:
@@ -678,36 +682,35 @@ void Nes::RunOpcode()
 			break;
 		case 0x0C: case 0x0D: case 0x2C: case 0x2D: case 0x4D: case 0x6D: case 0xAC: //absolute R
 		case 0xAD: case 0xAE: case 0xAF: case 0xCC: case 0xCD: case 0xEC: case 0xED:
+			CpuRead(++PC);
 			++PC;
-			CpuRead(addressBus + 1);
-			++PC;
-			CpuRead(op1 | (op2 << 8));
+			CpuRead(op1 | (dataBus << 8));
 			break;
 		case 0x11: case 0x31: case 0x51: case 0x71: //(indirect),y / indirect indexed R
 		case 0xB1: case 0xD1: case 0xF1: case 0xB3:
 			++PC;
 			CpuRead(op1);
-			CpuRead(uint8_t(addressBus + 1));
-			CpuRead(uint8_t(cpuMem[uint8_t(addressBus - 1)] + rY) | (cpuMem[addressBus] << 8));
+			tempData = dataBus;
+			CpuRead(uint8_t(op1 + 1));
+			CpuRead(uint8_t(tempData + rY) | (dataBus << 8));
 
-			if(cpuMem[op1] + rY > 0xFF)
+			if(tempData + rY > 0xFF)
 			{
 				CpuRead(addressBus + 0x0100);
 			}
 			break;
 		case 0x14: case 0x15: case 0x34: case 0x35: case 0x54: case 0x55: case 0x74: //zero page,X R
-		case 0x75: case 0xB4: case 0xB5: case 0xD4: case 0xD5: case 0xF4: case 0xF5:
+		case 0x75: case 0xB4: case 0xB5: case 0xD4: case 0xD5: case 0xF4: case 0xF5:	
 			++PC;
 			CpuRead(op1);
-			CpuRead(uint8_t(addressBus + rX));
+			CpuRead(uint8_t(op1 + rX));
 			break;
 		case 0x19: case 0x39: case 0x59: case 0x79: case 0xB9: //absolute,Y R
 		case 0xBE: case 0xBF: case 0xD9: case 0xF9:
-			++PC;
-			CpuRead(addressBus + 1);
+			CpuRead(++PC);
 
 			++PC;
-			CpuRead(uint8_t(op1 + rY) + (op2 << 8));
+			CpuRead(uint8_t(op1 + rY) + (dataBus << 8));
 
 			if(op1 + rY > 0xFF)
 			{
@@ -716,11 +719,10 @@ void Nes::RunOpcode()
 			break;
 		case 0x1C: case 0x1D: case 0x3C: case 0x3D: case 0x5C: case 0x5D: case 0x7C: //absolute,X R
 		case 0x7D: case 0xBC: case 0xBD: case 0xDC: case 0xDD: case 0xFC: case 0xFD:
-			++PC;
-			CpuRead(addressBus + 1);
+			CpuRead(++PC);
 
 			++PC;
-			CpuRead(uint8_t(op1 + rX) + (op2 << 8));
+			CpuRead(uint8_t(op1 + rX) + (dataBus << 8));
 
 			if(op1 + rX > 0xFF)
 			{
@@ -973,28 +975,38 @@ void Nes::RunOpcode()
 void Nes::CpuRead(uint16_t address)
 {
 	addressBus = address;
-	dataBus = cpuMem[addressBus];
 
-	if((addressBus & 0xE000) == 0x2000) //ppu register mirrors
+	switch(addressBus & 0xE000)
 	{
-		switch(addressBus & 7)
-		{
-			case 2: dataBus = ppu.StatusRead();  break;
-			case 4: dataBus = ppu.OamDataRead(); break;
-			case 7: dataBus = ppu.DataRead();    break;
-		}
-	}
-	else
-	{
-		switch(addressBus)
-		{
-			case 0x4015: dataBus = apu.StatusRead(); break;
+		case 0x0000: dataBus = cpuRam[addressBus & 0x07FF]; break;
 
-			case 0x4016:
-				dataBus = (addressBus & 0xE0) | (controller_reg & 1); //addressBus = open bus?
-				controller_reg >>= 1; //if we have read 4016 8 times, start returning 1s
-			break;
-		}
+		case 0x2000:
+			switch(addressBus & 7)
+			{
+				case 2: dataBus = ppu.StatusRead();  break;
+				case 4: dataBus = ppu.OamDataRead(); break;
+				case 7: dataBus = ppu.DataRead();    break;
+			}
+		break;
+
+		case 0x4000:
+			switch(addressBus)
+			{
+				case 0x4014: dataBus = 0x40;             break; //open bus, maybe hax something better later
+				case 0x4015: dataBus = apu.StatusRead(); break;
+
+				case 0x4016:
+					dataBus = (addressBus & 0xE0) | (controller_reg & 1); //addressBus = open bus?
+					controller_reg >>= 1; //if we have read 4016 8 times, start returning 1s
+				break;
+			}
+		break;
+
+		case 0x6000: break;
+		case 0x8000: dataBus = *(bankPtr[0] + (addressBus & 0x1FFF)); break;
+		case 0xA000: dataBus = *(bankPtr[1] + (addressBus & 0x1FFF)); break;
+		case 0xC000: dataBus = *(bankPtr[2] + (addressBus & 0x1FFF)); break;
+		case 0xE000: dataBus = *(bankPtr[3] + (addressBus & 0x1FFF)); break;
 	}
 
 	CpuTick();
@@ -1006,84 +1018,79 @@ void Nes::CpuWrite(uint16_t address, uint8_t data) // todo: block writes to ppu 
 	addressBus = address;
 	dataBus = data;
 
-	if(addressBus & 0x8000)
+	switch(addressBus & 0xE000)
 	{
-		if(mapper == 2)
-		{
-			// unrom & uorom for now
-			std::memcpy(&cpuMem[0x8000], &fileContent[0x4000 * (dataBus & 0b1111)], 0x4000);
-		}
-		else if(mapper == 7)
-		{
-			std::memcpy(&cpuMem[0x8000], &fileContent[0x8000 * (dataBus & 0b0111)], 0x8000);
-			if(dataBus & 0b00010000)
+		case 0x0000: cpuRam[addressBus & 0x07FF] = dataBus; break;
+
+		case 0x2000:
+			switch(addressBus & 7)
 			{
-				ppu.SetNametableMirroring(0xC00, 0);
+				case 0: ppu.CtrlWrite(dataBus);    break;
+				case 1: ppu.MaskWrite(dataBus);    break;
+				case 3: ppu.OamAddrWrite(dataBus); break;
+				case 4: ppu.OamDataWrite(dataBus); break;
+				case 5: ppu.ScrollWrite(dataBus);  break;
+				case 6: ppu.AddrWrite(dataBus);    break;
+				case 7: ppu.DataWrite(dataBus);    break;
 			}
-			else
+		break;
+
+		case 0x4000:
+			switch(addressBus)
 			{
-				ppu.SetNametableMirroring(0x400, 0x400); //fix: only use 0x2400
-			}
-		}
-		CpuTick();
-		return;
-	}
+				case 0x4000: apu.Pulse0Write(dataBus, 0); break;
+				case 0x4001: apu.Pulse1Write(dataBus, 0); break;
+				case 0x4002: apu.Pulse2Write(dataBus, 0); break;
+				case 0x4003: apu.Pulse3Write(dataBus, 0); break;
 
-	cpuMem[addressBus] = dataBus;
+				case 0x4004: apu.Pulse0Write(dataBus, 1); break;
+				case 0x4005: apu.Pulse1Write(dataBus, 1); break;
+				case 0x4006: apu.Pulse2Write(dataBus, 1); break;
+				case 0x4007: apu.Pulse3Write(dataBus, 1); break;
 
-	if((addressBus & 0xE000) == 0x2000)
-	{
-		switch(addressBus & 7)
-		{
-			case 0: ppu.CtrlWrite(dataBus);    break;
-			case 1: ppu.MaskWrite(dataBus);    break;
-			case 3: ppu.OamAddrWrite(dataBus); break;
-			case 4: ppu.OamDataWrite(dataBus); break;
-			case 5: ppu.ScrollWrite(dataBus);  break;
-			case 6: ppu.AddrWrite(dataBus);    break;
-			case 7: ppu.DataWrite(dataBus);    break;
-		}
-	}
-	else
-	{
-		switch(addressBus)
-		{
-			case 0x4000: apu.Pulse0Write(dataBus, 0); break;
-			case 0x4001: apu.Pulse1Write(dataBus, 0); break;
-			case 0x4002: apu.Pulse2Write(dataBus, 0); break;
-			case 0x4003: apu.Pulse3Write(dataBus, 0); break;
+				case 0x4008: apu.Triangle0Write(dataBus); break;
+				case 0x400A: apu.Triangle2Write(dataBus); break;
+				case 0x400B: apu.Triangle3Write(dataBus); break;
 
-			case 0x4004: apu.Pulse0Write(dataBus, 1); break;
-			case 0x4005: apu.Pulse1Write(dataBus, 1); break;
-			case 0x4006: apu.Pulse2Write(dataBus, 1); break;
-			case 0x4007: apu.Pulse3Write(dataBus, 1); break;
+				case 0x400C: apu.Noise0Write(dataBus);    break;
+				case 0x400E: apu.Noise2Write(dataBus);    break;
+				case 0x400F: apu.Noise3Write(dataBus);    break;
 
-			case 0x4008: apu.Triangle0Write(dataBus); break;
-			case 0x400A: apu.Triangle2Write(dataBus); break;
-			case 0x400B: apu.Triangle3Write(dataBus); break;
-
-			case 0x400C: apu.Noise0Write(dataBus);    break;
-			case 0x400E: apu.Noise2Write(dataBus);    break;
-			case 0x400F: apu.Noise3Write(dataBus);    break;
-
-			case 0x4014:
-				// only toggle bool here, move this to CpuOpDone?
-				// if(cycles & 1) cpu_tick(); //+1 cycle if dma started on an odd cycle
-				CpuTick(); //tick or read?
-				{
-				uint16_t dmaOffset = dataBus << 8;
-
-				for(uint16_t x=0; x<=255; ++x)
-				{
-					CpuRead(dmaOffset + x);
-					CpuWrite(0x2004, dataBus);
-				}
-				}
+				case 0x4014:
+					dmaPending = true;
+					dmaAddress = dataBus << 8;
 				break;
-			case 0x4015: apu.StatusWrite(dataBus);       break;
-			case 0x4016: readJoy1 = dataBus & 1;         break;
-			case 0x4017: apu.FrameCounterWrite(dataBus); break;
-		}
+
+				case 0x4015: apu.StatusWrite(dataBus);       break;
+				case 0x4016: readJoy1 = dataBus & 1;         break;
+				case 0x4017: apu.FrameCounterWrite(dataBus); break;
+			}
+		break;
+
+		case 0x6000: break;
+		case 0x8000: case 0xA000: case 0xC000: case 0xE000:
+			if(mapper == 2)
+			{
+				bankPtr[0] = &prgRom[(dataBus & 0b1111) * 0x4000];
+				bankPtr[1] = bankPtr[0] + 0x2000;
+			}
+			else if(mapper == 7)
+			{
+				bankPtr[0] = &prgRom[(dataBus & 0b0111) * 0x8000];
+				bankPtr[1] = bankPtr[0] + 0x2000;
+				bankPtr[2] = bankPtr[0] + 0x4000;
+				bankPtr[3] = bankPtr[0] + 0x6000;
+
+				if(dataBus & 0b00010000)
+				{
+					ppu.SetNametableMirroring(0xC00, 0);
+				}
+				else
+				{
+					ppu.SetNametableMirroring(0x400, 0x400); //fix: only use 0x2400
+				}
+			}
+		break;
 	}
 
 	CpuTick();
@@ -1095,27 +1102,50 @@ void Nes::CpuTick()
 	apu.Tick();
 	ppu.Tick();
 	PollInterrupts();
+	//probably check DMC DMA here
 	ppu.Tick();
 	ppu.Tick();
+
+	++cycleCount;
 }
 
 
 void Nes::CpuOpDone()
 {
+	if(dmaPending)
+	{
+		// DMA actually waits for writes to finish, not op to finish
+		// however, this makes no difference for OAM DMA
+		if(cycleCount & 1)
+		{
+			CpuRead(PC); //read what? doesn't really matter
+		}
+
+		for(uint16_t x=0; x<=255; ++x)
+		{
+			CpuRead(dmaAddress + x); //should it be 1st or 2nd write from R&W ops (2nd currently)?
+			CpuWrite(0x2004, dataBus);
+		}
+
+		CpuRead(PC);
+		dmaPending = false;
+	}
+
 	if(nmiLine)
 	{
 		// ++PC;             //fetch op1, increment suppressed
 		CpuRead(addressBus); //
 		CpuWrite(0x100 | rS, PC >> 8); //push PC high on stack
 		CpuWrite(0x100 | addressBus - 1, PC); //push PC low on stack
-		CpuWrite(0x100 | addressBus - 1, rP.to_ulong() & 0b11101111); //push flags on stack with B flag clear
+		CpuWrite(0x100 | addressBus - 1, rP.to_ulong() & 0b11101111); //push flags on stack with B clear
 
 		rS -= 3;         //read nmi vector low, set I flag
 		rP.set(2);       //
 		CpuRead(0xFFFA); //
+		tempData = dataBus;
 		CpuRead(0xFFFB); //read nmi vector high
 
-		PC = cpuMem[0xFFFA] | (dataBus << 8); //fetch next opcode
+		PC = tempData | (dataBus << 8); //fetch next opcode
 		CpuRead(PC);                          //
 
 		nmiPending = false;
@@ -1127,14 +1157,15 @@ void Nes::CpuOpDone()
 		CpuRead(addressBus); //
 		CpuWrite(0x100 | rS, PC >> 8); //push PC high on stack
 		CpuWrite(0x100 | addressBus - 1, PC); //push PC low on stack
-		CpuWrite(0x100 | addressBus - 1, rP.to_ulong() & 0b11101111); //push flags on stack with B flag clear
+		CpuWrite(0x100 | addressBus - 1, rP.to_ulong() & 0b11101111); //push flags on stack with B clear
 
-		rS -= 3;         //read nmi vector low, set I flag
+		rS -= 3;         //read irq vector low, set I flag
 		rP.set(2);       //
 		CpuRead(0xFFFE); //
-		CpuRead(0xFFFF); //read nmi vector high
+		tempData = dataBus;
+		CpuRead(0xFFFF); //read irq vector high
 
-		PC = cpuMem[0xFFFE] | (dataBus << 8); //fetch next opcode
+		PC = tempData | (dataBus << 8); //fetch next opcode
 		CpuRead(PC);                          //
 
 		irqPending = false;
@@ -1176,20 +1207,20 @@ void Nes::DebugCpu()
 		"BEQ","SBC","KIL","ISC","NOP","SBC","INC","ISC","SED","SBC","NOP","ISC","NOP","SBC","INC","ISC"
 	};
 
-	const uint8_t opcode = cpuMem[PC];
-	const uint8_t op1 = cpuMem[PC+1];
-	const uint8_t op2 = cpuMem[PC+2];
+	// const uint8_t opcode = cpuMem[PC];
+	// const uint8_t op1 = cpuMem[PC+1];
+	// const uint8_t op2 = cpuMem[PC+2];
 
-	std::cout << std::uppercase << std::hex << std::setfill('0')
-			  << std::setw(4) << PC
-			  << "  " << std::setw(2) << +opcode
-			  << " " << std::setw(4) << op1 + (op2 << 8)
-			  << "  " << opName[opcode]
-			  << "       A:" << std::setw(2) << +rA
-			  << " X:" << std::setw(2) << +rX
-			  << " Y:" << std::setw(2) << +rY
-			  << " P:" << std::setw(2) << (rP.to_ulong() & ~0x10)
-			  << " SP:" << std::setw(2) << +rS
-			  << " PPU:" << std::setw(3) << std::dec << ppu.GetScanlineH()
-			  << " SL:" << std::setw(3) << ppu.GetScanlineV() << std::endl;
+	// std::cout << std::uppercase << std::hex << std::setfill('0')
+			  // << std::setw(4) << PC
+			  // << "  " << std::setw(2) << +opcode
+			  // << " " << std::setw(4) << op1 + (op2 << 8)
+			  // << "  " << opName[opcode]
+			  // << "       A:" << std::setw(2) << +rA
+			  // << " X:" << std::setw(2) << +rX
+			  // << " Y:" << std::setw(2) << +rY
+			  // << " P:" << std::setw(2) << (rP.to_ulong() & ~0x10)
+			  // << " SP:" << std::setw(2) << +rS
+			  // << " PPU:" << std::setw(3) << std::dec << ppu.GetScanlineH()
+			  // << " SL:" << std::setw(3) << ppu.GetScanlineV() << std::endl;
 }

@@ -118,7 +118,8 @@ void Apu::Dmc0Write(uint8_t dataBus)
 {
 	const std::array<uint16_t, 16> rateIndex
 	{{
-		428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106, 84, 72, 54
+		428/2, 380/2, 340/2, 320/2, 286/2, 254/2, 226/2, 214/2,
+		190/2, 160/2, 142/2, 128/2, 106/2,  84/2,  72/2,  54/2
 	}};
 
 	dmc.enableIrq = dataBus & 0b10000000;
@@ -281,6 +282,52 @@ void Apu::Tick()
 			noise.lfsr |= feedback << 14;
 		}
 
+		if(!dmc.freqCounter--)
+		{
+			dmc.freqCounter = dmc.freqTimer;
+			if(!dmc.silence)
+			{
+				if(dmc.outputShift & 1)
+				{
+					if(dmc.output < 0x7E)
+					{
+						dmc.output += 2;
+					}
+				}
+				else if(dmc.output > 1)
+				{
+					dmc.output -= 2;
+				}
+			}
+
+			dmc.outputShift >>= 1;
+			--dmc.bitsRemaining &= 0b0111;
+			if(!dmc.bitsRemaining)
+			{
+				dmc.outputShift = dmc.sampleBuffer;
+				dmc.silence = !dmc.sampleBuffer;
+				//check if is_sample_buffer_empty bool is necessary
+			}
+		}
+
+		if(dmc.sampleLength && !dmc.bitsRemaining)
+		{
+			// dmc.sampleBuffer = nes.CpuRead(dma.address);
+			++dmc.address |= 0x8000;
+			if(!--dmc.sampleLength)
+			{
+				if(dmc.loop)
+				{
+					dmc.sampleLength = dmc.sampleLengthLoad;
+					dmc.address = dmc.addressLoad;
+				}
+				else if(dmc.enableIrq)
+				{
+					dmc.irqPending = true;
+				}
+			}
+		}
+
 		switch(sequencerCounter)
 		{
 			case 0:
@@ -348,9 +395,9 @@ void Apu::Tick()
 		{
 			nearestCounter = 0;
 			++outI &= 0b11111;
-			const float output = mixer.pulse[pulseOutput] + mixer.tnd[triangleOutput*3 + noiseOutput*2];
-			apuSamples[sampleCount*2] = output;
-			apuSamples[sampleCount*2+1] = output;
+			const float output = mixer.pulse[pulseOutput] + mixer.tnd[triangleOutput * 3 + noiseOutput * 2]; //+dmc.output
+			apuSamples[sampleCount * 2] = output;
+			apuSamples[sampleCount * 2 + 1] = output;
 			++sampleCount;
 		}
 	}
