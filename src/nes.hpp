@@ -26,7 +26,7 @@ class Nes
 		void CpuOpDone();
 		void PollInterrupts();
 
-		void DebugCpu();
+		void DebugCpu(uint8_t opcode);
 
 		uint32_t cycleCount = 0;
 

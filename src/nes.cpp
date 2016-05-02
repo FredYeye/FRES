@@ -131,7 +131,7 @@ void Nes::LoadRom(std::string inFile)
 		bankPtr[0] = &prgRom[0];
 		bankPtr[1] = &prgRom[0x2000];
 		bankPtr[2] = &prgRom[0x4000];
-		bankPtr[3] = bankPtr[0x6000];
+		bankPtr[3] = &prgRom[0x6000];
 
 		ppu.SetNametableMirroring(0xC00, 0);
 	}
@@ -151,7 +151,7 @@ void Nes::RunOpcode()
 
 
 	#ifdef DEBUG
-		DebugCpu();
+		DebugCpu(opcode);
 	#endif
 	#ifdef DUMP_VRAM
 		if(ppu.GetScanlineV() == 261 && ppu.GetScanlineH() == 0)
@@ -1102,7 +1102,6 @@ void Nes::CpuTick()
 	apu.Tick();
 	ppu.Tick();
 	PollInterrupts();
-	//probably check DMC DMA here
 	ppu.Tick();
 	ppu.Tick();
 
@@ -1182,10 +1181,12 @@ void Nes::PollInterrupts()
 	nmiPending |= !oldNmi & nmi;
 
 	irqPending = !rP.test(2) & apu.PollFrameInterrupt();
+
+	//dmc dma here?
 }
 
 
-void Nes::DebugCpu()
+void Nes::DebugCpu(uint8_t opcode)
 {
 	const std::array<std::string, 256> opName
 	{
@@ -1211,16 +1212,16 @@ void Nes::DebugCpu()
 	// const uint8_t op1 = cpuMem[PC+1];
 	// const uint8_t op2 = cpuMem[PC+2];
 
-	// std::cout << std::uppercase << std::hex << std::setfill('0')
-			  // << std::setw(4) << PC
-			  // << "  " << std::setw(2) << +opcode
+	std::cout << std::uppercase << std::hex << std::setfill('0')
+			  << std::setw(4) << PC
+			  << "  " << std::setw(2) << +opcode
 			  // << " " << std::setw(4) << op1 + (op2 << 8)
-			  // << "  " << opName[opcode]
-			  // << "       A:" << std::setw(2) << +rA
-			  // << " X:" << std::setw(2) << +rX
-			  // << " Y:" << std::setw(2) << +rY
-			  // << " P:" << std::setw(2) << (rP.to_ulong() & ~0x10)
-			  // << " SP:" << std::setw(2) << +rS
-			  // << " PPU:" << std::setw(3) << std::dec << ppu.GetScanlineH()
-			  // << " SL:" << std::setw(3) << ppu.GetScanlineV() << std::endl;
+			  << "  " << opName[opcode]
+			  << "       A:" << std::setw(2) << +rA
+			  << " X:" << std::setw(2) << +rX
+			  << " Y:" << std::setw(2) << +rY
+			  << " P:" << std::setw(2) << (rP.to_ulong() & ~0x10)
+			  << " SP:" << std::setw(2) << +rS
+			  << " PPU:" << std::setw(3) << std::dec << ppu.GetScanlineH()
+			  << " SL:" << std::setw(3) << ppu.GetScanlineV() << std::endl;
 }
