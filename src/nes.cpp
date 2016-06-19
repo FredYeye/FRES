@@ -22,11 +22,9 @@ Nes::Nes(std::string inFile)
 	CpuRead(PC); //PC?
 	CpuRead(PC);
 	CpuRead(PC);
-	CpuRead(0x100);
-	CpuRead(0x1FF);
-	CpuRead(0x1FE);
-
-	rS -= 3;
+	CpuRead(0x100 | rS--);
+	CpuRead(0x100 | rS--);
+	CpuRead(0x100 | rS--);
 	CpuRead(0xFFFC);
 	tempData = dataBus;
 
@@ -146,8 +144,6 @@ void Nes::LoadRom(std::string inFile)
 void Nes::RunOpcode()
 {
 	const uint8_t opcode = dataBus;
-	// const uint8_t op1 = cpuMem[PC+1];
-	// const uint8_t op2 = cpuMem[PC+2];
 
 
 	#ifdef DEBUG
@@ -171,8 +167,6 @@ void Nes::RunOpcode()
 	switch(opcode)
 	{
 		// opcodes left
-		// 0B ANC
-		// 2B ANC
 		// 4B ALR
 		// 6B ARR
 		// 8B XAA
@@ -181,17 +175,14 @@ void Nes::RunOpcode()
 		// 9C SHY
 		// 9E SHX
 		// 9F AHX
-		// AB LAX
 		// BB LAS
-		// CB AXS
 
 		case 0x00: //BRK
 			++PC;
-			CpuWrite(0x0100 | rS, PC >> 8);
-			CpuWrite(0x0100 | uint8_t(addressBus - 1), PC);
-			CpuWrite(0x0100 | uint8_t(addressBus - 1), rP.to_ulong() | 0b00010000);
+			CpuWrite(0x0100 | rS--, PC >> 8);
+			CpuWrite(0x0100 | rS--, PC);
+			CpuWrite(0x0100 | rS--, rP.to_ulong() | 0b00010000);
 
-			rS -= 3;
 			rP.set(2);
 			CpuRead(0xFFFE);
 			tempData = dataBus;
@@ -259,7 +250,6 @@ void Nes::RunOpcode()
 
 		case 0x10: //BPL
 			++PC;
-			++addressBus;
 			if(!rP.test(7))
 			{
 				const uint16_t pagePC = PC + int8_t(op1);
@@ -274,7 +264,6 @@ void Nes::RunOpcode()
 			break;
 		case 0x30: //BMI
 			++PC;
-			++addressBus;
 			if(rP.test(7))
 			{
 				const uint16_t pagePC = PC + int8_t(op1);
@@ -289,7 +278,6 @@ void Nes::RunOpcode()
 			break;
 		case 0x50: //BVC
 			++PC;
-			++addressBus;
 			if(!rP.test(6))
 			{
 				const uint16_t pagePC = PC + int8_t(op1);
@@ -304,7 +292,6 @@ void Nes::RunOpcode()
 			break;
 		case 0x70: //BVS
 			++PC;
-			++addressBus;
 			if(rP.test(6))
 			{
 				const uint16_t pagePC = PC + int8_t(op1);
@@ -319,7 +306,6 @@ void Nes::RunOpcode()
 			break;
 		case 0x90: //BCC
 			++PC;
-			++addressBus;
 			if(!rP.test(0))
 			{
 				const uint16_t pagePC = PC + int8_t(op1);
@@ -334,7 +320,6 @@ void Nes::RunOpcode()
 			break;
 		case 0xB0: //BCS
 			++PC;
-			++addressBus;
 			if(rP.test(0))
 			{
 				const uint16_t pagePC = PC + int8_t(op1);
@@ -349,7 +334,6 @@ void Nes::RunOpcode()
 			break;
 		case 0xD0: //BNE
 			++PC;
-			++addressBus;
 			if(!rP.test(1))
 			{
 				const uint16_t pagePC = PC + int8_t(op1);
@@ -364,7 +348,6 @@ void Nes::RunOpcode()
 			break;
 		case 0xF0: //BEQ
 			++PC;
-			++addressBus;
 			if(rP.test(1))
 			{
 				const uint16_t pagePC = PC + int8_t(op1);
@@ -403,12 +386,11 @@ void Nes::RunOpcode()
 		case 0x20: //JSR
 			++PC;
 			// rS = op1; //wtf
-			CpuRead(0x0100 | rS);
+			CpuRead(0x0100 | rS--);
 			CpuWrite(addressBus, PC >> 8);
-			CpuWrite(0x0100 | uint8_t(addressBus - 1), PC);
+			CpuWrite(0x0100 | rS--, PC);
 			CpuRead(PC);
 
-			rS -= 2;
 			PC = op1 + (dataBus << 8);
 			break;
 		case 0x40: //RTI
@@ -452,7 +434,7 @@ void Nes::RunOpcode()
 			break;
 
 		case 0x88: //DEY
-			--rY; //actually set one cycle later
+			--rY; //set one cycle later? doesn't matter
 			rP[1] = !rY;
 			rP[7] = rY & 0x80;
 			break;
@@ -597,6 +579,22 @@ void Nes::RunOpcode()
 			rP[7] = rX & 0x80;
 			break;
 
+		case 0x0B: case 0x2B: //ANC
+			++PC;
+			rA &= op1;
+			rP[1] = !rA;
+			rP[7] = rA & 0x80;
+			rP[0] = rA & 0x80;
+			break;
+
+		case 0xCB: //AXS
+			++PC;
+			rP[0] = !((rA & rX) - dataBus & 0x0100);
+			rP[1] = !((rA & rX) - dataBus);
+			rP[7] = (rA & rX) - dataBus & 0x80;
+			rX = (rA & rX) - op1;
+			break;
+
 		// case 0x1A: case 0x3A: case 0x5A: case 0x7A: case 0xDA: case 0xEA: case 0xFA: //NOP (1 byte)
 		// case 0x04: case 0x14: case 0x34: case 0x44: case 0x54: case 0x64: case 0x74: //NOP (2 bytes)
 		// case 0x80: case 0x82: case 0x89: case 0xC2: case 0xD4: case 0xE2: case 0xF4:
@@ -676,8 +674,8 @@ void Nes::RunOpcode()
 			CpuRead(op1);
 			break;
 		case 0x09: case 0x29: case 0x49: case 0x69: case 0x80: case 0x82: case 0x89: //immediate R
-		case 0xA0: case 0xA2: case 0xA9: case 0xC0: case 0xC2: case 0xC9: case 0xE0:
-		case 0xE2: case 0xE9: case 0xEB:
+		case 0xA0: case 0xA2: case 0xA9: case 0xAB: case 0xC0: case 0xC2: case 0xC9:
+		case 0xE0: case 0xE2: case 0xE9: case 0xEB:
 			++PC;
 			break;
 		case 0x0C: case 0x0D: case 0x2C: case 0x2D: case 0x4D: case 0x6D: case 0xAC: //absolute R
@@ -820,7 +818,7 @@ void Nes::RunOpcode()
 			rP[7] = dataBus & 0x80;
 			break;
 
-		case 0xA3: case 0xA7: case 0xAF: case 0xB3: case 0xB7: case 0xBF: //lax
+		case 0xA3: case 0xA7: case 0xAF: case 0xB3: case 0xB7: case 0xAB: case 0xBF: //lax
 			rA = dataBus;
 			rX = dataBus;
 			rP[1] = !rX;
@@ -1009,11 +1007,28 @@ void Nes::CpuRead(uint16_t address)
 		case 0xE000: dataBus = *(bankPtr[3] + (addressBus & 0x1FFF)); break;
 	}
 
+	if(apu.dmcDma & !dmcDmaActive) //where to do this?
+	{
+		dmcDmaActive = true;
+
+		CpuRead(addressBus); //current read becomes the halt/1st dummy, this is the 2nd dummy read
+		if(cycleCount & 1)
+		{
+			CpuRead(addressBus); //alignment
+		}
+		CpuRead(apu.GetDmcAddr()); //dma fetch
+		apu.DmcDma(dataBus);
+		CpuRead(PC); //resume
+
+		dmcDmaActive = false;
+		apu.dmcDma = false;
+	}
+
 	CpuTick();
 }
 
 
-void Nes::CpuWrite(uint16_t address, uint8_t data) // todo: block writes to ppu on the first screen
+void Nes::CpuWrite(uint16_t address, uint8_t data)
 {
 	addressBus = address;
 	dataBus = data;
@@ -1056,6 +1071,11 @@ void Nes::CpuWrite(uint16_t address, uint8_t data) // todo: block writes to ppu 
 				case 0x400E: apu.Noise2Write(dataBus);    break;
 				case 0x400F: apu.Noise3Write(dataBus);    break;
 
+				case 0x4010: apu.Dmc0Write(dataBus);      break;
+				case 0x4011: apu.Dmc1Write(dataBus);      break;
+				case 0x4012: apu.Dmc2Write(dataBus);      break;
+				case 0x4013: apu.Dmc3Write(dataBus);      break;
+
 				case 0x4014:
 					dmaPending = true;
 					dmaAddress = dataBus << 8;
@@ -1068,6 +1088,7 @@ void Nes::CpuWrite(uint16_t address, uint8_t data) // todo: block writes to ppu 
 		break;
 
 		case 0x6000: break;
+
 		case 0x8000: case 0xA000: case 0xC000: case 0xE000:
 			if(mapper == 2)
 			{
@@ -1117,7 +1138,7 @@ void Nes::CpuOpDone()
 		// however, this makes no difference for OAM DMA
 		if(cycleCount & 1)
 		{
-			CpuRead(PC); //read what? doesn't really matter
+			CpuRead(PC); //read what? doesn't really matter, maybe addressBus
 		}
 
 		for(uint16_t x=0; x<=255; ++x)
@@ -1134,18 +1155,17 @@ void Nes::CpuOpDone()
 	{
 		// ++PC;             //fetch op1, increment suppressed
 		CpuRead(addressBus); //
-		CpuWrite(0x100 | rS, PC >> 8); //push PC high on stack
-		CpuWrite(0x100 | addressBus - 1, PC); //push PC low on stack
-		CpuWrite(0x100 | addressBus - 1, rP.to_ulong() & 0b11101111); //push flags on stack with B clear
+		CpuWrite(0x100 | rS--, PC >> 8); //push PC high on stack
+		CpuWrite(0x100 | rS--, PC);      //push PC low on stack
+		CpuWrite(0x100 | rS--, rP.to_ulong() & 0b11101111); //push flags on stack with B clear
 
-		rS -= 3;         //read nmi vector low, set I flag
-		rP.set(2);       //
+		rP.set(2);       //read nmi vector low, set I flag
 		CpuRead(0xFFFA); //
 		tempData = dataBus;
 		CpuRead(0xFFFB); //read nmi vector high
 
 		PC = tempData | (dataBus << 8); //fetch next opcode
-		CpuRead(PC);                          //
+		CpuRead(PC);                    //
 
 		nmiPending = false;
 		irqPending = false;
@@ -1154,18 +1174,17 @@ void Nes::CpuOpDone()
 	{
 		// ++PC;             //fetch op1, increment suppressed
 		CpuRead(addressBus); //
-		CpuWrite(0x100 | rS, PC >> 8); //push PC high on stack
-		CpuWrite(0x100 | addressBus - 1, PC); //push PC low on stack
-		CpuWrite(0x100 | addressBus - 1, rP.to_ulong() & 0b11101111); //push flags on stack with B clear
+		CpuWrite(0x100 | rS--, PC >> 8); //push PC high on stack
+		CpuWrite(0x100 | rS--, PC);      //push PC low on stack
+		CpuWrite(0x100 | rS--, rP.to_ulong() & 0b11101111); //push flags on stack with B clear
 
-		rS -= 3;         //read irq vector low, set I flag
-		rP.set(2);       //
+		rP.set(2);       //read irq vector low, set I flag
 		CpuRead(0xFFFE); //
 		tempData = dataBus;
 		CpuRead(0xFFFF); //read irq vector high
 
 		PC = tempData | (dataBus << 8); //fetch next opcode
-		CpuRead(PC);                          //
+		CpuRead(PC);                    //
 
 		irqPending = false;
 	}
@@ -1181,8 +1200,6 @@ void Nes::PollInterrupts()
 	nmiPending |= !oldNmi & nmi;
 
 	irqPending = !rP.test(2) & apu.PollFrameInterrupt();
-
-	//dmc dma here?
 }
 
 
@@ -1216,12 +1233,33 @@ void Nes::DebugCpu(uint8_t opcode)
 			  << std::setw(4) << PC
 			  << "  " << std::setw(2) << +opcode
 			  // << " " << std::setw(4) << op1 + (op2 << 8)
+			  << " " << std::setw(4) << (DebugRead(PC+1) + (DebugRead(PC+2) << 8))
 			  << "  " << opName[opcode]
-			  << "       A:" << std::setw(2) << +rA
+			  << "    A:" << std::setw(2) << +rA
 			  << " X:" << std::setw(2) << +rX
 			  << " Y:" << std::setw(2) << +rY
 			  << " P:" << std::setw(2) << (rP.to_ulong() & ~0x10)
 			  << " SP:" << std::setw(2) << +rS
 			  << " PPU:" << std::setw(3) << std::dec << ppu.GetScanlineH()
 			  << " SL:" << std::setw(3) << ppu.GetScanlineV() << std::endl;
+}
+
+
+uint8_t Nes::DebugRead(uint16_t address)
+{
+	if(address < 0x8000)
+	{
+		std::cout << "running code below 0x8000, at " << address << "\n";
+	}
+
+	uint8_t a;
+	switch(address & 0xE000)
+	{
+		case 0x8000: a = *(bankPtr[0] + (address & 0x1FFF)); break;
+		case 0xA000: a = *(bankPtr[1] + (address & 0x1FFF)); break;
+		case 0xC000: a = *(bankPtr[2] + (address & 0x1FFF)); break;
+		case 0xE000: a = *(bankPtr[3] + (address & 0x1FFF)); break;
+	}
+
+	return a;
 }

@@ -145,9 +145,36 @@ void Apu::Dmc2Write(uint8_t dataBus)
 }
 
 
-void Apu::Dmc3Write(uint8_t dataBus)
+void Apu::Dmc3Write(uint8_t dataBus) //4013
 {
 	dmc.sampleLengthLoad = (dataBus << 4) + 1;
+}
+
+
+uint16_t Apu::GetDmcAddr()
+{
+	return dmc.address;
+}
+
+
+void Apu::DmcDma(uint8_t sample)
+{
+	dmc.sampleBuffer = sample;
+	++dmc.address |= 0x8000;
+	dmc.sampleBufferEmpty = false;
+
+	if(!--dmc.sampleLength)
+	{
+		if(dmc.loop)
+		{
+			dmc.sampleLength = dmc.sampleLengthLoad;
+			dmc.address = dmc.addressLoad;
+		}
+		else if(dmc.enableIrq)
+		{
+			dmc.irqPending = true;
+		}
+	}
 }
 
 
@@ -177,11 +204,14 @@ void Apu::StatusWrite(uint8_t dataBus) //4015
 		noise.lengthCounter = 0;
 	}
 
-	dmc.enable = dataBus & 0b00010000;
-	if(dmc.enable && !dmc.sampleLength)
+	// dmc.enable = dataBus & 0b00010000;
+	if(dataBus & 0b00010000)
 	{
-		dmc.sampleLength = dmc.sampleLengthLoad;
-		dmc.address = dmc.addressLoad;
+		if(!dmc.sampleLength)
+		{
+			dmc.sampleLength = dmc.sampleLengthLoad;
+			dmc.address = dmc.addressLoad;
+		}
 	}
 	else
 	{
@@ -301,17 +331,20 @@ void Apu::Tick()
 			}
 
 			dmc.outputShift >>= 1;
-			--dmc.bitsRemaining &= 0b0111;
+			--dmc.bitsRemaining;
 			if(!dmc.bitsRemaining)
 			{
+				dmc.bitsRemaining = 8;
 				dmc.outputShift = dmc.sampleBuffer;
-				dmc.silence = !dmc.sampleBuffer;
-				//check if is_sample_buffer_empty bool is necessary
+				dmc.silence = dmc.sampleBufferEmpty;
+				dmc.sampleBufferEmpty = true;
 			}
 		}
 
-		if(dmc.sampleLength && !dmc.bitsRemaining)
+		if(dmc.sampleLength && dmc.sampleBufferEmpty)
 		{
+			dmcDma = true;
+			/*
 			// dmc.sampleBuffer = nes.CpuRead(dma.address);
 			++dmc.address |= 0x8000;
 			if(!--dmc.sampleLength)
@@ -326,6 +359,7 @@ void Apu::Tick()
 					dmc.irqPending = true;
 				}
 			}
+			*/
 		}
 
 		switch(sequencerCounter)

@@ -69,7 +69,6 @@ int main(int argc, char* argv[])
 	{
 		// std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
-		glfwPollEvents();
 		nes.AdvanceFrame(input);
 
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -81,6 +80,7 @@ int main(int argc, char* argv[])
 		nes.apu.sampleCount = 0;
 
 		glfwSwapBuffers(window);
+		glfwPollEvents();
 
 		// std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
 		// frameTime += std::chrono::duration_cast<std::chrono::microseconds>(t3-t1).count();

@@ -27,6 +27,7 @@ class Nes
 		void PollInterrupts();
 
 		void DebugCpu(uint8_t opcode);
+		uint8_t DebugRead(uint16_t address);
 
 		uint32_t cycleCount = 0;
 
@@ -55,6 +56,7 @@ class Nes
 		bool irqPending = false;
 
 		bool dmaPending = false;
+		bool dmcDmaActive = false;
 
 		uint8_t mapper;
 		uint8_t tempData;
