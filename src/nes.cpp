@@ -1009,6 +1009,8 @@ void Nes::CpuRead(uint16_t address)
 
 	if(apu.dmcDma & !dmcDmaActive) //where to do this?
 	{
+		const uint16_t tempAdr = addressBus; //better solution?
+
 		dmcDmaActive = true;
 
 		CpuRead(addressBus); //current read becomes the halt/1st dummy, this is the 2nd dummy read
@@ -1018,7 +1020,7 @@ void Nes::CpuRead(uint16_t address)
 		}
 		CpuRead(apu.GetDmcAddr()); //dma fetch
 		apu.DmcDma(dataBus);
-		CpuRead(PC); //resume
+		CpuRead(tempAdr); //resume (addressBus)
 
 		dmcDmaActive = false;
 		apu.dmcDma = false;
@@ -1249,7 +1251,8 @@ uint8_t Nes::DebugRead(uint16_t address)
 {
 	if(address < 0x8000)
 	{
-		std::cout << "running code below 0x8000, at " << address << "\n";
+		std::cout << "running code below 0x8000, at 0x"
+		<< std::uppercase << std::hex << std::setfill('0') << std::setw(4) << address << "\n";
 	}
 
 	uint8_t a;

@@ -114,7 +114,7 @@ void Apu::Noise3Write(uint8_t dataBus)
 }
 
 
-void Apu::Dmc0Write(uint8_t dataBus)
+void Apu::Dmc0Write(uint8_t dataBus) //4010
 {
 	const std::array<uint16_t, 16> rateIndex
 	{{
@@ -124,7 +124,7 @@ void Apu::Dmc0Write(uint8_t dataBus)
 
 	dmc.enableIrq = dataBus & 0b10000000;
 	dmc.loop = dataBus & 0b01000000;
-	dmc.freqTimer = dataBus & 0b1111;
+	dmc.freqTimer = rateIndex[dataBus & 0b1111];
 
 	if(!dmc.enableIrq)
 	{
@@ -288,7 +288,39 @@ void Apu::Tick()
 		}
 	}
 
-	if(oddEvenTick)
+	switch(sequencerCounter)
+	{
+		case 14913:
+			HalfFrame();
+		case 7457: case 22371:
+			QuarterFrame();
+		break;
+
+		case 29828:
+			frameIRQ = !(blockIRQ | sequencerMode);
+		break;
+
+		case 29829:
+			if(!sequencerMode)
+			{
+				frameIRQ = !blockIRQ;
+				QuarterFrame();
+				HalfFrame();
+				sequencerCounter = 0xFFFF; //wrap
+			}
+		break;
+
+		case 37281:
+			if(sequencerMode)
+			{
+				QuarterFrame();
+				HalfFrame();
+				sequencerCounter = 0xFFFF; //wrap
+			}
+		break;
+	}
+
+	if(evenTick)
 	{
 		for(auto &p : pulse)
 		{
@@ -344,68 +376,6 @@ void Apu::Tick()
 		if(dmc.sampleLength && dmc.sampleBufferEmpty)
 		{
 			dmcDma = true;
-			/*
-			// dmc.sampleBuffer = nes.CpuRead(dma.address);
-			++dmc.address |= 0x8000;
-			if(!--dmc.sampleLength)
-			{
-				if(dmc.loop)
-				{
-					dmc.sampleLength = dmc.sampleLengthLoad;
-					dmc.address = dmc.addressLoad;
-				}
-				else if(dmc.enableIrq)
-				{
-					dmc.irqPending = true;
-				}
-			}
-			*/
-		}
-
-		switch(sequencerCounter)
-		{
-			case 0:
-				if(!sequencerMode)
-				{
-					frameIRQ = !blockIRQ;
-				}
-			break;
-
-			case 7457:
-				QuarterFrame();
-			break;
-
-			case 14913:
-				QuarterFrame();
-				HalfFrame();
-			break;
-
-			case 22371:
-				QuarterFrame();
-			break;
-
-			case 29828:
-				frameIRQ = !(blockIRQ | sequencerMode);
-			break;
-
-			case 29829:
-				if(!sequencerMode)
-				{
-					frameIRQ = !blockIRQ;
-					QuarterFrame();
-					HalfFrame();
-					sequencerCounter = 0xFFFF; //wrap
-				}
-			break;
-
-			case 37281:
-				if(sequencerMode)
-				{
-					QuarterFrame();
-					HalfFrame();
-					sequencerCounter = 0xFFFF; //wrap
-				}
-			break;
 		}
 
 		uint8_t pulseOutput = 0;
@@ -429,7 +399,7 @@ void Apu::Tick()
 		{
 			nearestCounter = 0;
 			++outI &= 0b11111;
-			const float output = mixer.pulse[pulseOutput] + mixer.tnd[triangleOutput * 3 + noiseOutput * 2]; //+dmc.output
+			const float output = mixer.pulse[pulseOutput] + mixer.tnd[triangleOutput * 3 + noiseOutput * 2 + dmc.output]; //+dmc.output
 			apuSamples[sampleCount * 2] = output;
 			apuSamples[sampleCount * 2 + 1] = output;
 			++sampleCount;
@@ -437,7 +407,11 @@ void Apu::Tick()
 	}
 
 	++sequencerCounter;
-	oddEvenTick = !oddEvenTick;
+	// if(!sequencerCounter)
+	// {
+		// frameIRQ = !(blockIRQ | sequencerMode);
+	// }
+	evenTick = !evenTick;
 }
 
 

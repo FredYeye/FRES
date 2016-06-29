@@ -115,7 +115,7 @@ class Apu
 		uint16_t sequencerCounter = 0;
 		bool sequencerMode = false;
 
-		bool oddEvenTick = false; //sufficient for timers that tick every 2 cpu cycles? also rename to something better
+		bool evenTick = true; //sufficient for timers that tick every 2 cpu cycles? also rename to something better
 
 		std::array<float, 736*2> apuSamples{};
 		uint8_t nearestCounter = 0;
