@@ -147,34 +147,7 @@ void Apu::Dmc2Write(uint8_t dataBus)
 
 void Apu::Dmc3Write(uint8_t dataBus) //4013
 {
-	dmc.sampleLengthLoad = (dataBus << 4) + 1;
-}
-
-
-uint16_t Apu::GetDmcAddr()
-{
-	return dmc.address;
-}
-
-
-void Apu::DmcDma(uint8_t sample)
-{
-	dmc.sampleBuffer = sample;
-	++dmc.address |= 0x8000;
-	dmc.sampleBufferEmpty = false;
-
-	if(!--dmc.sampleLength)
-	{
-		if(dmc.loop)
-		{
-			dmc.sampleLength = dmc.sampleLengthLoad;
-			dmc.address = dmc.addressLoad;
-		}
-		else if(dmc.enableIrq)
-		{
-			dmc.irqPending = true;
-		}
-	}
+	dmc.sampleLength = (dataBus << 4) + 1;
 }
 
 
@@ -207,15 +180,15 @@ void Apu::StatusWrite(uint8_t dataBus) //4015
 	// dmc.enable = dataBus & 0b00010000;
 	if(dataBus & 0b00010000)
 	{
-		if(!dmc.sampleLength)
+		if(!dmc.samplesRemaining)
 		{
-			dmc.sampleLength = dmc.sampleLengthLoad;
+			dmc.samplesRemaining = dmc.sampleLength;
 			dmc.address = dmc.addressLoad;
 		}
 	}
 	else
 	{
-		dmc.sampleLength = 0;
+		dmc.samplesRemaining = 0;
 	}
 	dmc.irqPending = false;
 }
@@ -240,7 +213,7 @@ uint8_t Apu::StatusRead() //4015
 	{
 		data |= 0b1000;
 	}
-	if(dmc.sampleLength)
+	if(dmc.samplesRemaining)
 	{
 		data |= 0b00010000;
 	}
@@ -268,6 +241,33 @@ void Apu::FrameCounterWrite(uint8_t dataBus) //4017
 	{
 		QuarterFrame();
 		HalfFrame();
+	}
+}
+
+
+const uint16_t Apu::GetDmcAddr()
+{
+	return dmc.address;
+}
+
+
+void Apu::DmcDma(uint8_t sample)
+{
+	dmc.sampleBuffer = sample;
+	++dmc.address |= 0x8000;
+	dmc.sampleBufferEmpty = false;
+
+	if(!--dmc.samplesRemaining)
+	{
+		if(dmc.loop)
+		{
+			dmc.samplesRemaining = dmc.sampleLength;
+			dmc.address = dmc.addressLoad;
+		}
+		else if(dmc.enableIrq)
+		{
+			dmc.irqPending = true;
+		}
 	}
 }
 
@@ -363,17 +363,16 @@ void Apu::Tick()
 			}
 
 			dmc.outputShift >>= 1;
-			--dmc.bitsRemaining;
-			if(!dmc.bitsRemaining)
+			if(!--dmc.bitsRemaining)
 			{
-				dmc.bitsRemaining = 8;
+				dmc.bitsRemaining = 8; //doing this in DmcDma makes dmc_basics pass, but not the correct solution (i think...)
 				dmc.outputShift = dmc.sampleBuffer;
 				dmc.silence = dmc.sampleBufferEmpty;
 				dmc.sampleBufferEmpty = true;
 			}
 		}
 
-		if(dmc.sampleLength && dmc.sampleBufferEmpty)
+		if(dmc.samplesRemaining && dmc.sampleBufferEmpty)
 		{
 			dmcDma = true;
 		}
@@ -399,7 +398,7 @@ void Apu::Tick()
 		{
 			nearestCounter = 0;
 			++outI &= 0b11111;
-			const float output = mixer.pulse[pulseOutput] + mixer.tnd[triangleOutput * 3 + noiseOutput * 2 + dmc.output]; //+dmc.output
+			const float output = mixer.pulse[pulseOutput] + mixer.tnd[triangleOutput * 3 + noiseOutput * 2 + dmc.output];
 			apuSamples[sampleCount * 2] = output;
 			apuSamples[sampleCount * 2 + 1] = output;
 			++sampleCount;

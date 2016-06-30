@@ -42,7 +42,7 @@ struct Noise
 
 struct Dmc
 {
-	uint16_t freqTimer, freqCounter, address, addressLoad, sampleLength, sampleLengthLoad;
+	uint16_t freqTimer, freqCounter, address, addressLoad, samplesRemaining, sampleLength;
 	uint8_t output, outputShift, bitsRemaining, sampleBuffer;
 	bool enableIrq, irqPending, loop, enable, silence, sampleBufferEmpty;
 };
@@ -77,12 +77,12 @@ class Apu
 		void Dmc2Write(uint8_t dataBus);                 //4012
 		void Dmc3Write(uint8_t dataBus);                 //4013
 
-		uint16_t GetDmcAddr();
-		void DmcDma(uint8_t sample);
-
 		void StatusWrite(uint8_t dataBus);               //4015
 		uint8_t StatusRead();                            //4015
 		void FrameCounterWrite(uint8_t dataBus);         //4017
+
+		const uint16_t GetDmcAddr();
+		void DmcDma(uint8_t sample);
 
 		void Tick();
 

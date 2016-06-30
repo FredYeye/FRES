@@ -995,7 +995,7 @@ void Nes::CpuRead(uint16_t address)
 
 				case 0x4016:
 					dataBus = (addressBus & 0xE0) | (controller_reg & 1); //addressBus = open bus?
-					controller_reg >>= 1; //if we have read 4016 8 times, start returning 1s
+					controller_reg >>= 1; //todo: if we have read 4016 8 times, start returning 1s
 				break;
 			}
 		break;
@@ -1145,7 +1145,7 @@ void Nes::CpuOpDone()
 
 		for(uint16_t x=0; x<=255; ++x)
 		{
-			CpuRead(dmaAddress + x); //should it be 1st or 2nd write from R&W ops (2nd currently)?
+			CpuRead(dmaAddress + x); //should dmaAddress be 1st or 2nd write from R&W ops (2nd currently)?
 			CpuWrite(0x2004, dataBus);
 		}
 
@@ -1155,38 +1155,36 @@ void Nes::CpuOpDone()
 
 	if(nmiLine)
 	{
-		// ++PC;             //fetch op1, increment suppressed
-		CpuRead(addressBus); //
-		CpuWrite(0x100 | rS--, PC >> 8); //push PC high on stack
-		CpuWrite(0x100 | rS--, PC);      //push PC low on stack
+		CpuRead(addressBus);                                //fetch op1, increment suppressed
+		CpuWrite(0x100 | rS--, PC >> 8);                    //push PC high on stack
+		CpuWrite(0x100 | rS--, PC);                         //push PC low on stack
 		CpuWrite(0x100 | rS--, rP.to_ulong() & 0b11101111); //push flags on stack with B clear
 
-		rP.set(2);       //read nmi vector low, set I flag
-		CpuRead(0xFFFA); //
+		rP.set(2);                                          //read nmi vector low, set I flag
+		CpuRead(0xFFFA);                                    //
 		tempData = dataBus;
-		CpuRead(0xFFFB); //read nmi vector high
+		CpuRead(0xFFFB);                                    //read nmi vector high
 
-		PC = tempData | (dataBus << 8); //fetch next opcode
-		CpuRead(PC);                    //
+		PC = tempData | (dataBus << 8);                     //fetch next opcode
+		CpuRead(PC);                                        //
 
 		nmiPending = false;
 		irqPending = false;
 	}
 	else if(irqLine)
 	{
-		// ++PC;             //fetch op1, increment suppressed
-		CpuRead(addressBus); //
-		CpuWrite(0x100 | rS--, PC >> 8); //push PC high on stack
-		CpuWrite(0x100 | rS--, PC);      //push PC low on stack
+		CpuRead(addressBus);                                //fetch op1, increment suppressed
+		CpuWrite(0x100 | rS--, PC >> 8);                    //push PC high on stack
+		CpuWrite(0x100 | rS--, PC);                         //push PC low on stack
 		CpuWrite(0x100 | rS--, rP.to_ulong() & 0b11101111); //push flags on stack with B clear
 
-		rP.set(2);       //read irq vector low, set I flag
-		CpuRead(0xFFFE); //
+		rP.set(2);                                          //read irq vector low, set I flag
+		CpuRead(0xFFFE);                                    //
 		tempData = dataBus;
-		CpuRead(0xFFFF); //read irq vector high
+		CpuRead(0xFFFF);                                    //read irq vector high
 
-		PC = tempData | (dataBus << 8); //fetch next opcode
-		CpuRead(PC);                    //
+		PC = tempData | (dataBus << 8);                     //fetch next opcode
+		CpuRead(PC);                                        //
 
 		irqPending = false;
 	}
