@@ -376,15 +376,27 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 			case 3: spriteAttribute[spriteIndex] = oam2[spriteIndex * 4 + 2]; break;
 			case 4: spriteXpos[spriteIndex] = oam2[spriteIndex * 4 + 3];      break;
 			case 5:
-				// do 8x16 stuff here probably
-				bgAddress = ((ppuCtrl & 0b1000) << 9) | (oam2[spriteIndex * 4 + 1] << 4);
+				if(!(ppuCtrl & 0b00100000))
+				{
+					bgAddress = ((ppuCtrl & 0b1000) << 9) | (oam2[spriteIndex * 4 + 1] << 4);
+				}
+				else //8x16 mode
+				{
+					bgAddress = (oam2[spriteIndex * 4 + 1] << 12) | (oam2[spriteIndex * 4 + 1] << 4);
+					bgAddress &= 0x1FE0;
+				}
+
 				{
 				uint8_t yOffset = scanlineV - oam2[spriteIndex * 4];
 				if(spriteAttribute[spriteIndex] & 0b10000000) //flip V
 				{
 					yOffset = ~yOffset;
 				}
-				bgAddress |= yOffset & 7;
+				bgAddress |= yOffset & 0b0111;
+				if(ppuCtrl & 0b00100000)
+				{
+					bgAddress += (yOffset & 8) << 1;
+				}
 				}
 
 				spriteBitmapLow[spriteIndex] = vram[bgAddress];
