@@ -370,8 +370,8 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 		sprite0OnCurrent = sprite0OnNext;
 		oamAddr = 0;
 
-		//sprite fetching
-		switch(scanlineH & 7) // do everything in case 7?
+		// sprite fetching
+		switch(scanlineH & 7) // do everything in case 7? / all sprites in one for loop
 		{
 			case 3: spriteAttribute[spriteIndex] = oam2[spriteIndex * 4 + 2]; break;
 			case 4: spriteXpos[spriteIndex] = oam2[spriteIndex * 4 + 3];      break;
@@ -412,9 +412,8 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 					ReverseBits(spriteBitmapHigh[spriteIndex]);
 				}
 
-				if(oam2[spriteIndex*4] >= 0xEF)
+				if(oam2[spriteIndex*4] >= 0xEF) // correct solution? sprite 63's Y coord check, does it need to be a range check?
 				{
-					// correct solution? sprite 63's Y coord check, does it need to be a range check?
 					spriteBitmapLow[spriteIndex] = 0;
 					spriteBitmapHigh[spriteIndex] = 0;
 				}
