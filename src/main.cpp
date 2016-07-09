@@ -17,7 +17,7 @@
 #endif
 
 
-uint8_t input;
+uint8_t input, input2;
 
 
 int main(int argc, char* argv[])
@@ -69,7 +69,7 @@ int main(int argc, char* argv[])
 	{
 		// std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
-		nes.AdvanceFrame(input);
+		nes.AdvanceFrame(input, input2);
 
 		glClear(GL_COLOR_BUFFER_BIT);
 		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 240, GL_RGB, GL_UNSIGNED_BYTE, nes.ppu.GetPixelPtr());
@@ -222,6 +222,18 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 		if(glfwGetKey(window, v) == GLFW_PRESS)
 		{
 			input |= shift;
+		}
+		shift <<= 1;
+	}
+
+	input2 = 0;
+	const std::vector<int> keys2{GLFW_KEY_G, GLFW_KEY_H, GLFW_KEY_Y, GLFW_KEY_T, GLFW_KEY_I, GLFW_KEY_K, GLFW_KEY_J, GLFW_KEY_L};
+	shift = 1;
+	for(auto &v : keys2)
+	{
+		if(glfwGetKey(window, v) == GLFW_PRESS)
+		{
+			input2 |= shift;
 		}
 		shift <<= 1;
 	}

@@ -12,7 +12,7 @@ class Nes
 {
 	public:
 		Nes(std::string inFile);
-		void AdvanceFrame(uint8_t input);
+		void AdvanceFrame(uint8_t input, uint8_t input2);
 
 		Ppu ppu;
 		Apu apu;
@@ -38,7 +38,7 @@ class Nes
 		uint16_t addressBus;
 		uint16_t dmaAddress;
 		uint8_t dataBus;
-		uint8_t controller_reg;
+		uint8_t controller_reg, controller_reg2;
 
 		std::array<uint8_t, 0x800> cpuRam;
 		std::vector<uint8_t> prgRom;

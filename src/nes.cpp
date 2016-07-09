@@ -36,7 +36,7 @@ Nes::Nes(std::string inFile)
 }
 
 
-void Nes::AdvanceFrame(uint8_t input)
+void Nes::AdvanceFrame(uint8_t input, uint8_t input2)
 {
 	while(!ppu.RenderFrame())
 	{
@@ -45,6 +45,7 @@ void Nes::AdvanceFrame(uint8_t input)
 		if(readJoy1)
 		{
 			controller_reg = input;
+			controller_reg2 = input2;
 		}
 	}
 }
@@ -736,7 +737,6 @@ void Nes::RunOpcode()
 
 	switch(opcode)
 	{
-		//R
 		case 0xE3: case 0xE7: case 0xEF: case 0xF3: case 0xF7: case 0xFB: case 0xFF: //isc
 			++dataBus;
 			rP[1] = !dataBus;
@@ -757,7 +757,7 @@ void Nes::RunOpcode()
 			rP[6] = (prevrA ^ rA) & (dataBus ^ rA) & 0x80;
 			}
 			rP[7] = rA & 0x80;
-			break;
+		break;
 
 		case 0x23: case 0x27: case 0x2F: case 0x33: case 0x37: case 0x3B: case 0x3F: //rla
 			{
@@ -774,7 +774,7 @@ void Nes::RunOpcode()
 			rA &= dataBus;
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
-			break;
+		break;
 
 		case 0xC3: case 0xC7: case 0xCF: case 0xD3: case 0xD7: case 0xDB: case 0xDF: //dcp
 			--dataBus;
@@ -787,7 +787,7 @@ void Nes::RunOpcode()
 			rP[0] = !(rA - dataBus & 0x0100);
 			rP[1] = !(rA - dataBus);
 			rP[7] = rA - dataBus & 0x80;
-			break;
+		break;
 
 		case 0x43: case 0x47: case 0x4F: case 0x53: case 0x57: case 0x5B: case 0x5F: //sre
 			rP[0] = dataBus & 0x01;
@@ -801,14 +801,14 @@ void Nes::RunOpcode()
 			rA ^= dataBus;
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
-			break;
+		break;
 
 		case 0xA1: case 0xA5: case 0xA9: case 0xAD: //lda
 		case 0xB1: case 0xB5: case 0xB9: case 0xBD:
 			rA = dataBus;
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
-			break;
+		break;
 
 		case 0x03: case 0x07: case 0x0F: case 0x13: case 0x17: case 0x1B: case 0x1F: //slo
 			rP[0] = dataBus & 0x80;
@@ -822,53 +822,52 @@ void Nes::RunOpcode()
 			rA |= dataBus;
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
-			break;
+		break;
 
 		case 0xE0: case 0xE4: case 0xEC: //cpx
 			rP[0] = !(rX - dataBus & 0x0100);
 			rP[1] = !(rX - dataBus);
 			rP[7] = rX - dataBus & 0x80;
-			break;
+		break;
 
 		case 0xC0: case 0xC4: case 0xCC: //cpy
 			rP[0] = !(rY - dataBus & 0x0100);
 			rP[1] = !(rY - dataBus);
 			rP[7] = rY - dataBus & 0x80;
-			break;
+		break;
 
 		case 0xA2: case 0xA6: case 0xAE: case 0xB6: case 0xBE: //ldx
 			rX = dataBus;
 			rP[1] = !rX;
 			rP[7] = rX & 0x80;
-			break;
+		break;
 
 		case 0xA0: case 0xA4: case 0xAC: case 0xB4: case 0xBC: //ldy
 			rY = dataBus;
 			rP[1] = !rY;
 			rP[7] = rY & 0x80;
-			break;
+		break;
 
 		case 0x24: case 0x2C: //bit
 			rP[1] = !(dataBus & rA);
 			rP[6] = dataBus & 0x40;
 			rP[7] = dataBus & 0x80;
-			break;
+		break;
 
 		case 0xA3: case 0xA7: case 0xAF: case 0xB3: case 0xB7: case 0xAB: case 0xBF: //lax
 			rA = dataBus;
 			rX = dataBus;
 			rP[1] = !rX;
 			rP[7] = rX & 0x80;
-			break;
+		break;
 
-		//RW
 		case 0x46: case 0x4E: case 0x56: case 0x5E: //lsr
 			rP[0] = dataBus & 0x01;
 			dataBus >>= 1;
 			rP[1] = !dataBus;
 			rP.reset(7);
 			CpuWrite(addressBus, dataBus);
-			break;
+		break;
 
 		case 0x06: case 0x0E: case 0x16: case 0x1E: //asl
 			rP[0] = dataBus & 0x80;
@@ -876,7 +875,7 @@ void Nes::RunOpcode()
 			rP[1] = !dataBus;
 			rP[7] = dataBus & 0x80;
 			CpuWrite(addressBus, dataBus);
-			break;
+		break;
 
 		case 0x26: case 0x2E: case 0x36: case 0x3E: //rol
 			{
@@ -887,7 +886,7 @@ void Nes::RunOpcode()
 			rP[1] = !dataBus;
 			rP[7] = dataBus & 0x80;
 			CpuWrite(addressBus, dataBus);
-			break;
+		break;
 
 		case 0x66: case 0x6E: case 0x76: case 0x7E: //ror
 			{
@@ -898,21 +897,21 @@ void Nes::RunOpcode()
 			rP[1] = !dataBus;
 			rP[7] = dataBus & 0x80;
 			CpuWrite(addressBus, dataBus);
-			break;
+		break;
 
 		case 0xC6: case 0xCE: case 0xD6: case 0xDE: //dec
 			--dataBus;
 			rP[1] = !dataBus;
 			rP[7] = dataBus & 0x80;
 			CpuWrite(addressBus, dataBus);
-			break;
+		break;
 
 		case 0xE6: case 0xEE: case 0xF6: case 0xFE: //inc
 			++dataBus;
 			rP[1] = !dataBus;
 			rP[7] = dataBus & 0x80;
 			CpuWrite(addressBus, dataBus);
-			break;
+		break;
 
 		case 0x63: case 0x67: case 0x6F: case 0x73: case 0x77: case 0x7B: case 0x7F: //rra
 			{
@@ -932,7 +931,7 @@ void Nes::RunOpcode()
 			rP[6] = (prevrA ^ rA) & (dataBus ^ rA) & 0x80;
 			}
 			rP[7] = rA & 0x80;
-			break;
+		break;
 	}
 
 	CpuRead(PC); //fetch next opcode
@@ -964,8 +963,13 @@ void Nes::CpuRead(uint16_t address)
 				case 0x4015: dataBus = apu.StatusRead(); break;
 
 				case 0x4016:
-					dataBus = (addressBus & 0xE0) | (controller_reg & 1); //addressBus = open bus?
+					dataBus = ((addressBus >> 8) & 0xE0) | (controller_reg & 1); //addressBus = open bus?
 					controller_reg >>= 1; //todo: if we have read 4016 8 times, start returning 1s
+				break;
+
+				case 0x4017:
+					dataBus = ((addressBus >> 8) & 0xE0) | (controller_reg2 & 1);
+					controller_reg2 >>= 1;
 				break;
 			}
 		break;
@@ -1195,14 +1199,9 @@ void Nes::DebugCpu(uint8_t opcode)
 		"BEQ","SBC","KIL","ISC","NOP","SBC","INC","ISC","SED","SBC","NOP","ISC","NOP","SBC","INC","ISC"
 	};
 
-	// const uint8_t opcode = cpuMem[PC];
-	// const uint8_t op1 = cpuMem[PC+1];
-	// const uint8_t op2 = cpuMem[PC+2];
-
 	std::cout << std::uppercase << std::hex << std::setfill('0')
 			  << std::setw(4) << PC
 			  << "  " << std::setw(2) << +opcode
-			  // << " " << std::setw(4) << op1 + (op2 << 8)
 			  << " " << std::setw(4) << (DebugRead(PC+1) + (DebugRead(PC+2) << 8))
 			  << "  " << opName[opcode]
 			  << "    A:" << std::setw(2) << +rA
@@ -1217,15 +1216,14 @@ void Nes::DebugCpu(uint8_t opcode)
 
 uint8_t Nes::DebugRead(uint16_t address)
 {
-	if(address < 0x8000)
-	{
-		std::cout << "running code below 0x8000, at 0x"
-		<< std::uppercase << std::hex << std::setfill('0') << std::setw(4) << address << "\n";
-	}
-
-	uint8_t a;
+	uint8_t a = 0;
 	switch(address & 0xE000)
 	{
+		case 0x0000: case 0x2000: case 0x4000: case 0x6000:
+				std::cout << "running code below 0x8000, at 0x"
+				<< std::uppercase << std::hex << std::setfill('0') << std::setw(4) << address << "\n";
+		break;
+
 		case 0x8000: a = *(bankPtr[0] + (address & 0x1FFF)); break;
 		case 0xA000: a = *(bankPtr[1] + (address & 0x1FFF)); break;
 		case 0xC000: a = *(bankPtr[2] + (address & 0x1FFF)); break;
