@@ -737,6 +737,12 @@ void Nes::RunOpcode()
 	switch(opcode)
 	{
 		//R
+		case 0xE3: case 0xE7: case 0xEF: case 0xF3: case 0xF7: case 0xFB: case 0xFF: //isc
+			++dataBus;
+			rP[1] = !dataBus;
+			rP[7] = dataBus & 0x80;
+			CpuWrite(addressBus, dataBus);
+
 		case 0xE1: case 0xE5: case 0xE9: case 0xEB: case 0xED: //sbc
 		case 0xF1: case 0xF5: case 0xF9: case 0xFD:
 			dataBus ^= 0xFF; // sbc(value) = adc(~value)
@@ -753,6 +759,16 @@ void Nes::RunOpcode()
 			rP[7] = rA & 0x80;
 			break;
 
+		case 0x23: case 0x27: case 0x2F: case 0x33: case 0x37: case 0x3B: case 0x3F: //rla
+			{
+			const bool newCarry = dataBus & 0x80;
+			dataBus = (dataBus << 1) | rP[0];
+			rP[0] = newCarry;
+			}
+			rP[1] = !dataBus;
+			rP[7] = dataBus & 0x80;
+			CpuWrite(addressBus, dataBus);
+
 		case 0x21: case 0x25: case 0x29: case 0x2D: //and
 		case 0x31: case 0x35: case 0x39: case 0x3D:
 			rA &= dataBus;
@@ -760,12 +776,25 @@ void Nes::RunOpcode()
 			rP[7] = rA & 0x80;
 			break;
 
+		case 0xC3: case 0xC7: case 0xCF: case 0xD3: case 0xD7: case 0xDB: case 0xDF: //dcp
+			--dataBus;
+			rP[1] = !dataBus;
+			rP[7] = dataBus & 0x80;
+			CpuWrite(addressBus, dataBus);
+
 		case 0xC1: case 0xC5: case 0xC9: case 0xCD: //cmp
 		case 0xD1: case 0xD5: case 0xD9: case 0xDD:
 			rP[0] = !(rA - dataBus & 0x0100);
 			rP[1] = !(rA - dataBus);
 			rP[7] = rA - dataBus & 0x80;
 			break;
+
+		case 0x43: case 0x47: case 0x4F: case 0x53: case 0x57: case 0x5B: case 0x5F: //sre
+			rP[0] = dataBus & 0x01;
+			dataBus >>= 1;
+			rP[1] = !dataBus;
+			rP.reset(7);
+			CpuWrite(addressBus, dataBus);
 
 		case 0x41: case 0x45: case 0x49: case 0x4D: //eor
 		case 0x51: case 0x55: case 0x59: case 0x5D:
@@ -780,6 +809,13 @@ void Nes::RunOpcode()
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
 			break;
+
+		case 0x03: case 0x07: case 0x0F: case 0x13: case 0x17: case 0x1B: case 0x1F: //slo
+			rP[0] = dataBus & 0x80;
+			dataBus <<= 1;
+			rP[1] = !dataBus;
+			rP[7] = dataBus & 0x80;
+			CpuWrite(addressBus, dataBus);
 
 		case 0x01: case 0x05: case 0x09: case 0x0D: //ora
 		case 0x11: case 0x15: case 0x19: case 0x1D:
@@ -876,72 +912,6 @@ void Nes::RunOpcode()
 			rP[1] = !dataBus;
 			rP[7] = dataBus & 0x80;
 			CpuWrite(addressBus, dataBus);
-			break;
-
-		case 0xC3: case 0xC7: case 0xCF: case 0xD3: case 0xD7: case 0xDB: case 0xDF: //dcp
-			--dataBus;
-			rP[1] = !dataBus;
-			rP[7] = dataBus & 0x80;
-			CpuWrite(addressBus, dataBus);
-
-			rP[0] = !(rA - dataBus & 0x0100);
-			rP[1] = !(rA - dataBus);
-			rP[7] = rA - dataBus & 0x80;
-			break;
-
-		case 0xE3: case 0xE7: case 0xEF: case 0xF3: case 0xF7: case 0xFB: case 0xFF: //isc
-			++dataBus;
-			rP[1] = !dataBus;
-			rP[7] = dataBus & 0x80;
-			CpuWrite(addressBus, dataBus);
-
-			{
-			const uint8_t prevrA = rA;
-			rA = (rA - dataBus) - !rP[0];
-			rP[0] = !((prevrA - dataBus) - !rP[0] & 0x0100);
-			rP[1] = !rA;
-			rP[6] = (prevrA ^ rA) & (~dataBus ^ rA) & 0x80;
-			}
-			rP[7] = rA & 0x80;
-			break;
-
-		case 0x03: case 0x07: case 0x0F: case 0x13: case 0x17: case 0x1B: case 0x1F: //slo
-			rP[0] = dataBus & 0x80;
-			dataBus <<= 1;
-			rP[1] = !dataBus;
-			rP[7] = dataBus & 0x80;
-			CpuWrite(addressBus, dataBus);
-
-			rA |= dataBus;
-			rP[1] = !rA;
-			rP[7] = rA & 0x80;
-			break;
-
-		case 0x23: case 0x27: case 0x2F: case 0x33: case 0x37: case 0x3B: case 0x3F: //rla
-			{
-			const bool newCarry = dataBus & 0x80;
-			dataBus = (dataBus << 1) | rP[0];
-			rP[0] = newCarry;
-			}
-			rP[1] = !dataBus;
-			rP[7] = dataBus & 0x80;
-			CpuWrite(addressBus, dataBus);
-
-			rA &= dataBus;
-			rP[1] = !rA;
-			rP[7] = rA & 0x80;
-			break;
-
-		case 0x43: case 0x47: case 0x4F: case 0x53: case 0x57: case 0x5B: case 0x5F: //sre
-			rP[0] = dataBus & 0x01;
-			dataBus >>= 1;
-			rP[1] = !dataBus;
-			rP.reset(7);
-			CpuWrite(addressBus, dataBus);
-
-			rA ^= dataBus;
-			rP[1] = !rA;
-			rP[7] = rA & 0x80;
 			break;
 
 		case 0x63: case 0x67: case 0x6F: case 0x73: case 0x77: case 0x7B: case 0x7F: //rra
