@@ -17,9 +17,6 @@
 #endif
 
 
-uint8_t input, input2;
-
-
 int main(int argc, char* argv[])
 {
 	if(argc < 2)
@@ -106,8 +103,8 @@ void initialize(GLuint &vao, const uint8_t *const pixelPtr)
 	glBindVertexArray(vao);
 
 	// 1 square (made by 2 triangles) to be rendered
-	const float vertices_position[8] = {-1.0f,1.0f,	1.0f,1.0f, 1.0f,-1.0f, -1.0f,-1.0f};
-	const float texture_coord[8] = {0.0f,0.0f, 1.0f,0.0f, 1.0f,1.0f, 0.0f,1.0f};
+	const int8_t vertices_position[8] = {-1,1, 1,1, 1,-1, -1,-1};
+	const uint8_t texture_coord[8] = {0,0, 1,0, 1,1, 0,1};
 	const uint8_t indices[6] = {0,1,2, 2,3,0};
 
 	std::string vertex = "#version 130\n in vec4 position; in vec2 texture_coord; out vec2 texture_coord_from_vshader; void main() {gl_Position = position; texture_coord_from_vshader = texture_coord;}";
@@ -151,14 +148,14 @@ void initialize(GLuint &vao, const uint8_t *const pixelPtr)
 	GLint position_attribute = glGetAttribLocation(shaderProgram, "position");
 
 	// Specify how the data for position can be accessed
-	glVertexAttribPointer(position_attribute, 2, GL_FLOAT, GL_FALSE, 0, 0);
+	glVertexAttribPointer(position_attribute, 2, GL_BYTE, GL_FALSE, 0, 0);
 
 	// Enable the attribute
 	glEnableVertexAttribArray(position_attribute);
 
 	// Texture coord attribute
 	GLint texture_coord_attribute = glGetAttribLocation(shaderProgram, "texture_coord");
-	glVertexAttribPointer(texture_coord_attribute, 2, GL_FLOAT, GL_FALSE, 0, (GLvoid*)sizeof(vertices_position));
+	glVertexAttribPointer(texture_coord_attribute, 2, GL_UNSIGNED_BYTE, GL_FALSE, 0, (GLvoid*)sizeof(vertices_position));
 	glEnableVertexAttribArray(texture_coord_attribute);
 }
 
@@ -242,6 +239,4 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 	{
 		glfwSetWindowShouldClose(window, GL_TRUE);
 	}
-
-	return;
 }

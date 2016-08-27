@@ -39,9 +39,6 @@ class Audio
 		IAudioRenderClient *pRenderClient = 0;
 		WAVEFORMATEX *pwfx = 0;
 
-		uint8_t *pData;
-		uint32_t flags = 0;
-
 		const uint32_t referenceTimeSec = 10000000;
 		const uint32_t referenceTimeMSec = 10000;
 		int64_t requestedDuration = referenceTimeSec; //1 = 100ns (REFERENCE_TIME)

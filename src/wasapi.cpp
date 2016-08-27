@@ -56,6 +56,8 @@ void Audio::StreamSource()
 		pAudioClient->GetCurrentPadding(&queuedFrames);
 	}
 
+	uint8_t *pData;
+	uint32_t flags = 0;
 	pRenderClient->GetBuffer(frameAmount, &pData);
 	std::memcpy(pData, audioSource, frameAmount * 2 * 4);
 	pRenderClient->ReleaseBuffer(frameAmount, flags);
