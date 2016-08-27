@@ -3,7 +3,7 @@ set(project_name nes)
 project(${project_name})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -march=native") #-flto -static
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -march=native") #-flto -static -fno-math-errno?
 
 if(WIN32)
 	message("bad choice")
@@ -35,6 +35,9 @@ if(WIN32)
 		src/file.hpp
 		src/gl_core_3_3.h
 		)
+
+	add_executable(${project_name} ${header_files} ${source_files})
+	target_link_libraries(nes ${GLFW_LIBRARY} opengl32 ole32 ksuser)
 endif(WIN32)
 
 if(UNIX)
@@ -67,14 +70,7 @@ if(UNIX)
 		src/file.hpp
 		src/gl_core_3_3.h
 		)
-endif(UNIX)
 
-add_executable(${project_name} ${header_files} ${source_files})
-
-if(WIN32)
-	target_link_libraries(nes ${GLFW_LIBRARY} opengl32 ole32 ksuser)
-endif(WIN32)
-
-if(UNIX)
+	add_executable(${project_name} ${header_files} ${source_files})
 	target_link_libraries(nes ${GLFW_LIBRARIES} ${OPENGL_LIBRARIES} lasound)
 endif(UNIX)
