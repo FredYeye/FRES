@@ -89,13 +89,17 @@ void Audio::Init()
 
 	SetFormat();
 
+	uint32_t bufferFrameCount;
 	hr = pAudioClient->GetBufferSize(&bufferFrameCount);
 	TestHResult(hr, "GetBufferSize");
 
-	int64_t actualDuration = double(referenceTimeSec) * bufferFrameCount / pwfx->nSamplesPerSec;
-	sleepTime = double(actualDuration) / referenceTimeMSec / 2;
-
-	// std::cout << "requested " << requestedDuration * 0.0001 << "ms, actual duration: " << actualDuration * 0.0001 << "ms\n";
+	if(bufferFrameCount != frameAmount*2)
+	{
+		int64_t actualDuration = double(referenceTimeSec) * bufferFrameCount / pwfx->nSamplesPerSec;
+		std::cout << "requested " << frameAmount*2 << " frames (" << requestedDuration * 0.0001 << " ms), got "
+				  << bufferFrameCount << " frames (" << actualDuration * 0.0001 << " ms)";
+	}
+	// uint32_t sleepTime = double(actualDuration) / referenceTimeMSec / 2;
 
 	const IID IID_IAudioRenderClient = __uuidof(IAudioRenderClient);
 	hr = pAudioClient->GetService(IID_IAudioRenderClient, (void**)&pRenderClient);
@@ -106,10 +110,10 @@ void Audio::Init()
 void Audio::SetFormat()
 {
 	//2 channels, 44100hz, 32bit(float)
-	channels = pwfx->nChannels;
-	sampleRate = pwfx->nSamplesPerSec;
-	bitRate = pwfx->wBitsPerSample;
-	frameSize = pwfx->nBlockAlign; // frameSize = channels * (bitRate / 8);
+	uint8_t channels = pwfx->nChannels;
+	uint32_t sampleRate = pwfx->nSamplesPerSec;
+	uint8_t bitRate = pwfx->wBitsPerSample;
+	uint8_t frameSize = pwfx->nBlockAlign; // frameSize = channels * (bitRate / 8);
 
 	bool floatPCM = false;
 	if(pwfx->wFormatTag == WAVE_FORMAT_EXTENSIBLE)
@@ -120,10 +124,6 @@ void Audio::SetFormat()
 			floatPCM = true;
 		}
 	}
-
-	// std::cout << pwfx->wFormatTag << "\n"
-			  // << pwfx->nAvgBytesPerSec << "\n"
-			  // << pwfx->cbSize << "\n";
 
 	if(channels != 2 || sampleRate != 44100 || bitRate != 32 || floatPCM != true)
 	{

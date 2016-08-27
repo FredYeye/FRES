@@ -23,14 +23,6 @@ class Audio
 		void Release();
 		void TestHResult(HRESULT hr, std::string functionName);
 
-		std::vector<uint8_t> audioStream;
-		uint32_t cursor = 0;
-		uint8_t channels;
-		uint32_t sampleRate;
-		uint8_t bitRate;
-
-		uint8_t frameSize;
-
 		HRESULT hr;
 
 		IMMDeviceEnumerator *pEnumerator = 0;
@@ -42,10 +34,6 @@ class Audio
 		const uint32_t referenceTimeSec = 10000000;
 		const uint32_t referenceTimeMSec = 10000;
 		int64_t requestedDuration = referenceTimeSec; //1 = 100ns (REFERENCE_TIME)
-
-		uint32_t bufferFrameCount;
-		uint32_t numFramesAvailable;
-		uint32_t sleepTime;
 
 		void *audioSource;
 		uint16_t frameAmount;

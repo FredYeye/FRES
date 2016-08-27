@@ -79,8 +79,8 @@ int main(int argc, char* argv[])
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 
-		// std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
-		// frameTime += std::chrono::duration_cast<std::chrono::microseconds>(t3-t1).count();
+		// std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+		// frameTime += std::chrono::duration_cast<std::chrono::microseconds>(t2-t1).count();
 		// ++frames;
 		// if(frameTime >= 1000000)
 		// {
