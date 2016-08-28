@@ -377,27 +377,28 @@ void Apu::Tick()
 			dmcDma = true;
 		}
 
-		uint8_t pulseOutput = 0;
-		for(auto &p : pulse)
-		{
-			if(p.duty & p.dutyCounter && p.lengthCounter && !SweepForcingSilence(p))
-			{
-				pulseOutput += (p.constant) ? p.volume : p.envelopeVolume;
-			}
-		}
-
-		uint8_t triangleOutput = (ultrasonic) ? 7 : triangle.sequencerTable[triangle.sequencerStep]; //should be 7.5. HMM set to 0?
-
-		uint8_t noiseOutput = 0;
-		if(!(noise.lfsr & 1) && noise.lengthCounter)
-		{
-			noiseOutput = (noise.constant) ? noise.volume : noise.envelopeVolume;
-		}
-
 		if(++nearestCounter == outputCounter[outI])
 		{
 			nearestCounter = 0;
 			++outI &= 0b11111;
+
+			uint8_t pulseOutput = 0;
+			for(auto &p : pulse)
+			{
+				if(p.duty & p.dutyCounter && p.lengthCounter && !SweepForcingSilence(p))
+				{
+					pulseOutput += (p.constant) ? p.volume : p.envelopeVolume;
+				}
+			}
+
+			uint8_t triangleOutput = (ultrasonic) ? 7 : triangle.sequencerTable[triangle.sequencerStep]; //should be 7.5. HMM set to 0?
+
+			uint8_t noiseOutput = 0;
+			if(!(noise.lfsr & 1) && noise.lengthCounter)
+			{
+				noiseOutput = (noise.constant) ? noise.volume : noise.envelopeVolume;
+			}
+
 			const float output = mixer.pulse[pulseOutput] + mixer.tnd[triangleOutput * 3 + noiseOutput * 2 + dmc.output];
 			apuSamples[sampleCount * 2] = output;
 			apuSamples[sampleCount * 2 + 1] = output;

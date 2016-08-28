@@ -48,17 +48,26 @@ void Audio::StopAudio()
 
 void Audio::StreamSource()
 {
-	uint32_t queuedFrames;
-	pAudioClient->GetCurrentPadding(&queuedFrames);
-	while(queuedFrames > frameAmount)
-	{
-		Sleep(1);
-		pAudioClient->GetCurrentPadding(&queuedFrames);
-	}
+	// uint32_t queuedFrames;
+	// pAudioClient->GetCurrentPadding(&queuedFrames);
+	// while(queuedFrames > frameAmount)
+	// {
+		// Sleep(1);
+		// pAudioClient->GetCurrentPadding(&queuedFrames);
+	// }
+
+	// uint8_t *pData;
+	// uint32_t flags = 0;
+	// pRenderClient->GetBuffer(frameAmount, &pData);
+	// std::memcpy(pData, audioSource, frameAmount * 2 * 4);
+	// pRenderClient->ReleaseBuffer(frameAmount, flags);
 
 	uint8_t *pData;
 	uint32_t flags = 0;
-	pRenderClient->GetBuffer(frameAmount, &pData);
+	while(pRenderClient->GetBuffer(frameAmount, &pData))
+	{
+		Sleep(1);
+	}
 	std::memcpy(pData, audioSource, frameAmount * 2 * 4);
 	pRenderClient->ReleaseBuffer(frameAmount, flags);
 }
@@ -93,13 +102,13 @@ void Audio::Init()
 	hr = pAudioClient->GetBufferSize(&bufferFrameCount);
 	TestHResult(hr, "GetBufferSize");
 
-	if(bufferFrameCount != frameAmount*2)
+	if(bufferFrameCount != frameAmount * 2)
 	{
-		int64_t actualDuration = double(referenceTimeSec) * bufferFrameCount / pwfx->nSamplesPerSec;
-		std::cout << "requested " << frameAmount*2 << " frames (" << requestedDuration * 0.0001 << " ms), got "
+		const double referenceTimeSec = 10000000.0;
+		int64_t actualDuration = referenceTimeSec * bufferFrameCount / pwfx->nSamplesPerSec;
+		std::cout << "requested " << frameAmount * 2 << " frames (" << requestedDuration * 0.0001 << " ms), got "
 				  << bufferFrameCount << " frames (" << actualDuration * 0.0001 << " ms)";
 	}
-	// uint32_t sleepTime = double(actualDuration) / referenceTimeMSec / 2;
 
 	const IID IID_IAudioRenderClient = __uuidof(IAudioRenderClient);
 	hr = pAudioClient->GetService(IID_IAudioRenderClient, (void**)&pRenderClient);
