@@ -52,8 +52,8 @@ int main(int argc, char* argv[])
 	Nes nes(infile);
 
 	GLuint vao;
-	initialize(vao, nes.ppu.GetPixelPtr());
-	glfwSetKeyCallback(window, key_callback);
+	Initialize(vao, nes.ppu.GetPixelPtr());
+	glfwSetKeyCallback(window, KeyCallback);
 
 	// init audio
 	Audio audio(nes.apu.GetOutput(), false);
@@ -92,124 +92,116 @@ int main(int argc, char* argv[])
 
 	audio.StopAudio();
 	glfwTerminate();
+
 	return 0;
 }
 
 
-void initialize(GLuint &vao, const uint8_t *const pixelPtr)
+void Initialize(GLuint &vao, const uint8_t *const pixelPtr)
 {
-	// Use a Vertex Array Object
-	glGenVertexArrays(1, &vao);
+	glGenVertexArrays(1, &vao); //Use a Vertex Array Object
 	glBindVertexArray(vao);
 
-	// 1 square (made by 2 triangles) to be rendered
-	const int8_t vertices_position[8] = {-1,1, 1,1, 1,-1, -1,-1};
-	const uint8_t texture_coord[8] = {0,0, 1,0, 1,1, 0,1};
+	const int8_t verticesPosition[8] = {-1,1, 1,1, 1,-1, -1,-1}; //1 square (made by 2 triangles) to be rendered
+	const uint8_t textureCoord[8] = {0,0, 1,0, 1,1, 0,1};
 	const uint8_t indices[6] = {0,1,2, 2,3,0};
 
-	std::string vertex = "#version 130\n in vec4 position; in vec2 texture_coord; out vec2 texture_coord_from_vshader; void main() {gl_Position = position; texture_coord_from_vshader = texture_coord;}";
-	std::string fragment = "#version 130\n in vec2 texture_coord_from_vshader; out vec4 out_color; uniform sampler2D texture_sampler; void main() {out_color = texture(texture_sampler, texture_coord_from_vshader);}";
-
-	// Create a Vector Buffer Object that will store the vertices on video memory
-	GLuint vbo;
+	GLuint vbo; //Create a Vector Buffer Object that will store the vertices on video memory
 	glGenBuffers(1, &vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo); //Allocate space for vertex positions and texture coordinates
+	glBufferData(GL_ARRAY_BUFFER, sizeof(verticesPosition) + sizeof(textureCoord), 0, GL_STATIC_DRAW);
 
-	// Allocate space for vertex positions and texture coordinates
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices_position) + sizeof(texture_coord), 0, GL_STATIC_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(verticesPosition), verticesPosition); //Transfer the vertex positions
+	glBufferSubData(GL_ARRAY_BUFFER, sizeof(verticesPosition), sizeof(textureCoord), textureCoord); //Transfer the texture coordinates
 
-	// Transfer the vertex positions:
-	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices_position), vertices_position);
-
-	// Transfer the texture coordinates:
-	glBufferSubData(GL_ARRAY_BUFFER, sizeof(vertices_position), sizeof(texture_coord), texture_coord);
-
-	// Create an Element Array Buffer that will store the indices array:
-	GLuint eab;
+	GLuint eab; //Create an Element Array Buffer that will store the indices array
 	glGenBuffers(1, &eab);
-
-	// Transfer the data from indices to eab
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, eab);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, eab); //Transfer the data from indices to eab
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
-	// Create a texture
-	GLuint texture;
+	GLuint texture; //Create a texture
 	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture); //Specify that we work with a 2D texture
 
-	// Specify that we work with a 2D texture
-	glBindTexture(GL_TEXTURE_2D, texture);
-
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 240, 0, GL_RGB, GL_UNSIGNED_BYTE, pixelPtr);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, 256, 240, 0, GL_RGB, GL_UNSIGNED_BYTE, pixelPtr);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	GLuint shaderProgram = create_program(vertex, fragment);
+	GLuint shaderProgram = CreateProgram();
 
 	GLint position_attribute = glGetAttribLocation(shaderProgram, "position");
+	glVertexAttribPointer(position_attribute, 2, GL_BYTE, GL_FALSE, 0, 0); //Specify how the data for position can be accessed
+	glEnableVertexAttribArray(position_attribute); //Enable the attribute
 
-	// Specify how the data for position can be accessed
-	glVertexAttribPointer(position_attribute, 2, GL_BYTE, GL_FALSE, 0, 0);
-
-	// Enable the attribute
-	glEnableVertexAttribArray(position_attribute);
-
-	// Texture coord attribute
-	GLint texture_coord_attribute = glGetAttribLocation(shaderProgram, "texture_coord");
-	glVertexAttribPointer(texture_coord_attribute, 2, GL_UNSIGNED_BYTE, GL_FALSE, 0, (GLvoid*)sizeof(vertices_position));
-	glEnableVertexAttribArray(texture_coord_attribute);
+	GLint textureCoord_attribute = glGetAttribLocation(shaderProgram, "textureCoord"); //Texture coord attribute
+	glVertexAttribPointer(textureCoord_attribute, 2, GL_UNSIGNED_BYTE, GL_FALSE, 0, (GLvoid*)sizeof(verticesPosition));
+	glEnableVertexAttribArray(textureCoord_attribute);
 }
 
 
-GLuint create_program(std::string vertex, std::string fragment)
+GLuint CreateProgram()
 {
-	// Load and compile the vertex and fragment shaders
-	GLuint vertexShader = load_and_compile_shader(vertex, GL_VERTEX_SHADER);
-	GLuint fragmentShader = load_and_compile_shader(fragment, GL_FRAGMENT_SHADER);
+	const std::string vertex =
+	"#version 130\n"
+	"in vec4 position; in vec2 textureCoord;"
+	"out vec2 textureCoord_from_vshader;"
+	"void main() {"
+	"gl_Position = position;"
+	"textureCoord_from_vshader = textureCoord;"
+	"}";
 
-	// Attach the above shader to a program
-	GLuint shaderProgram = glCreateProgram();
+	const std::string fragment =
+	"#version 130\n"
+	"in vec2 textureCoord_from_vshader;"
+	"out vec4 out_color;"
+	"uniform sampler2D texture_sampler;"
+	"void main() {"
+	"out_color = texture(texture_sampler, textureCoord_from_vshader);"
+	"}";
+
+	GLuint vertexShader = LoadAndCompileShader(vertex, GL_VERTEX_SHADER); //Load and compile the vertex and fragment shaders
+	GLuint fragmentShader = LoadAndCompileShader(fragment, GL_FRAGMENT_SHADER);
+
+	GLuint shaderProgram = glCreateProgram(); //Attach the above shader to a program
 	glAttachShader(shaderProgram, vertexShader);
 	glAttachShader(shaderProgram, fragmentShader);
 
-	// Flag the shaders for deletion
-	glDeleteShader(vertexShader);
+	glDeleteShader(vertexShader); //Flag the shaders for deletion
 	glDeleteShader(fragmentShader);
 
-	// Link and use the program
-	glLinkProgram(shaderProgram);
+	glLinkProgram(shaderProgram); //Link and use the program
 	glUseProgram(shaderProgram);
 
 	return shaderProgram;
 }
 
 
-GLuint load_and_compile_shader(std::string &sName, GLenum shaderType)
+GLuint LoadAndCompileShader(const std::string &shaderName, GLenum shaderType)
 {
-	std::vector<char> buffer(sName.begin(), sName.end());
+	std::vector<char> buffer(shaderName.begin(), shaderName.end());
 	buffer.push_back(0);
 	const char *src = buffer.data();
 
-	// Compile the shader
-	GLuint shader = glCreateShader(shaderType);
+	GLuint shader = glCreateShader(shaderType); //Compile the shader
 	glShaderSource(shader, 1, &src, 0);
 	glCompileShader(shader);
 
-	// Check the result of the compilation
-	GLint test;
+	GLint test; //Check the result of the compilation
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &test);
-	if(!test) {
-		std::cerr << "Shader compilation failed with this message:" << std::endl;
+	if(test != GL_TRUE)
+	{
 		std::array<char, 512> compilation_log;
 		glGetShaderInfoLog(shader, compilation_log.size(), 0, compilation_log.data());
-		std::cerr << &compilation_log[0] << std::endl;
+		std::cout << "Shader compilation failed:" << std::endl << &compilation_log[0] << std::endl;
 		glfwTerminate();
 		exit(-1);
 	}
+
 	return shader;
 }
 
 
-static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
 	input = 0;
 	const std::vector<int> keys{GLFW_KEY_Z, GLFW_KEY_X, GLFW_KEY_S, GLFW_KEY_A, GLFW_KEY_UP, GLFW_KEY_DOWN, GLFW_KEY_LEFT, GLFW_KEY_RIGHT};

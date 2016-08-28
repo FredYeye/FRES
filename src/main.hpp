@@ -1,10 +1,9 @@
 #pragma once
 
 
-void initialize(GLuint &vao, const uint8_t *const pixelPtr);
-GLuint create_program(std::string vertex, std::string fragment);
-GLuint load_and_compile_shader(std::string &sName, GLenum shaderType);
-static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
-
+void Initialize(GLuint &vao, const uint8_t *const pixelPtr);
+GLuint CreateProgram();
+GLuint LoadAndCompileShader(const std::string &shaderName, GLenum shaderType);
+static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 uint8_t input, input2;
