@@ -47,10 +47,10 @@ class Nes
 
 		bool readJoy1 = false;
 
-		bool nmiLine = false;
-		bool delayedNmi = false;
 		bool nmi = false;
-		bool nmiPending = false;
+		bool nmiPending = false;  //true = nmi detected, but interrupt polling will miss
+		bool nmiPending2 = false; //first cycle after nmiPending set, still too early
+		bool nmiPending3 = false; //second cycle after nmiPending set, interrupt polling will see nmi now. or something like that
 
 		bool irqLine = false;
 		bool irqPending = false;

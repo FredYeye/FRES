@@ -934,6 +934,8 @@ void Nes::RunOpcode()
 		break;
 	}
 
+	nmiPending3 = nmiPending2;
+
 	CpuRead(PC); //fetch next opcode
 	CpuOpDone();
 }
@@ -1127,7 +1129,7 @@ void Nes::CpuOpDone()
 		dmaPending = false;
 	}
 
-	if(nmiLine)
+	if(nmiPending3)
 	{
 		CpuRead(addressBus);                                //fetch op1, increment suppressed
 		CpuWrite(0x100 | rS--, PC >> 8);                    //push PC high on stack
@@ -1162,13 +1164,13 @@ void Nes::CpuOpDone()
 
 		irqPending = false;
 	}
-	nmiLine = nmiPending;
 	irqLine = irqPending;
 }
 
 
 void Nes::PollInterrupts()
 {
+	nmiPending2 = nmiPending;
 	bool oldNmi = nmi;
 	nmi = ppu.PollNmi();
 	nmiPending |= !oldNmi & nmi;
