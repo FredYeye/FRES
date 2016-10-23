@@ -13,6 +13,7 @@
 #include "apu.hpp"
 #include "ppu.hpp"
 #include "file.hpp"
+// #include "sha1.hpp"
 
 
 Nes::Nes(std::string inFile)

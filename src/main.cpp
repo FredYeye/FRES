@@ -69,7 +69,7 @@ int main(int argc, char* argv[])
 		nes.AdvanceFrame(input, input2);
 
 		glClear(GL_COLOR_BUFFER_BIT);
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 240, GL_RGB, GL_UNSIGNED_BYTE, nes.ppu.GetPixelPtr());
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 240, GL_RGBA, GL_UNSIGNED_BYTE, nes.ppu.GetPixelPtr());
 		glBindVertexArray(vao);
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, 0);
 
@@ -97,7 +97,7 @@ int main(int argc, char* argv[])
 }
 
 
-void Initialize(GLuint &vao, const uint8_t *const pixelPtr)
+void Initialize(GLuint &vao, const uint32_t *const pixelPtr)
 {
 	glGenVertexArrays(1, &vao); //Use a Vertex Array Object
 	glBindVertexArray(vao);
@@ -123,7 +123,7 @@ void Initialize(GLuint &vao, const uint8_t *const pixelPtr)
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture); //Specify that we work with a 2D texture
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, 256, 240, 0, GL_RGB, GL_UNSIGNED_BYTE, pixelPtr);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 256, 240, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixelPtr);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 

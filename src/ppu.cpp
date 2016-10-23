@@ -205,15 +205,14 @@ void Ppu::Tick()
 			uint8_t pIndex;
 			if(spritePixel && (!spritePriority || !bgPixel))
 			{
-				pIndex = vram[0x3F10 + spritePixel] * 3;
+				pIndex = vram[0x3F10 + spritePixel];
 			}
 			else
 			{
-				pIndex = vram[0x3F00 + bgPixel] * 3;
+				pIndex = vram[0x3F00 + bgPixel];
 			}
 
-			std::memcpy(&render[renderPos], &palette[pIndex], 3);
-			renderPos += 3;
+			render[renderPos++] = palette[pIndex];
 		}
 
 		if(ppuMask & 0b00011000)
@@ -222,12 +221,9 @@ void Ppu::Tick()
 			OamScan();
 		}
 	}
-	else if(scanlineV == 241) //vblank scanlines
+	else if(scanlineV == 241 && scanlineH == 1 && !suppressNmiFlag) //vblank scanlines
 	{
-		if(scanlineH == 1 && !suppressNmiFlag)
-		{
-			ppuStatus |= 0x80; //VBL nmi
-		}
+		ppuStatus |= 0x80; //VBL nmi
 	}
 	else if(scanlineV == 261) //prerender scanline
 	{
@@ -544,7 +540,7 @@ uint8_t* Ppu::GetVramPtr()
 }
 
 
-const uint8_t* const Ppu::GetPixelPtr() const
+const uint32_t* const Ppu::GetPixelPtr() const
 {
 	return render.data();
 }

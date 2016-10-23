@@ -23,6 +23,7 @@ if(WIN32)
 		src/ppu.cpp
 		src/wasapi.cpp
 		src/file.cpp
+		src/sha1.cpp
 		src/gl_core_3_3.c
 		)
 
@@ -33,12 +34,14 @@ if(WIN32)
 		src/ppu.hpp
 		src/wasapi.hpp
 		src/file.hpp
+		src/sha1.hpp
 		src/gl_core_3_3.h
 		)
 
 	add_executable(${project_name} ${header_files} ${source_files})
 	target_link_libraries(nes ${GLFW_LIBRARY} opengl32 ole32 ksuser)
 endif(WIN32)
+
 
 if(UNIX)
 	message("lucky! cha cha cha!")
@@ -58,6 +61,7 @@ if(UNIX)
 		src/ppu.cpp
 		src/alsa.cpp
 		src/file.cpp
+		src/sha1.cpp
 		src/gl_core_3_3.c
 		)
 
@@ -68,6 +72,7 @@ if(UNIX)
 		src/ppu.hpp
 		src/alsa.hpp
 		src/file.hpp
+		src/sha1.hpp
 		src/gl_core_3_3.h
 		)
 
