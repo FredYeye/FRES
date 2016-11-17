@@ -14,17 +14,12 @@ uint8_t Ppu::StatusRead() //2002
 {
 	if(scanlineV == 241)
 	{
-		// nmi checks get offset by +1. see if this is actually stupid later.
-		if(scanlineH == 0+1)
-		{
-			suppressNmiFlag = true;
-			//     0: reads it as clear and never sets the flag or generates NMI for that frame
-		}
-		else if(scanlineH == 1+1 || scanlineH == 2+1)
+		if(uint16_t(scanlineH - 1) < 3) //-1 because the scanlineH variable has already been updated... i think
 		{
 			suppressNmi = true;
-			//   1-2: reads it as set, clears it, and suppresses the NMI for that frame
-			// 340,3: behaves normally (reads flag's value, clears it, and doesn't affect NMI operation)
+			//dot      0: reads it as clear and never sets the flag or generates NMI for that frame
+			//dots   1-2: reads it as set, clears it, and suppresses the NMI for that frame
+			//dots 340,3: behaves normally (reads flag's value, clears it, and doesn't affect NMI operation)
 		}
 	}
 
@@ -154,74 +149,9 @@ void Ppu::Tick()
 {
 	if(scanlineV < 240) //visible scanlines
 	{
-		if(scanlineH && scanlineH <= 256)
-		{
-			uint8_t spritePixel = 0;
-			bool spritePriority = true; //false puts sprite in front of BG
-			bool opaqueSprite0 = false;
-			if(ppuMask & 0b00010000 && scanlineV) //slV >=1 correct solution?
-			{
-				for(uint8_t x = 0; x < 8; ++x)
-				{
-					if(!spriteXpos[x])
-					{
-						if(!spritePixel && !(scanlineH <= 8 && !(ppuMask & 0b00000100)))
-						{
-							spritePriority = spriteAttribute[x] & 0b00100000;
-							spritePixel = spriteBitmapLow[x] >> 7;
-							spritePixel |= (spriteBitmapHigh[x] >> 6) & 0b10;
-							if(spritePixel)
-							{
-								spritePixel |= (spriteAttribute[x] & 0b11) << 2;
-								if(!x)
-								{
-									opaqueSprite0 = sprite0OnCurrent;
-								}
-							}
-						}
-						spriteBitmapLow[x] <<= 1;
-						spriteBitmapHigh[x] <<= 1;
-					}
-				}
-			}
-
-			uint8_t bgPixel = 0;
-			if(ppuMask & 0b00001000 && !(scanlineH <= 8 && !(ppuMask & 0b00000010)))
-			{
-				bgPixel = (bgLow >> (15 - fineX)) & 1;
-				bgPixel |= (bgHigh >> (14 - fineX)) & 2;
-
-				if(bgPixel)
-				{
-					bgPixel |= (attribute >> (28 - fineX * 2)) & 0b1100;
-
-					if(opaqueSprite0 && scanlineH != 256)
-					{
-						ppuStatus |= 0b01000000; //sprite 0 hit
-					}
-				}
-			}
-
-			uint8_t pIndex;
-			if(spritePixel && (!spritePriority || !bgPixel))
-			{
-				pIndex = vram[0x3F10 + spritePixel];
-			}
-			else
-			{
-				pIndex = vram[0x3F00 + bgPixel];
-			}
-
-			render[renderPos++] = palette[pIndex];
-		}
-
-		if(ppuMask & 0b00011000)
-		{
-			RenderFetches();
-			OamScan();
-		}
+		VisibleScanlines();
 	}
-	else if(scanlineV == 241 && scanlineH == 1 && !suppressNmiFlag) //vblank scanlines
+	else if(scanlineV == 241 && scanlineH == 1 && !suppressNmi) //vblank scanlines
 	{
 		ppuStatus |= 0x80; //VBL nmi
 	}
@@ -231,7 +161,6 @@ void Ppu::Tick()
 		{
 			ppuStatus &= 0b00011111; //clear sprite overflow, sprite 0 hit and vblank
 			suppressNmi = false;
-			suppressNmiFlag = false;
 		}
 		else if(scanlineH >= 280 && scanlineH <= 304 && ppuMask & 0b00011000)
 		{
@@ -259,6 +188,77 @@ void Ppu::Tick()
 			renderFrame = true;
 			renderPos = 0;
 		}
+	}
+}
+
+
+void Ppu::VisibleScanlines()
+{
+	if(scanlineH && scanlineH <= 256)
+	{
+		uint8_t spritePixel = 0;
+		bool spritePriority = true; //false puts sprite in front of BG
+		bool opaqueSprite0 = false;
+		if(ppuMask & 0b00010000 && scanlineV) //slV >=1 correct solution?
+		{
+			for(uint8_t x = 0; x < 8; ++x)
+			{
+				if(!spriteXpos[x])
+				{
+					if(!spritePixel && !(scanlineH <= 8 && !(ppuMask & 0b00000100)))
+					{
+						spritePriority = spriteAttribute[x] & 0b00100000;
+						spritePixel = spriteBitmapLow[x] >> 7;
+						spritePixel |= (spriteBitmapHigh[x] >> 6) & 0b10;
+						if(spritePixel)
+						{
+							spritePixel |= (spriteAttribute[x] & 0b11) << 2;
+							if(!x)
+							{
+								opaqueSprite0 = sprite0OnCurrent;
+							}
+						}
+					}
+					spriteBitmapLow[x] <<= 1;
+					spriteBitmapHigh[x] <<= 1;
+				}
+			}
+		}
+
+		uint8_t bgPixel = 0;
+		if(ppuMask & 0b00001000 && !(scanlineH <= 8 && !(ppuMask & 0b00000010)))
+		{
+			bgPixel = (bgLow >> (15 - fineX)) & 1;
+			bgPixel |= (bgHigh >> (14 - fineX)) & 2;
+
+			if(bgPixel)
+			{
+				bgPixel |= (attribute >> (28 - fineX * 2)) & 0b1100;
+
+				if(opaqueSprite0 && scanlineH != 256)
+				{
+					ppuStatus |= 0b01000000; //sprite 0 hit
+				}
+			}
+		}
+
+		uint8_t pIndex;
+		if(spritePixel && (!spritePriority || !bgPixel))
+		{
+			pIndex = vram[0x3F10 + spritePixel];
+		}
+		else
+		{
+			pIndex = vram[0x3F00 + bgPixel];
+		}
+
+		render[renderPos++] = palette[pIndex];
+	}
+
+	if(ppuMask & 0b00011000)
+	{
+		RenderFetches();
+		OamScan();
 	}
 }
 
@@ -507,7 +507,7 @@ void Ppu::OamUpdateIndex()
 
 bool Ppu::PollNmi() const
 {
-	return (!suppressNmi) ? ppuStatus & ppuCtrl & 0x80 : false;
+	return !suppressNmi && ppuStatus & ppuCtrl & 0x80;
 }
 
 

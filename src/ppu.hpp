@@ -34,6 +34,7 @@ class Ppu
 		const std::array<uint8_t, 0x4000>& GetVram();
 
 	private:
+		void VisibleScanlines();
 		void RenderFetches();
 		void OamScan();
 		void OamUpdateIndex();
@@ -86,7 +87,6 @@ class Ppu
 
 		bool renderFrame = false;
 		bool suppressNmi = false;
-		bool suppressNmiFlag = false;
 
 		std::array<uint8_t, 8> spriteBitmapLow;
 		std::array<uint8_t, 8> spriteBitmapHigh;
