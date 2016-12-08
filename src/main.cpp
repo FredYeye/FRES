@@ -84,9 +84,9 @@ int main(int argc, char* argv[])
 		// ++frames;
 		// if(frameTime >= 1000000)
 		// {
-			// std::cout << frames << " fps" << std::endl;
-			// frameTime = 0;
-			// frames = 0;
+		// 	std::cout << frames << " fps" << std::endl;
+		// 	frameTime = 0;
+		// 	frames = 0;
 		// }
 	}
 

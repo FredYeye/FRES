@@ -5,6 +5,26 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -march=native") #-flto -static -fno-math-errno?
 
+set(source_files
+	src/main.cpp
+	src/nes.cpp
+	src/apu.cpp
+	src/ppu.cpp
+	src/file.cpp
+	src/sha1.cpp
+	src/gl_core_3_3.c
+	)
+
+set(header_files
+	src/main.hpp
+	src/nes.hpp
+	src/apu.hpp
+	src/ppu.hpp
+	src/file.hpp
+	src/sha1.hpp
+	src/gl_core_3_3.h
+	)
+
 if(WIN32)
 	message("bad choice")
 
@@ -16,26 +36,12 @@ if(WIN32)
 
 	add_definitions(-DWINDOWS -lglfw3 -lopengl32)
 
-	set(source_files
-		src/main.cpp
-		src/nes.cpp
-		src/apu.cpp
-		src/ppu.cpp
+	set(source_files ${source_files}
 		src/wasapi.cpp
-		src/file.cpp
-		src/sha1.cpp
-		src/gl_core_3_3.c
 		)
 
-	set(header_files
-		src/main.hpp
-		src/nes.hpp
-		src/apu.hpp
-		src/ppu.hpp
+	set(header_files ${header_files}
 		src/wasapi.hpp
-		src/file.hpp
-		src/sha1.hpp
-		src/gl_core_3_3.h
 		)
 
 	add_executable(${project_name} ${header_files} ${source_files})
@@ -54,26 +60,12 @@ if(UNIX)
 
 	add_definitions(-DLINUX -lglfw3)
 
-	set(source_files
-		src/main.cpp
-		src/nes.cpp
-		src/apu.cpp
-		src/ppu.cpp
+	set(source_files ${source_files}
 		src/alsa.cpp
-		src/file.cpp
-		src/sha1.cpp
-		src/gl_core_3_3.c
 		)
 
-	set(header_files
-		src/main.hpp
-		src/nes.hpp
-		src/apu.hpp
-		src/ppu.hpp
+	set(header_files ${header_files}
 		src/alsa.hpp
-		src/file.hpp
-		src/sha1.hpp
-		src/gl_core_3_3.h
 		)
 
 	add_executable(${project_name} ${header_files} ${source_files})

@@ -14,7 +14,7 @@ uint8_t Ppu::StatusRead() //2002
 {
 	if(scanlineV == 241)
 	{
-		if(uint16_t(scanlineH - 1) < 3) //-1 because the scanlineH variable has already been updated... i think
+		if(uint16_t(scanlineH - 1) < 3) //-1 because the scanlineH variable has already been incremented... i think
 		{
 			suppressNmi = true;
 			//dot      0: reads it as clear and never sets the flag or generates NMI for that frame
@@ -31,7 +31,7 @@ uint8_t Ppu::StatusRead() //2002
 }
 
 
-uint8_t Ppu::OamDataRead() //2004
+const uint8_t Ppu::OamDataRead() const //2004
 {
 	//do more stuff (reads while sprite eval is running)
 	return oam[oamAddr];
@@ -42,7 +42,7 @@ uint8_t Ppu::DataRead() //2007
 {
 	if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18)) //figure out what happens otherwise
 	{
-		uint8_t currentLatch = (ppuAddress >= 0x3F00) ? vram[ppuAddress & 0x3F1F] : ppuDataLatch;
+		const uint8_t currentLatch = (ppuAddress >= 0x3F00) ? vram[ppuAddress & 0x3F1F] : ppuDataLatch;
 
 		if(ppuAddress >= 0x2000)
 		{
@@ -171,6 +171,7 @@ void Ppu::Tick()
 		if(ppuMask & 0b00011000)
 		{
 			RenderFetches();
+			OamScan();
 			if(oddFrame && scanlineH == 339)
 			{
 				++scanlineH;
@@ -199,7 +200,7 @@ void Ppu::VisibleScanlines()
 		uint8_t spritePixel = 0;
 		bool spritePriority = true; //false puts sprite in front of BG
 		bool opaqueSprite0 = false;
-		if(ppuMask & 0b00010000 && scanlineV) //slV >=1 correct solution?
+		if(ppuMask & 0b00010000) //slV >=1 correct solution?
 		{
 			for(uint8_t x = 0; x < 8; ++x)
 			{
@@ -234,7 +235,6 @@ void Ppu::VisibleScanlines()
 			if(bgPixel)
 			{
 				bgPixel |= (attribute >> (28 - fineX * 2)) & 0b1100;
-
 				if(opaqueSprite0 && scanlineH != 256)
 				{
 					ppuStatus |= 0b01000000; //sprite 0 hit
@@ -367,7 +367,7 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 		oamAddr = 0;
 
 		// sprite fetching
-		switch(scanlineH & 7) // do everything in case 7? / all sprites in one for loop
+		switch(scanlineH & 7) // do everything in case 7 / all sprites in one for loop?
 		{
 			case 3: spriteAttribute[spriteIndex] = oam2[spriteIndex * 4 + 2]; break;
 			case 4: spriteXpos[spriteIndex] = oam2[spriteIndex * 4 + 3];      break;
@@ -505,7 +505,7 @@ void Ppu::OamUpdateIndex()
 }
 
 
-bool Ppu::PollNmi() const
+const bool Ppu::PollNmi() const
 {
 	return !suppressNmi && ppuStatus & ppuCtrl & 0x80;
 }

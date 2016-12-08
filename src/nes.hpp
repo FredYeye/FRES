@@ -20,11 +20,12 @@ class Nes
 	private:
 		void LoadRom(std::string inFile);
 		void RunOpcode();
-		void CpuRead(uint16_t address);
-		void CpuWrite(uint16_t address, uint8_t data);
+		void CpuRead(const uint16_t address);
+		void CpuWrite(const uint16_t address, const uint8_t data);
 		void CpuTick();
 		void CpuOpDone();
 		void PollInterrupts();
+		void Branch(const bool flag, const uint8_t op1);
 
 		void DebugCpu(uint8_t opcode);
 		uint8_t DebugRead(uint16_t address);
@@ -48,9 +49,7 @@ class Nes
 		bool readJoy1 = false;
 
 		bool nmi = false;
-		bool nmiPending = false;  //true = nmi detected, but interrupt polling will miss
-		bool nmiPending2 = false; //first cycle after nmiPending set, still too early
-		bool nmiPending3 = false; //second cycle after nmiPending set, interrupt polling will see nmi now. or something like that
+		std::array<bool, 3> nmiPending{};
 
 		bool irqLine = false;
 		bool irqPending = false;

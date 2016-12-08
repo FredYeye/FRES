@@ -251,116 +251,28 @@ void Nes::RunOpcode()
 			break;
 
 		case 0x10: //BPL
-			++PC;
-			if(!rP.test(7))
-			{
-				const uint16_t pagePC = PC + int8_t(op1);
-				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
-				CpuRead(PC);
-				if(PC != pagePC)
-				{
-					PC = pagePC;
-					CpuRead(PC);
-				}
-			}
+			Branch(!rP[7], op1);
 			break;
 		case 0x30: //BMI
-			++PC;
-			if(rP.test(7))
-			{
-				const uint16_t pagePC = PC + int8_t(op1);
-				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
-				CpuRead(PC);
-				if(PC != pagePC)
-				{
-					PC = pagePC;
-					CpuRead(PC);
-				}
-			}
+			Branch(rP[7], op1);
 			break;
 		case 0x50: //BVC
-			++PC;
-			if(!rP.test(6))
-			{
-				const uint16_t pagePC = PC + int8_t(op1);
-				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
-				CpuRead(PC);
-				if(PC != pagePC)
-				{
-					PC = pagePC;
-					CpuRead(PC);
-				}
-			}
+			Branch(!rP[6], op1);
 			break;
 		case 0x70: //BVS
-			++PC;
-			if(rP.test(6))
-			{
-				const uint16_t pagePC = PC + int8_t(op1);
-				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
-				CpuRead(PC);
-				if(PC != pagePC)
-				{
-					PC = pagePC;
-					CpuRead(PC);
-				}
-			}
+			Branch(rP[6], op1);
 			break;
 		case 0x90: //BCC
-			++PC;
-			if(!rP.test(0))
-			{
-				const uint16_t pagePC = PC + int8_t(op1);
-				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
-				CpuRead(PC);
-				if(PC != pagePC)
-				{
-					PC = pagePC;
-					CpuRead(PC);
-				}
-			}
+			Branch(!rP[0], op1);
 			break;
 		case 0xB0: //BCS
-			++PC;
-			if(rP.test(0))
-			{
-				const uint16_t pagePC = PC + int8_t(op1);
-				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
-				CpuRead(PC);
-				if(PC != pagePC)
-				{
-					PC = pagePC;
-					CpuRead(PC);
-				}
-			}
+			Branch(rP[0], op1);
 			break;
 		case 0xD0: //BNE
-			++PC;
-			if(!rP.test(1))
-			{
-				const uint16_t pagePC = PC + int8_t(op1);
-				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
-				CpuRead(PC);
-				if(PC != pagePC)
-				{
-					PC = pagePC;
-					CpuRead(PC);
-				}
-			}
+			Branch(!rP[1], op1);
 			break;
 		case 0xF0: //BEQ
-			++PC;
-			if(rP.test(1))
-			{
-				const uint16_t pagePC = PC + int8_t(op1);
-				PC = (PC & 0xFF00) | (pagePC & 0x00FF);
-				CpuRead(PC);
-				if(PC != pagePC)
-				{
-					PC = pagePC;
-					CpuRead(PC);
-				}
-			}
+			Branch(rP[1], op1);
 			break;
 
 		case 0x18: //CLC
@@ -935,14 +847,12 @@ void Nes::RunOpcode()
 		break;
 	}
 
-	nmiPending3 = nmiPending2;
-
 	CpuRead(PC); //fetch next opcode
 	CpuOpDone();
 }
 
 
-void Nes::CpuRead(uint16_t address)
+void Nes::CpuRead(const uint16_t address)
 {
 	addressBus = address;
 
@@ -1007,7 +917,7 @@ void Nes::CpuRead(uint16_t address)
 }
 
 
-void Nes::CpuWrite(uint16_t address, uint8_t data)
+void Nes::CpuWrite(const uint16_t address, const uint8_t data)
 {
 	addressBus = address;
 	dataBus = data;
@@ -1130,7 +1040,7 @@ void Nes::CpuOpDone()
 		dmaPending = false;
 	}
 
-	if(nmiPending3)
+	if(nmiPending[2])
 	{
 		CpuRead(addressBus);                                //fetch op1, increment suppressed
 		CpuWrite(0x100 | rS--, PC >> 8);                    //push PC high on stack
@@ -1145,7 +1055,7 @@ void Nes::CpuOpDone()
 		PC = tempData | (dataBus << 8);                     //fetch next opcode
 		CpuRead(PC);                                        //
 
-		nmiPending = false;
+		nmiPending[0] = false;
 		irqPending = false;
 	}
 	else if(irqLine)
@@ -1171,12 +1081,31 @@ void Nes::CpuOpDone()
 
 void Nes::PollInterrupts()
 {
-	nmiPending2 = nmiPending;
-	bool oldNmi = nmi;
+	nmiPending[2] = nmiPending[1]; //first cycle after nmiPending set, still too early
+	nmiPending[1] = nmiPending[0]; //second cycle after nmiPending set, interrupt polling will see nmi now. or something like that
+
+	const bool oldNmi = nmi;
 	nmi = ppu.PollNmi();
-	nmiPending |= !oldNmi & nmi;
+	nmiPending[0] |= !oldNmi & nmi; //nmiPending[0] gets set = nmi detected, but interrupt polling will miss
 
 	irqPending = !rP.test(2) & apu.PollFrameInterrupt();
+}
+
+
+void Nes::Branch(const bool flag, const uint8_t op1)
+{
+	++PC;
+	if(flag)
+	{
+		const uint16_t pagePC = PC + int8_t(op1);
+		PC = (PC & 0xFF00) | (pagePC & 0x00FF);
+		CpuRead(PC);
+		if(PC != pagePC)
+		{
+			PC = pagePC;
+			CpuRead(PC);
+		}
+	}
 }
 
 
