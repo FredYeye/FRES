@@ -197,30 +197,17 @@ void Apu::StatusWrite(uint8_t dataBus) //4015
 uint8_t Apu::StatusRead() //4015
 {
 	uint8_t data = 0;
-	if(pulse[0].lengthCounter)
-	{
-		data |= 0b0001;
-	}
-	if(pulse[1].lengthCounter)
-	{
-		data |= 0b0010;
-	}
-	if(triangle.lengthCounter)
-	{
-		data |= 0b0100;
-	}
-	if(noise.lengthCounter)
-	{
-		data |= 0b1000;
-	}
-	if(dmc.samplesRemaining)
-	{
-		data |= 0b00010000;
-	}
-	data |= dmc.irqPending << 7;
+
+	data  = bool(pulse[0].lengthCounter);
+	data |= bool(pulse[1].lengthCounter) << 1;
+	data |= bool(triangle.lengthCounter) << 2;
+	data |= bool(noise.lengthCounter   ) << 3;
+	data |= bool(dmc.samplesRemaining  ) << 4;
 
 	data |= frameIRQ << 6;
 	frameIRQ = false;
+
+	data |= dmc.irqPending << 7;
 
 	return data;
 }
@@ -245,7 +232,7 @@ void Apu::FrameCounterWrite(uint8_t dataBus) //4017
 }
 
 
-const uint16_t Apu::GetDmcAddr()
+const uint16_t Apu::GetDmcAddr() const
 {
 	return dmc.address;
 }
@@ -415,13 +402,13 @@ void Apu::Tick()
 }
 
 
-void* Apu::GetOutput() //734 samples/frame = 60.0817), use as timer?
+const void* const Apu::GetOutput() const //734 samples/frame = 60.0817), use as timer?
 {
 	return apuSamples.data();
 }
 
 
-bool Apu::PollFrameInterrupt()
+bool Apu::PollFrameInterrupt() const
 {
 	return frameIRQ;
 }
@@ -529,12 +516,11 @@ void Apu::HalfFrame()
 }
 
 
-bool Apu::SweepForcingSilence(const Pulse &p)
+bool Apu::SweepForcingSilence(const Pulse &p) const
 {
-	//>= 0x800 surely can be done better, also see !sweepNegate above
-	if(p.freqTimer < 8 || (!p.sweepNegate && p.freqTimer + (p.freqTimer >> p.sweepShift) >= 0x800))
+	if(p.freqTimer < 8)
 	{
 		return true;
 	}
-	return false;
+	return !p.sweepNegate & (p.freqTimer + (p.freqTimer >> p.sweepShift) >> 11); //if freqTimer >= 0x800
 }

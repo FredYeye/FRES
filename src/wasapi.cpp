@@ -6,7 +6,7 @@
 #include "mmreg.h"
 
 
-Audio::Audio(void *audioSrc, bool moreAccurateFramerate)
+Audio::Audio(const void *audioSrc, bool moreAccurateFramerate) : audioSource(audioSrc)
 {
 	if(moreAccurateFramerate)
 	{
@@ -21,7 +21,6 @@ Audio::Audio(void *audioSrc, bool moreAccurateFramerate)
 		frameAmount = 735;
 	}
 
-	audioSource = audioSrc;
 	Init();
 }
 

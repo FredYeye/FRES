@@ -10,7 +10,7 @@
 class Audio
 {
 	public:
-		Audio(void *audioSrc, bool moreAccurateFramerate);
+		Audio(const void *audioSrc, bool moreAccurateFramerate);
 		~Audio();
 		void StartAudio();
 		void StopAudio();
@@ -32,6 +32,6 @@ class Audio
 
 		int64_t requestedDuration; //1 = 100ns (REFERENCE_TIME)
 
-		void *audioSource;
+		const void *audioSource;
 		uint16_t frameAmount;
 };

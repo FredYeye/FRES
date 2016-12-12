@@ -81,21 +81,21 @@ class Apu
 		uint8_t StatusRead();                            //4015
 		void FrameCounterWrite(uint8_t dataBus);         //4017
 
-		const uint16_t GetDmcAddr();
+		const uint16_t GetDmcAddr() const;
 		void DmcDma(uint8_t sample);
 
 		void Tick();
 
-		void* GetOutput();
+		const void* const GetOutput() const;
 		uint16_t sampleCount = 0;
 
-		bool PollFrameInterrupt();
+		bool PollFrameInterrupt() const;
 		bool dmcDma = false;
 
 	private:
 		void QuarterFrame();
 		void HalfFrame();
-		bool SweepForcingSilence(const Pulse &p);
+		bool SweepForcingSilence(const Pulse &p) const;
 
 		std::array<Pulse, 2> pulse{};
 		Triangle triangle{};

@@ -534,7 +534,7 @@ const bool Ppu::RenderFrame()
 }
 
 
-uint8_t* Ppu::GetVramPtr()
+uint8_t* const Ppu::GetVramPtr()
 {
 	return vram.data();
 }
@@ -546,19 +546,19 @@ const uint32_t* const Ppu::GetPixelPtr() const
 }
 
 
-uint16_t Ppu::GetScanlineH()
+uint16_t Ppu::GetScanlineH() const
 {
 	return scanlineH;
 }
 
 
-uint16_t Ppu::GetScanlineV()
+uint16_t Ppu::GetScanlineV() const
 {
 	return scanlineV;
 }
 
 
-const std::array<uint8_t, 0x4000>& Ppu::GetVram()
+const std::array<uint8_t, 0x4000>& Ppu::GetVram() const
 {
 	return vram;
 }

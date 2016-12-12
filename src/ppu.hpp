@@ -26,12 +26,12 @@ class Ppu
 		void SetNametableMirroring(uint16_t mirroring, uint16_t base);
 
 		const bool RenderFrame();
-		uint8_t* GetVramPtr();
+		uint8_t* const GetVramPtr();
 		const uint32_t* const GetPixelPtr() const;
 
-		uint16_t GetScanlineH();
-		uint16_t GetScanlineV();
-		const std::array<uint8_t, 0x4000>& GetVram();
+		uint16_t GetScanlineH() const;
+		uint16_t GetScanlineV() const;
+		const std::array<uint8_t, 0x4000>& GetVram() const;
 
 	private:
 		void VisibleScanlines();

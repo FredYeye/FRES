@@ -1081,8 +1081,8 @@ void Nes::CpuOpDone()
 
 void Nes::PollInterrupts()
 {
-	nmiPending[2] = nmiPending[1]; //first cycle after nmiPending set, still too early
-	nmiPending[1] = nmiPending[0]; //second cycle after nmiPending set, interrupt polling will see nmi now. or something like that
+	nmiPending[2] = nmiPending[1]; //second cycle after nmiPending set, interrupt polling will see nmi now. or something like that
+	nmiPending[1] = nmiPending[0]; //first cycle after nmiPending set, still too early
 
 	const bool oldNmi = nmi;
 	nmi = ppu.PollNmi();
