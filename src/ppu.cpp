@@ -55,6 +55,12 @@ uint8_t Ppu::DataRead() //2007
 		ppuAddress += (ppuCtrl & 0b0100) ? 0x20 : 0x01;
 		return currentLatch;
 	}
+	// else
+	// {
+		//increment coarse Y and X
+		// if X has been updated already, skip
+		// is this during all dots?
+	// }
 
 	return 0;
 }
@@ -171,7 +177,6 @@ void Ppu::Tick()
 		if(ppuMask & 0b00011000)
 		{
 			RenderFetches();
-			OamScan();
 			if(oddFrame && scanlineH == 339)
 			{
 				++scanlineH;
@@ -200,7 +205,7 @@ void Ppu::VisibleScanlines()
 		uint8_t spritePixel = 0;
 		bool spritePriority = true; //false puts sprite in front of BG
 		bool opaqueSprite0 = false;
-		if(ppuMask & 0b00010000) //slV >=1 correct solution?
+		if(ppuMask & 0b00010000 && scanlineV) //&& scanlineV is probably not the correct solution. find out why this happens
 		{
 			for(uint8_t x = 0; x < 8; ++x)
 			{
@@ -238,6 +243,7 @@ void Ppu::VisibleScanlines()
 				if(opaqueSprite0 && scanlineH != 256)
 				{
 					ppuStatus |= 0b01000000; //sprite 0 hit
+					// std::cout << "Y:" << scanlineV << " X:" << scanlineH << "\n"; //for sprite test 7
 				}
 			}
 		}
@@ -434,7 +440,8 @@ void Ppu::OamScan()
 			{
 				oam2[oam2Index] = oam[oamSpritenum]; //oam search starts at oam[oamAddr]
 
-				if(scanlineV >= oam[oamSpritenum] && scanlineV < oam[oamSpritenum] + 8 + ((ppuCtrl & 0b00100000) >> 2))
+				const uint8_t spriteLastRow = 7 + ((ppuCtrl & 0b00100000) >> 2); //make a member var that updates when ppuCtrl is written to?
+				if(uint16_t(scanlineV - oam[oamSpritenum]) <= spriteLastRow) //if current scanline is on a sprite
 				{
 					++oamEvalPattern;
 					++oam2Index;
