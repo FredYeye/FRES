@@ -205,7 +205,7 @@ void Ppu::VisibleScanlines()
 		uint8_t spritePixel = 0;
 		bool spritePriority = true; //false puts sprite in front of BG
 		bool opaqueSprite0 = false;
-		if(ppuMask & 0b00010000 && scanlineV) //&& scanlineV is probably not the correct solution. find out why this happens
+		if(ppuMask & 0b00010000)
 		{
 			for(uint8_t x = 0; x < 8; ++x)
 			{
@@ -243,7 +243,6 @@ void Ppu::VisibleScanlines()
 				if(opaqueSprite0 && scanlineH != 256)
 				{
 					ppuStatus |= 0b01000000; //sprite 0 hit
-					// std::cout << "Y:" << scanlineV << " X:" << scanlineH << "\n"; //for sprite test 7
 				}
 			}
 		}
@@ -315,7 +314,7 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 					ppuAddress &= 0x7FE0;
 					ppuAddress ^= 0x400;
 				}
-				break;
+			break;
 
 			//value is determined on the first cycle of each fetch (1,3,5,7)
 			case 1: //NT
@@ -326,7 +325,8 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 					attribute |= (attributeLatch & 0b11) * 0x5555; //2-bit splat
 				}
 				nametable = vram[0x2000 | ppuAddress & nametableMirroring | nametableBase];
-				break;
+			break;
+
 			case 3: //AT
 				if(scanlineH != 339)
 				{
@@ -339,14 +339,16 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 				{
 					nametable = vram[0x2000 | ppuAddress & nametableMirroring | nametableBase];
 				}
-				break;
+			break;
+
 			case 5: //low
 				bgAddress = (nametable << 4) + (ppuAddress >> 12) | ((ppuCtrl & 0x10) << 8);
 				bgLowLatch = vram[bgAddress];
-				break;
+			break;
+
 			case 7: //high
 				bgHighLatch = vram[bgAddress + 8];
-				break;
+			break;
 		}
 
 		if(scanlineH <= 256)
@@ -378,6 +380,9 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 			case 3: spriteAttribute[spriteIndex] = oam2[spriteIndex * 4 + 2]; break;
 			case 4: spriteXpos[spriteIndex] = oam2[spriteIndex * 4 + 3];      break;
 			case 5:
+				// spriteAttribute[spriteIndex] = oam2[spriteIndex * 4 + 2]; //test this. should make no diff as oam2 can't be changed here
+				// spriteXpos[spriteIndex] = oam2[spriteIndex * 4 + 3]; //just add a note about correct impl
+
 				if(!(ppuCtrl & 0b00100000))
 				{
 					bgAddress = ((ppuCtrl & 0b1000) << 9) | (oam2[spriteIndex * 4 + 1] << 4);
@@ -406,7 +411,8 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 				{
 					ReverseBits(spriteBitmapLow[spriteIndex]);
 				}
-				break;
+			break;
+
 			case 7:
 				spriteBitmapHigh[spriteIndex] = vram[bgAddress | 8];
 				if(spriteAttribute[spriteIndex] & 0b01000000) //flip H
@@ -414,13 +420,16 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 					ReverseBits(spriteBitmapHigh[spriteIndex]);
 				}
 
-				if(oam2[spriteIndex*4] >= 0xEF) // correct solution? sprite 63's Y coord check, does it need to be a range check?
+				if(oam2[spriteIndex*4] >= 239 || scanlineV == 261) // correct solution? sprite 63's Y coord check, does it need to be a range check?
 				{
+					//also check if we are on line 261. it doesn't eval sprites but draws from the sprite buffer, which can have been filled on line 239.
+					//what actually prevents this from happening?
 					spriteBitmapLow[spriteIndex] = 0;
 					spriteBitmapHigh[spriteIndex] = 0;
 				}
+
 				++spriteIndex &= 0b0111;
-				break;
+			break;
 		}
 	}
 }
@@ -440,8 +449,8 @@ void Ppu::OamScan()
 			{
 				oam2[oam2Index] = oam[oamSpritenum]; //oam search starts at oam[oamAddr]
 
-				const uint8_t spriteLastRow = 7 + ((ppuCtrl & 0b00100000) >> 2); //make a member var that updates when ppuCtrl is written to?
-				if(uint16_t(scanlineV - oam[oamSpritenum]) <= spriteLastRow) //if current scanline is on a sprite
+				const uint8_t spriteHeight = 8 + ((ppuCtrl & 0b00100000) >> 2); //make a member var that updates when ppuCtrl is written to?
+				if(uint16_t(scanlineV - oam[oamSpritenum]) < spriteHeight) //if current scanline is on a sprite
 				{
 					++oamEvalPattern;
 					++oam2Index;
