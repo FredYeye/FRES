@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <array>
+#include <vector>
 
 
 class Ppu
@@ -23,15 +24,17 @@ class Ppu
 		void Tick();
 
 		const bool PollNmi() const;
-		void SetNametableMirroring(uint16_t mirroring, uint16_t base);
+
+		enum NametableLayout : uint8_t {A = 0, B, ABAB, AACC};
+		void SetNametableMirroring(NametableLayout layout);
+		void SetPatternBanks(const uint8_t dataBus);
 
 		const bool RenderFrame();
-		uint8_t* const GetVramPtr();
 		const uint32_t* const GetPixelPtr() const;
 
 		uint16_t GetScanlineH() const;
 		uint16_t GetScanlineV() const;
-		const std::array<uint8_t, 0x4000>& GetVram() const;
+		void SetPattern(std::vector<uint8_t> &chr);
 
 	private:
 		void VisibleScanlines();
@@ -54,7 +57,11 @@ class Ppu
 			0xFFA4EAED, 0xFFA4F4D6, 0xFFB8F8C5, 0xFFD3F6BE, 0xFFF1F1BF, 0xFFB9B9B9, 0xFF000000, 0xFF000000
 		}};
 
-		std::array<uint8_t, 0x4000> vram;
+		std::vector<uint8_t> pattern;
+		std::array<uint8_t, 0x1000> nametable; //alt. vector
+		std::array<uint8_t, 32> paletteIndices;
+		std::array<uint8_t*, 8> pPattern;
+		std::array<uint8_t*, 4> pNametable;
 		std::array<uint8_t, 64*4> oam;
 		std::array<uint8_t, 8*4> oam2;
 
@@ -69,7 +76,7 @@ class Ppu
 		uint16_t ppuAddress, ppuAddressLatch;
 
 		uint16_t bgAddress;
-		uint8_t nametable;
+		uint8_t nametableA; //rename
 		uint32_t attribute;
 		uint8_t attributeLatch;
 		uint16_t bgLow, bgHigh;
@@ -80,7 +87,6 @@ class Ppu
 		bool oddFrame = false;
 		uint8_t fineX = 0;
 		uint8_t ppuDataLatch = 0;
-		uint16_t nametableMirroring, nametableBase;
 		uint8_t oam2Index = 0;
 		uint8_t oamEvalPattern = 0;
 		uint8_t oamSpritenum = 0; //0-3 = sprite0, 4-7 = sprite1 [...] 252-255 = sprite63

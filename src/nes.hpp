@@ -43,7 +43,6 @@ class Nes
 
 		std::array<uint8_t, 0x800> cpuRam;
 		std::vector<uint8_t> prgRom;
-		std::vector<uint8_t> chrRom;
 		std::array<uint8_t*, 4> bankPtr;
 
 		bool readJoy1 = false;

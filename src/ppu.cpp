@@ -42,15 +42,15 @@ uint8_t Ppu::DataRead() //2007
 {
 	if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18)) //figure out what happens otherwise
 	{
-		const uint8_t currentLatch = (ppuAddress >= 0x3F00) ? vram[ppuAddress & 0x3F1F] : ppuDataLatch;
+		const uint8_t currentLatch = (ppuAddress >= 0x3F00) ? paletteIndices[ppuAddress & 0x1F] : ppuDataLatch;
 
 		if(ppuAddress >= 0x2000)
 		{
-			ppuDataLatch = vram[ppuAddress & nametableMirroring | nametableBase];
+			ppuDataLatch = *(pNametable[(ppuAddress >> 10) & 0b11] + (ppuAddress & 0x3FF));
 		}
 		else
 		{
-			ppuDataLatch = vram[ppuAddress];
+			ppuDataLatch = *(pPattern[ppuAddress >> 10] + (ppuAddress & 0x3FF));
 		}
 		ppuAddress += (ppuCtrl & 0b0100) ? 0x20 : 0x01;
 		return currentLatch;
@@ -132,18 +132,18 @@ void Ppu::DataWrite(uint8_t dataBus) //2007
 	{
 		if(ppuAddress < 0x2000)
 		{
-			vram[ppuAddress] = dataBus;
+			*(pPattern[ppuAddress >> 10] + (ppuAddress & 0x3FF)) = dataBus;
 		}
 		else if(ppuAddress < 0x3F00)
 		{
-			vram[ppuAddress & nametableMirroring | nametableBase] = dataBus;
+			*(pNametable[(ppuAddress >> 10) & 0b11] + (ppuAddress & 0x3FF)) = dataBus;
 		}
 		else
 		{
-			vram[ppuAddress & 0x3F1F] = dataBus;
+			paletteIndices[ppuAddress & 0x1F] = dataBus;
 			if(!(ppuAddress & 0b11)) //sprite palette mirror write
 			{
-				vram[(ppuAddress & 0x3F1F) ^ 0x10] = dataBus;
+				paletteIndices[(ppuAddress & 0x1F) ^ 0x10] = dataBus;
 			}
 		}
 		ppuAddress += (ppuCtrl & 0b0100) ? 0x20 : 0x01;
@@ -250,11 +250,11 @@ void Ppu::VisibleScanlines()
 		uint8_t pIndex;
 		if(spritePixel && (!spritePriority || !bgPixel))
 		{
-			pIndex = vram[0x3F10 + spritePixel];
+			pIndex = paletteIndices[0x10 + spritePixel];
 		}
 		else
 		{
-			pIndex = vram[0x3F00 + bgPixel];
+			pIndex = paletteIndices[bgPixel];
 		}
 
 		render[renderPos++] = palette[pIndex];
@@ -324,7 +324,7 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 					bgHigh |= bgHighLatch;
 					attribute |= (attributeLatch & 0b11) * 0x5555; //2-bit splat
 				}
-				nametable = vram[0x2000 | ppuAddress & nametableMirroring | nametableBase];
+				nametableA = *(pNametable[(ppuAddress >> 10) & 0b11] + (ppuAddress & 0x3FF));
 			break;
 
 			case 3: //AT
@@ -332,22 +332,22 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 				{
 					uint16_t attributeAddr = 0x23C0 | (ppuAddress & 0xC00);
 					attributeAddr |= (ppuAddress >> 4 & 0x38) | (ppuAddress >> 2 & 0b0111);
-					attributeLatch = vram[attributeAddr & nametableMirroring | nametableBase];
+					attributeLatch = *(pNametable[(attributeAddr >> 10) & 0b11] + (attributeAddr & 0x3FF));
 					attributeLatch >>= (((ppuAddress >> 1) & 1) | ((ppuAddress >> 5) & 0b10)) * 2;
 				}
 				else
 				{
-					nametable = vram[0x2000 | ppuAddress & nametableMirroring | nametableBase];
+					nametableA = *(pNametable[(ppuAddress >> 10) & 0b11] + (ppuAddress & 0x3FF));
 				}
 			break;
 
 			case 5: //low
-				bgAddress = (nametable << 4) + (ppuAddress >> 12) | ((ppuCtrl & 0x10) << 8);
-				bgLowLatch = vram[bgAddress];
+				bgAddress = (nametableA << 4) + (ppuAddress >> 12) | ((ppuCtrl & 0x10) << 8);
+				bgLowLatch = *(pPattern[(bgAddress >> 10) & 7] + (bgAddress & 0x3FF));
 			break;
 
 			case 7: //high
-				bgHighLatch = vram[bgAddress + 8];
+				bgHighLatch = *(pPattern[(bgAddress >> 10) & 7] + (bgAddress + 8 & 0x3FF));
 			break;
 		}
 
@@ -406,7 +406,7 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 				}
 				}
 
-				spriteBitmapLow[spriteIndex] = vram[bgAddress];
+				spriteBitmapLow[spriteIndex] = *(pPattern[(bgAddress >> 10) & 7] + (bgAddress & 0x3FF));
 				if(spriteAttribute[spriteIndex] & 0b01000000) //flip H
 				{
 					ReverseBits(spriteBitmapLow[spriteIndex]);
@@ -414,7 +414,7 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 			break;
 
 			case 7:
-				spriteBitmapHigh[spriteIndex] = vram[bgAddress | 8];
+				spriteBitmapHigh[spriteIndex] = *(pPattern[(bgAddress >> 10) & 7] + ((bgAddress | 8) & 0x3FF));
 				if(spriteAttribute[spriteIndex] & 0b01000000) //flip H
 				{
 					ReverseBits(spriteBitmapHigh[spriteIndex]);
@@ -527,10 +527,47 @@ const bool Ppu::PollNmi() const
 }
 
 
-void Ppu::SetNametableMirroring(uint16_t mirroring, uint16_t base)
+void Ppu::SetNametableMirroring(NametableLayout layout)
 {
-	nametableMirroring = 0x2FFF ^ mirroring;
-	nametableBase = base;
+	switch(layout)
+	{
+		case A:
+			pNametable[0] = nametable.data();
+			pNametable[1] = nametable.data();
+			pNametable[2] = nametable.data();
+			pNametable[3] = nametable.data();
+		break;
+
+		case B:
+			pNametable[0] = nametable.data() + 0x400;
+			pNametable[1] = nametable.data() + 0x400;
+			pNametable[2] = nametable.data() + 0x400;
+			pNametable[3] = nametable.data() + 0x400;
+		break;
+
+		case ABAB:
+			pNametable[0] = nametable.data();
+			pNametable[1] = nametable.data() + 0x400;
+			pNametable[2] = nametable.data();
+			pNametable[3] = nametable.data() + 0x400;
+		break;
+
+		case AACC:
+			pNametable[0] = nametable.data();
+			pNametable[1] = nametable.data();
+			pNametable[2] = nametable.data() + 0x800;
+			pNametable[3] = nametable.data() + 0x800;
+		break;
+	}
+}
+
+
+void Ppu::SetPatternBanks(const uint8_t dataBus)
+{
+	for(int x = 0; x < 8; x++)
+	{
+		pPattern[x] = pattern.data() + ((dataBus & 0b11) * 0x2000) + 0x400 * x;
+	}
 }
 
 
@@ -547,12 +584,6 @@ const bool Ppu::RenderFrame()
 	const bool currentRenderFrame = renderFrame;
 	renderFrame = false;
 	return currentRenderFrame;
-}
-
-
-uint8_t* const Ppu::GetVramPtr()
-{
-	return vram.data();
 }
 
 
@@ -574,7 +605,11 @@ uint16_t Ppu::GetScanlineV() const
 }
 
 
-const std::array<uint8_t, 0x4000>& Ppu::GetVram() const
+void Ppu::SetPattern(std::vector<uint8_t> &chr)
 {
-	return vram;
+	pattern = chr;
+	for(int x = 0; x < 8; x++)
+	{
+		pPattern[x] = pattern.data() + 0x400 * x;
+	}
 }

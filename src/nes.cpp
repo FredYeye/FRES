@@ -67,6 +67,8 @@ void Nes::LoadRom(std::string inFile)
 	}
 	fileContent.erase(fileContent.begin(), fileContent.begin() + 0x10);
 
+	std::vector<uint8_t> chrRom;
+
 	mapper = (header[6] >> 4) | (header[7] & 0b11110000);
 	if(mapper == 0)
 	{
@@ -88,16 +90,21 @@ void Nes::LoadRom(std::string inFile)
 		if(header[5])
 		{
 			chrRom.assign(fileContent.begin() + header[4] * 0x4000, fileContent.begin() + header[4] * 0x4000 + header[5] * 0x2000);
-			std::memcpy(ppu.GetVramPtr(), &chrRom[0], 0x2000);
+			ppu.SetPattern(chrRom);
+		}
+		else
+		{
+			std::vector<uint8_t> chrRam(0x2000);
+			ppu.SetPattern(chrRam);
 		}
 
 		if(header[6] & 1)
 		{
-			ppu.SetNametableMirroring(0x800, 0);
+			ppu.SetNametableMirroring(ppu.ABAB); //horizontal arrangement
 		}
 		else
 		{
-			ppu.SetNametableMirroring(0x400, 0);
+			ppu.SetNametableMirroring(ppu.AACC); //vertical arrangement
 		}
 	}
 	else if(mapper == 2)
@@ -112,16 +119,58 @@ void Nes::LoadRom(std::string inFile)
 		if(header[5])
 		{
 			chrRom.assign(fileContent.begin() + header[4] * 0x4000, fileContent.begin() + header[4] * 0x4000 + header[5] * 0x2000);
-			std::memcpy(ppu.GetVramPtr(), &chrRom[0], 0x2000);
+			ppu.SetPattern(chrRom);
+		}
+		else
+		{
+			std::vector<uint8_t> chrRam(0x2000);
+			ppu.SetPattern(chrRam);
 		}
 
 		if(header[6] & 1)
 		{
-			ppu.SetNametableMirroring(0x800, 0);
+			ppu.SetNametableMirroring(ppu.ABAB); //horizontal arrangement
 		}
 		else
 		{
-			ppu.SetNametableMirroring(0x400, 0);
+			ppu.SetNametableMirroring(ppu.AACC); //vertical arrangement
+		}
+	}
+	else if(mapper == 3) //bus conflicts?
+	{
+		prgRom.assign(fileContent.begin(), fileContent.begin() + header[4] * 0x4000);
+
+		bankPtr[0] = &prgRom[0];
+		bankPtr[1] = &prgRom[0x2000];
+		if(header[4] > 1)
+		{
+			bankPtr[2] = &prgRom[0x4000];
+			bankPtr[3] = &prgRom[0x6000];
+		}
+		else
+		{
+			bankPtr[2] = &prgRom[0x0000];
+			bankPtr[3] = &prgRom[0x2000];
+		}
+
+		if(header[5])
+		{
+			chrRom.assign(fileContent.begin() + header[4] * 0x4000, fileContent.begin() + header[4] * 0x4000 + header[5] * 0x2000);
+			ppu.SetPattern(chrRom);
+		}
+		else
+		{
+			std::vector<uint8_t> chrRam(0x8000); //hardcoded val?
+			ppu.SetPattern(chrRam);
+		}
+
+		if(header[6] & 1)
+		{
+			ppu.SetNametableMirroring(ppu.ABAB); //horizontal arrangement
+		}
+		else
+		{
+			ppu.SetNametableMirroring(ppu.AACC); //vertical arrangement
 		}
 	}
 	else if(mapper == 7)
@@ -133,7 +182,9 @@ void Nes::LoadRom(std::string inFile)
 		bankPtr[2] = &prgRom[0x4000];
 		bankPtr[3] = &prgRom[0x6000];
 
-		ppu.SetNametableMirroring(0xC00, 0);
+		ppu.SetNametableMirroring(ppu.A); // single screen
+		chrRom.resize(0x2000);
+		ppu.SetPattern(chrRom);
 	}
 	else
 	{
@@ -154,10 +205,10 @@ void Nes::RunOpcode()
 	#ifdef DUMP_VRAM
 		if(ppu.GetScanlineV() == 261 && ppu.GetScanlineH() == 0)
 		{
-			std::string outfile = "vram.txt";
-			std::ofstream result(outfile.c_str(), std::ios::out | std::ios::binary);
-			result.write((char*)&ppu.GetVram()[0],0x4000);
-			result.close();
+			// std::string outfile = "vram.txt";
+			// std::ofstream result(outfile.c_str(), std::ios::out | std::ios::binary);
+			// result.write((char*)&ppu.GetVram()[0],0x4000);
+			// result.close();
 		}
 	#endif
 
@@ -984,6 +1035,10 @@ void Nes::CpuWrite(const uint16_t address, const uint8_t data)
 				bankPtr[0] = &prgRom[(dataBus & 0b1111) * 0x4000];
 				bankPtr[1] = bankPtr[0] + 0x2000;
 			}
+			else if(mapper == 3)
+			{
+				ppu.SetPatternBanks(dataBus);
+			}
 			else if(mapper == 7)
 			{
 				bankPtr[0] = &prgRom[(dataBus & 0b0111) * 0x8000];
@@ -993,11 +1048,11 @@ void Nes::CpuWrite(const uint16_t address, const uint8_t data)
 
 				if(dataBus & 0b00010000)
 				{
-					ppu.SetNametableMirroring(0xC00, 0);
+					ppu.SetNametableMirroring(ppu.B);
 				}
 				else
 				{
-					ppu.SetNametableMirroring(0x400, 0x400); //fix: only use 0x2400
+					ppu.SetNametableMirroring(ppu.A);
 				}
 			}
 		break;
