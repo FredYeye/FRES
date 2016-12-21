@@ -527,51 +527,7 @@ const bool Ppu::PollNmi() const
 }
 
 
-void Ppu::SetNametableMirroring(NametableLayout layout)
-{
-	switch(layout)
-	{
-		case A:
-			pNametable[0] = nametable.data();
-			pNametable[1] = nametable.data();
-			pNametable[2] = nametable.data();
-			pNametable[3] = nametable.data();
-		break;
-
-		case B:
-			pNametable[0] = nametable.data() + 0x400;
-			pNametable[1] = nametable.data() + 0x400;
-			pNametable[2] = nametable.data() + 0x400;
-			pNametable[3] = nametable.data() + 0x400;
-		break;
-
-		case ABAB:
-			pNametable[0] = nametable.data();
-			pNametable[1] = nametable.data() + 0x400;
-			pNametable[2] = nametable.data();
-			pNametable[3] = nametable.data() + 0x400;
-		break;
-
-		case AACC:
-			pNametable[0] = nametable.data();
-			pNametable[1] = nametable.data();
-			pNametable[2] = nametable.data() + 0x800;
-			pNametable[3] = nametable.data() + 0x800;
-		break;
-	}
-}
-
-
-void Ppu::SetPatternBanks(const uint8_t dataBus)
-{
-	for(int x = 0; x < 8; x++)
-	{
-		pPattern[x] = pattern.data() + ((dataBus & 0b11) * 0x2000) + 0x400 * x;
-	}
-}
-
-
-void Ppu::ReverseBits(uint8_t &b)
+void Ppu::ReverseBits(uint8_t &b) const
 {
 	b = b >> 4 | b << 4;
 	b = (b & 0b11001100) >> 2 | (b & 0b00110011) << 2;
@@ -602,6 +558,24 @@ uint16_t Ppu::GetScanlineH() const
 uint16_t Ppu::GetScanlineV() const
 {
 	return scanlineV;
+}
+
+
+void Ppu::SetNametableMirroring(const std::array<NametableOffset, 4> &offset)
+{
+	for(int x = 0; x < 4; x++)
+	{
+		pNametable[x] = nametable.data() + offset[x];
+	}
+}
+
+
+void Ppu::SetPatternBanks(const uint8_t dataBus)
+{
+	for(int x = 0; x < 8; x++)
+	{
+		pPattern[x] = pattern.data() + ((dataBus & 0b11) * 0x2000) + 0x400 * x;
+	}
 }
 
 

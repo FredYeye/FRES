@@ -1,24 +1,24 @@
 // #define DEBUG
 // #define DUMP_VRAM
 
-#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <iomanip>
-#include <sstream>
-#include <vector>
-#include <cstring>
 
 #include "nes.hpp"
 #include "apu.hpp"
 #include "ppu.hpp"
-#include "file.hpp"
-// #include "sha1.hpp"
+#include "cart.hpp"
 
 
 Nes::Nes(std::string inFile)
 {
-	LoadRom(inFile);
+	Cart cart(inFile);
+	mapper = cart.mapper;
+	prgRom = cart.prgRom;
+	pPrgBank = cart.pPrgBank;
+	ppu.SetPattern(cart.chrMem);
+	ppu.SetNametableMirroring(cart.nametableOffsets);
 
 	CpuRead(PC); //PC?
 	CpuRead(PC);
@@ -48,148 +48,6 @@ void Nes::AdvanceFrame(uint8_t input, uint8_t input2)
 			controller_reg = input;
 			controller_reg2 = input2;
 		}
-	}
-}
-
-
-void Nes::LoadRom(std::string inFile)
-{
-	std::vector<uint8_t> fileContent = FileToU8Vec(inFile);
-
-	//ines header stuff
-	std::array<uint8_t, 16> header;
-	std::copy_n(fileContent.begin(), 16, header.begin());
-
-	if(header[0] != 0x4E && header[1] != 0x45 && header[2] != 0x53 && header[3] != 0x1A)
-	{
-		std::cout << "Not a valid .nes file" << std::endl;
-		exit(0);
-	}
-	fileContent.erase(fileContent.begin(), fileContent.begin() + 0x10);
-
-	std::vector<uint8_t> chrRom;
-
-	mapper = (header[6] >> 4) | (header[7] & 0b11110000);
-	if(mapper == 0)
-	{
-		prgRom.assign(fileContent.begin(), fileContent.begin() + header[4] * 0x4000);
-
-		bankPtr[0] = &prgRom[0];
-		bankPtr[1] = &prgRom[0x2000];
-		if(header[4] > 1)
-		{
-			bankPtr[2] = &prgRom[0x4000];
-			bankPtr[3] = &prgRom[0x6000];
-		}
-		else
-		{
-			bankPtr[2] = &prgRom[0x0000];
-			bankPtr[3] = &prgRom[0x2000];
-		}
-
-		if(header[5])
-		{
-			chrRom.assign(fileContent.begin() + header[4] * 0x4000, fileContent.begin() + header[4] * 0x4000 + header[5] * 0x2000);
-			ppu.SetPattern(chrRom);
-		}
-		else
-		{
-			std::vector<uint8_t> chrRam(0x2000);
-			ppu.SetPattern(chrRam);
-		}
-
-		if(header[6] & 1)
-		{
-			ppu.SetNametableMirroring(ppu.ABAB); //horizontal arrangement
-		}
-		else
-		{
-			ppu.SetNametableMirroring(ppu.AACC); //vertical arrangement
-		}
-	}
-	else if(mapper == 2)
-	{
-		prgRom.assign(fileContent.begin(), fileContent.begin() + header[4] * 0x4000);
-
-		bankPtr[0] = &prgRom[0];
-		bankPtr[1] = &prgRom[0x2000];
-		bankPtr[2] = &prgRom[(header[4] - 1) * 0x4000];
-		bankPtr[3] = bankPtr[2] + 0x2000;
-
-		if(header[5])
-		{
-			chrRom.assign(fileContent.begin() + header[4] * 0x4000, fileContent.begin() + header[4] * 0x4000 + header[5] * 0x2000);
-			ppu.SetPattern(chrRom);
-		}
-		else
-		{
-			std::vector<uint8_t> chrRam(0x2000);
-			ppu.SetPattern(chrRam);
-		}
-
-		if(header[6] & 1)
-		{
-			ppu.SetNametableMirroring(ppu.ABAB); //horizontal arrangement
-		}
-		else
-		{
-			ppu.SetNametableMirroring(ppu.AACC); //vertical arrangement
-		}
-	}
-	else if(mapper == 3) //bus conflicts?
-	{
-		prgRom.assign(fileContent.begin(), fileContent.begin() + header[4] * 0x4000);
-
-		bankPtr[0] = &prgRom[0];
-		bankPtr[1] = &prgRom[0x2000];
-		if(header[4] > 1)
-		{
-			bankPtr[2] = &prgRom[0x4000];
-			bankPtr[3] = &prgRom[0x6000];
-		}
-		else
-		{
-			bankPtr[2] = &prgRom[0x0000];
-			bankPtr[3] = &prgRom[0x2000];
-		}
-
-		if(header[5])
-		{
-			chrRom.assign(fileContent.begin() + header[4] * 0x4000, fileContent.begin() + header[4] * 0x4000 + header[5] * 0x2000);
-			ppu.SetPattern(chrRom);
-		}
-		else
-		{
-			std::vector<uint8_t> chrRam(0x8000); //hardcoded val?
-			ppu.SetPattern(chrRam);
-		}
-
-		if(header[6] & 1)
-		{
-			ppu.SetNametableMirroring(ppu.ABAB); //horizontal arrangement
-		}
-		else
-		{
-			ppu.SetNametableMirroring(ppu.AACC); //vertical arrangement
-		}
-	}
-	else if(mapper == 7)
-	{
-		prgRom.assign(fileContent.begin(), fileContent.begin() + header[4] * 0x4000);
-
-		bankPtr[0] = &prgRom[0];
-		bankPtr[1] = &prgRom[0x2000];
-		bankPtr[2] = &prgRom[0x4000];
-		bankPtr[3] = &prgRom[0x6000];
-
-		ppu.SetNametableMirroring(ppu.A); // single screen
-		chrRom.resize(0x2000);
-		ppu.SetPattern(chrRom);
-	}
-	else
-	{
-		std::cout << "unsupported mapper\n";
-		exit(0);
 	}
 }
 
@@ -939,10 +797,10 @@ void Nes::CpuRead(const uint16_t address)
 		break;
 
 		case 0x6000: break;
-		case 0x8000: dataBus = *(bankPtr[0] + (addressBus & 0x1FFF)); break;
-		case 0xA000: dataBus = *(bankPtr[1] + (addressBus & 0x1FFF)); break;
-		case 0xC000: dataBus = *(bankPtr[2] + (addressBus & 0x1FFF)); break;
-		case 0xE000: dataBus = *(bankPtr[3] + (addressBus & 0x1FFF)); break;
+		case 0x8000: dataBus = *(pPrgBank[0] + (addressBus & 0x1FFF)); break;
+		case 0xA000: dataBus = *(pPrgBank[1] + (addressBus & 0x1FFF)); break;
+		case 0xC000: dataBus = *(pPrgBank[2] + (addressBus & 0x1FFF)); break;
+		case 0xE000: dataBus = *(pPrgBank[3] + (addressBus & 0x1FFF)); break;
 	}
 
 	if(apu.dmcDma & !dmcDmaActive) //where to do this?
@@ -1032,8 +890,8 @@ void Nes::CpuWrite(const uint16_t address, const uint8_t data)
 		case 0x8000: case 0xA000: case 0xC000: case 0xE000:
 			if(mapper == 2)
 			{
-				bankPtr[0] = &prgRom[(dataBus & 0b1111) * 0x4000];
-				bankPtr[1] = bankPtr[0] + 0x2000;
+				pPrgBank[0] = &prgRom[(dataBus & 0b1111) * 0x4000];
+				pPrgBank[1] = pPrgBank[0] + 0x2000;
 			}
 			else if(mapper == 3)
 			{
@@ -1041,18 +899,18 @@ void Nes::CpuWrite(const uint16_t address, const uint8_t data)
 			}
 			else if(mapper == 7)
 			{
-				bankPtr[0] = &prgRom[(dataBus & 0b0111) * 0x8000];
-				bankPtr[1] = bankPtr[0] + 0x2000;
-				bankPtr[2] = bankPtr[0] + 0x4000;
-				bankPtr[3] = bankPtr[0] + 0x6000;
+				pPrgBank[0] = &prgRom[(dataBus & 0b0111) * 0x8000];
+				pPrgBank[1] = pPrgBank[0] + 0x2000;
+				pPrgBank[2] = pPrgBank[0] + 0x4000;
+				pPrgBank[3] = pPrgBank[0] + 0x6000;
 
 				if(dataBus & 0b00010000)
 				{
-					ppu.SetNametableMirroring(ppu.B);
+					ppu.SetNametableMirroring({B,B,B,B});
 				}
 				else
 				{
-					ppu.SetNametableMirroring(ppu.A);
+					ppu.SetNametableMirroring({A,A,A,A});
 				}
 			}
 		break;
@@ -1211,10 +1069,10 @@ uint8_t Nes::DebugRead(uint16_t address)
 				<< std::uppercase << std::hex << std::setfill('0') << std::setw(4) << address << "\n";
 		break;
 
-		case 0x8000: a = *(bankPtr[0] + (address & 0x1FFF)); break;
-		case 0xA000: a = *(bankPtr[1] + (address & 0x1FFF)); break;
-		case 0xC000: a = *(bankPtr[2] + (address & 0x1FFF)); break;
-		case 0xE000: a = *(bankPtr[3] + (address & 0x1FFF)); break;
+		case 0x8000: a = *(pPrgBank[0] + (address & 0x1FFF)); break;
+		case 0xA000: a = *(pPrgBank[1] + (address & 0x1FFF)); break;
+		case 0xC000: a = *(pPrgBank[2] + (address & 0x1FFF)); break;
+		case 0xE000: a = *(pPrgBank[3] + (address & 0x1FFF)); break;
 	}
 
 	return a;

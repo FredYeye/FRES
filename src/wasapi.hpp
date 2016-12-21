@@ -14,7 +14,7 @@ class Audio
 		~Audio();
 		void StartAudio();
 		void StopAudio();
-		void StreamSource();
+		void StreamSource() const;
 
 	private:
 		void Init();

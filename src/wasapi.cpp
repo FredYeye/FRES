@@ -45,7 +45,7 @@ void Audio::StopAudio()
 }
 
 
-void Audio::StreamSource()
+void Audio::StreamSource() const
 {
 	// uint32_t queuedFrames;
 	// pAudioClient->GetCurrentPadding(&queuedFrames);

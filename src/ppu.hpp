@@ -4,6 +4,7 @@
 #include <array>
 #include <vector>
 
+enum NametableOffset : uint16_t {A = 0, B = 0x400, C = 0x800, D = 0xC00};
 
 class Ppu
 {
@@ -25,15 +26,14 @@ class Ppu
 
 		const bool PollNmi() const;
 
-		enum NametableLayout : uint8_t {A = 0, B, ABAB, AACC};
-		void SetNametableMirroring(NametableLayout layout);
-		void SetPatternBanks(const uint8_t dataBus);
-
 		const bool RenderFrame();
 		const uint32_t* const GetPixelPtr() const;
 
 		uint16_t GetScanlineH() const;
 		uint16_t GetScanlineV() const;
+
+		void SetNametableMirroring(const std::array<NametableOffset, 4> &offset);
+		void SetPatternBanks(const uint8_t dataBus);
 		void SetPattern(std::vector<uint8_t> &chr);
 
 	private:
@@ -41,7 +41,7 @@ class Ppu
 		void RenderFetches();
 		void OamScan();
 		void OamUpdateIndex();
-		void ReverseBits(uint8_t &b);
+		void ReverseBits(uint8_t &b) const;
 
 		std::array<uint32_t, 256*240> render;
 

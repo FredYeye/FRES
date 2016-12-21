@@ -127,7 +127,7 @@ void Initialize(GLuint &vao, const uint32_t *const pixelPtr)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	GLuint shaderProgram = CreateProgram();
+	const GLuint shaderProgram = CreateProgram();
 
 	GLint position_attribute = glGetAttribLocation(shaderProgram, "position");
 	glVertexAttribPointer(position_attribute, 2, GL_BYTE, GL_FALSE, 0, 0); //Specify how the data for position can be accessed
@@ -159,8 +159,8 @@ GLuint CreateProgram()
 	"out_color = texture(texture_sampler, textureCoord_from_vshader);"
 	"}";
 
-	GLuint vertexShader = LoadAndCompileShader(vertex, GL_VERTEX_SHADER); //Load and compile the vertex and fragment shaders
-	GLuint fragmentShader = LoadAndCompileShader(fragment, GL_FRAGMENT_SHADER);
+	const GLuint vertexShader = LoadAndCompileShader(vertex, GL_VERTEX_SHADER); //Load and compile the vertex and fragment shaders
+	const GLuint fragmentShader = LoadAndCompileShader(fragment, GL_FRAGMENT_SHADER);
 
 	GLuint shaderProgram = glCreateProgram(); //Attach the above shader to a program
 	glAttachShader(shaderProgram, vertexShader);

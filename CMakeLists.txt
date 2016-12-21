@@ -10,6 +10,7 @@ set(source_files
 	src/nes.cpp
 	src/apu.cpp
 	src/ppu.cpp
+	src/cart.cpp
 	src/file.cpp
 	src/sha1.cpp
 	src/gl_core_3_3.c
@@ -20,6 +21,7 @@ set(header_files
 	src/nes.hpp
 	src/apu.hpp
 	src/ppu.hpp
+	src/cart.hpp
 	src/file.hpp
 	src/sha1.hpp
 	src/gl_core_3_3.h

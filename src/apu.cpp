@@ -378,7 +378,7 @@ void Apu::Tick()
 				}
 			}
 
-			uint8_t triangleOutput = (ultrasonic) ? 7 : triangle.sequencerTable[triangle.sequencerStep]; //should be 7.5. HMM set to 0?
+			const uint8_t triangleOutput = (ultrasonic) ? 7 : triangle.sequencerTable[triangle.sequencerStep]; //should be 7.5. HMM set to 0?
 
 			uint8_t noiseOutput = 0;
 			if(!(noise.lfsr & 1) && noise.lengthCounter)

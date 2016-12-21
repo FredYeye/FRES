@@ -18,7 +18,6 @@ class Nes
 		Apu apu;
 
 	private:
-		void LoadRom(std::string inFile);
 		void RunOpcode();
 		void CpuRead(const uint16_t address);
 		void CpuWrite(const uint16_t address, const uint8_t data);
@@ -43,7 +42,7 @@ class Nes
 
 		std::array<uint8_t, 0x800> cpuRam;
 		std::vector<uint8_t> prgRom;
-		std::array<uint8_t*, 4> bankPtr;
+		std::array<uint8_t*, 4> pPrgBank;
 
 		bool readJoy1 = false;
 
