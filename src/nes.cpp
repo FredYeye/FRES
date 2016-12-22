@@ -13,9 +13,9 @@
 
 Nes::Nes(std::string inFile)
 {
-	Cart cart(inFile);
+	Cart cart(inFile, prgRom);
 	mapper = cart.mapper;
-	prgRom = cart.prgRom;
+	// prgRom = cart.prgRom;
 	pPrgBank = cart.pPrgBank;
 	ppu.SetPattern(cart.chrMem);
 	ppu.SetNametableMirroring(cart.nametableOffsets);

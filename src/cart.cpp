@@ -8,7 +8,7 @@
 // #include "sha1.hpp"
 
 
-Cart::Cart(const std::string inFile)
+Cart::Cart(const std::string inFile, std::vector<uint8_t> &prgRom)
 {
 	std::vector<uint8_t> fileContent = FileToU8Vec(inFile);
 
@@ -26,7 +26,7 @@ Cart::Cart(const std::string inFile)
 	if(mapper == 0 || mapper == 2 || mapper == 3 || mapper == 7)
 	{
 		prgRom.assign(fileContent.begin(), fileContent.begin() + header[4] * 0x4000);
-		SetDefaultPrgBanks();
+		SetDefaultPrgBanks(prgRom);
 
 		SetChrMem(fileContent);
 		SetDefaultNametableLayout();
@@ -39,7 +39,7 @@ Cart::Cart(const std::string inFile)
 }
 
 
-void Cart::SetDefaultPrgBanks()
+void Cart::SetDefaultPrgBanks(std::vector<uint8_t> &prgRom)
 {
 	if(mapper == 0 || mapper == 3)
 	{

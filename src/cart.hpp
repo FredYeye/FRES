@@ -6,12 +6,12 @@
 struct Cart
 {
     public:
-        Cart(const std::string inFile);
+        Cart(const std::string inFile, std::vector<uint8_t> &prgRom);
 
         std::array<uint8_t, 16> header;
         uint8_t mapper;
 
-        std::vector<uint8_t> prgRom;
+        // std::vector<uint8_t> prgRom;
         std::array<uint8_t*, 4> pPrgBank;
 
         std::vector<uint8_t> chrMem;
@@ -20,7 +20,7 @@ struct Cart
         std::array<NametableOffset, 4> nametableOffsets;
 
     private:
-        void SetDefaultPrgBanks();
+        void SetDefaultPrgBanks(std::vector<uint8_t> &prgRom);
         void SetChrMem(const std::vector<uint8_t> &fileContent);
         void SetDefaultNametableLayout();
 };
