@@ -215,20 +215,21 @@ uint8_t Apu::StatusRead() //4015
 
 void Apu::FrameCounterWrite(uint8_t dataBus) //4017
 {
-	sequencerMode = dataBus & 0b10000000;
 	blockIRQ = dataBus & 0b01000000;
 	if(blockIRQ)
 	{
 		frameIRQ = false;
 	}
 
-	sequencerCounter = 0; //delayed by 3-4 cpu cycles
-
+	sequencerMode = dataBus & 0b10000000;
 	if(sequencerMode)
 	{
 		QuarterFrame();
 		HalfFrame();
 	}
+
+	sequencerResetDelay[3] = apuTick; //reset the sequencer timer 3 cycles later if on a apu tick, else 4. add one cycle because the current cycle doesn't count
+	sequencerResetDelay[4] = true;
 }
 
 
@@ -275,7 +276,17 @@ void Apu::Tick()
 		}
 	}
 
-	switch(sequencerCounter)
+	for(int x = 0; x < 4; x++)
+	{
+		sequencerResetDelay[x] = sequencerResetDelay[x+1];
+	}
+	if(sequencerResetDelay[0])
+	{
+		sequencerCounter = 0;
+		sequencerResetDelay.fill(false);
+	}
+
+	switch(sequencerCounter++)
 	{
 		case 14913:
 			HalfFrame();
@@ -293,7 +304,7 @@ void Apu::Tick()
 				frameIRQ = !blockIRQ;
 				QuarterFrame();
 				HalfFrame();
-				sequencerCounter = 0xFFFF; //wrap
+				sequencerCounter = 0; //wrap
 			}
 		break;
 
@@ -302,12 +313,12 @@ void Apu::Tick()
 			{
 				QuarterFrame();
 				HalfFrame();
-				sequencerCounter = 0xFFFF; //wrap
+				sequencerCounter = 0; //wrap
 			}
 		break;
 	}
 
-	if(evenTick)
+	if(apuTick)
 	{
 		for(auto &p : pulse)
 		{
@@ -393,12 +404,7 @@ void Apu::Tick()
 		}
 	}
 
-	++sequencerCounter;
-	// if(!sequencerCounter)
-	// {
-		// frameIRQ = !(blockIRQ | sequencerMode);
-	// }
-	evenTick = !evenTick;
+	apuTick = !apuTick;
 }
 
 

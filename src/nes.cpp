@@ -969,9 +969,9 @@ void Nes::CpuOpDone()
 		CpuRead(PC);                                        //
 
 		nmiPending[0] = false;
-		irqPending = false;
+		irqPending[1] = false;
 	}
-	else if(irqLine)
+	else if(irqPending[1])
 	{
 		CpuRead(addressBus);                                //fetch op1, increment suppressed
 		CpuWrite(0x100 | rS--, PC >> 8);                    //push PC high on stack
@@ -986,9 +986,8 @@ void Nes::CpuOpDone()
 		PC = tempData | (dataBus << 8);                     //fetch next opcode
 		CpuRead(PC);                                        //
 
-		irqPending = false;
+		irqPending[0] = false;
 	}
-	irqLine = irqPending;
 }
 
 
@@ -1001,7 +1000,8 @@ void Nes::PollInterrupts()
 	nmi = ppu.PollNmi();
 	nmiPending[0] |= !oldNmi & nmi; //nmiPending[0] gets set = nmi detected, but interrupt polling will miss
 
-	irqPending = !rP.test(2) & apu.PollFrameInterrupt();
+	irqPending[1] = irqPending[0];                          //first cycle after irqPending[0] set, polling will see now
+	irqPending[0] = !rP.test(2) & apu.PollFrameInterrupt(); //irq detected but polling will miss
 }
 
 
