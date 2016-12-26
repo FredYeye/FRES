@@ -33,7 +33,7 @@ void Apu::Pulse0Write(uint8_t dataBus, bool channel)
 
 void Apu::Pulse1Write(uint8_t dataBus, bool channel)
 {
-	pulse[channel].sweepTimer = (dataBus >> 4) & 0b0111;
+	pulse[channel].sweepTimer = ((dataBus >> 4) & 0b0111); //+1?
 	pulse[channel].sweepNegate = dataBus & 0b1000;
 	pulse[channel].sweepShift = dataBus & 0b0111;
 	pulse[channel].sweepReload = true;
@@ -60,7 +60,7 @@ void Apu::Pulse3Write(uint8_t dataBus, bool channel)
 }
 
 
-void Apu::Triangle0Write(uint8_t dataBus)
+void Apu::Triangle0Write(uint8_t dataBus) //4008
 {
 	triangle.halt = dataBus & 0b10000000;
 	triangle.linearLoad = dataBus & 0b01111111;
@@ -133,13 +133,13 @@ void Apu::Dmc0Write(uint8_t dataBus) //4010
 }
 
 
-void Apu::Dmc1Write(uint8_t dataBus)
+void Apu::Dmc1Write(uint8_t dataBus) //4011
 {
 	dmc.output = dataBus & 0b01111111; //todo: timer quirk
 }
 
 
-void Apu::Dmc2Write(uint8_t dataBus)
+void Apu::Dmc2Write(uint8_t dataBus) //4012
 {
 	dmc.addressLoad = 0xC000 | (dataBus << 6);
 }
@@ -222,7 +222,7 @@ void Apu::FrameCounterWrite(uint8_t dataBus) //4017
 	}
 
 	sequencerMode = dataBus & 0b10000000;
-	if(sequencerMode)
+	if(sequencerMode == 1)
 	{
 		QuarterFrame();
 		HalfFrame();
@@ -245,7 +245,7 @@ void Apu::DmcDma(uint8_t sample)
 	++dmc.address |= 0x8000;
 	dmc.sampleBufferEmpty = false;
 
-	if(!--dmc.samplesRemaining)
+	if(--dmc.samplesRemaining == 0)
 	{
 		if(dmc.loop)
 		{
@@ -269,7 +269,7 @@ void Apu::Tick()
 	}
 	if(triangle.lengthCounter && triangle.linearCounter && !ultrasonic)
 	{
-		if(!triangle.freqCounter--)
+		if(--triangle.freqCounter <= 0)
 		{
 			triangle.freqCounter = triangle.freqTimer;
 			++triangle.sequencerStep &= 0b00011111;
@@ -288,32 +288,33 @@ void Apu::Tick()
 
 	switch(sequencerCounter++)
 	{
-		case 14913:
+		case 37281: //step 4 of mode 1
+			if(sequencerMode == 1)
+			{
+				sequencerCounter = 0;
+			}
+		case 14913: //steps 2 of both modes
 			HalfFrame();
-		case 7457: case 22371:
+		case 7457: case 22371: //steps 1 and 3 of both modes
 			QuarterFrame();
 		break;
 
-		case 29828:
+		case 29830: //step 4 of mode 0, part 2
+			if(sequencerMode == 0)
+			{
+				sequencerCounter = 1; //wrap to 0+1 now and set frameIRQ
+			}
+		case 29828: //pre-step 4 irq flag
 			frameIRQ = !(blockIRQ | sequencerMode);
 		break;
 
-		case 29829:
-			if(!sequencerMode)
+		case 29829: //step 4 of mode 0
+			if(sequencerMode == 0)
 			{
 				frameIRQ = !blockIRQ;
 				QuarterFrame();
 				HalfFrame();
-				sequencerCounter = 0; //wrap
-			}
-		break;
-
-		case 37281:
-			if(sequencerMode)
-			{
-				QuarterFrame();
-				HalfFrame();
-				sequencerCounter = 0; //wrap
+				//can't wrap sequencerCounter to 0 yet, need to set frameIRQ on wrap to 0
 			}
 		break;
 	}
@@ -322,7 +323,7 @@ void Apu::Tick()
 	{
 		for(auto &p : pulse)
 		{
-			if(!p.freqCounter--)
+			if(--p.freqCounter <= 0)
 			{
 				p.freqCounter = p.freqTimer;
 				p.dutyCounter <<= 1;
@@ -333,7 +334,7 @@ void Apu::Tick()
 			}
 		}
 
-		if(!noise.freqCounter--)
+		if(--noise.freqCounter <= 0)
 		{
 			noise.freqCounter = noise.freqTimer;
 			bool feedback = (noise.mode) ? noise.lfsr & 0b01000000 : noise.lfsr & 0b00000010;
@@ -342,7 +343,7 @@ void Apu::Tick()
 			noise.lfsr |= feedback << 14;
 		}
 
-		if(!dmc.freqCounter--)
+		if(--dmc.freqCounter <= 0)
 		{
 			dmc.freqCounter = dmc.freqTimer;
 			if(!dmc.silence)
@@ -361,9 +362,9 @@ void Apu::Tick()
 			}
 
 			dmc.outputShift >>= 1;
-			if(!--dmc.bitsRemaining)
+			if(--dmc.bitsRemaining == 0)
 			{
-				dmc.bitsRemaining = 8; //doing this in DmcDma makes dmc_basics pass, but not the correct solution (i think...)
+				dmc.bitsRemaining = 8; //doing this in the if case below makes dmc_basics pass, but not the correct solution (i think...)
 				dmc.outputShift = dmc.sampleBuffer;
 				dmc.silence = dmc.sampleBufferEmpty;
 				dmc.sampleBufferEmpty = true;
@@ -372,6 +373,7 @@ void Apu::Tick()
 
 		if(dmc.samplesRemaining && dmc.sampleBufferEmpty)
 		{
+			dmc.bitsRemaining = 8;
 			dmcDma = true;
 		}
 
@@ -381,7 +383,7 @@ void Apu::Tick()
 			++outI &= 0b11111;
 
 			uint8_t pulseOutput = 0;
-			for(auto &p : pulse)
+			for(const auto &p : pulse)
 			{
 				if(p.duty & p.dutyCounter && p.lengthCounter && !SweepForcingSilence(p))
 				{
@@ -483,12 +485,7 @@ void Apu::HalfFrame()
 {
 	for(uint8_t x = 0; x <= 1; ++x)
 	{
-		if(pulse[x].sweepReload) //edge case(?) not handled yet
-		{
-			pulse[x].sweepCounter = pulse[x].sweepTimer;
-			pulse[x].sweepReload = false;
-		}
-		else if(!pulse[x].sweepCounter--)
+		if(!pulse[x].sweepCounter--)
 		{
 			pulse[x].sweepCounter = pulse[x].sweepTimer;
 			if(pulse[x].sweepEnabled && !SweepForcingSilence(pulse[x]))
@@ -502,6 +499,11 @@ void Apu::HalfFrame()
 					pulse[x].freqTimer += (pulse[x].freqTimer >> pulse[x].sweepShift);
 				}
 			}
+		}
+		if(pulse[x].sweepReload)
+		{
+			pulse[x].sweepCounter = pulse[x].sweepTimer;
+			pulse[x].sweepReload = false;
 		}
 
 		if(!pulse[x].halt && pulse[x].lengthCounter)

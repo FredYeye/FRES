@@ -7,7 +7,8 @@
 
 struct Pulse
 {
-	uint16_t freqTimer, freqCounter;
+	uint16_t freqTimer;
+	int16_t freqCounter;
 	uint8_t duty, dutyCounter;
 	uint8_t volume, envelopeVolume;
 	uint8_t envelopeCounter, lengthCounter;
@@ -18,7 +19,8 @@ struct Pulse
 
 struct Triangle
 {
-	uint16_t freqTimer, freqCounter;
+	uint16_t freqTimer;
+	int16_t freqCounter;
 	uint8_t linearLoad, linearCounter;
 	uint8_t lengthCounter;
 	uint8_t sequencerStep;
@@ -34,7 +36,8 @@ struct Triangle
 struct Noise
 {
 	uint16_t lfsr;
-	uint16_t freqTimer, freqCounter;
+	uint16_t freqTimer;
+	int16_t freqCounter;
 	uint8_t volume, envelopeVolume;
 	uint8_t envelopeCounter, lengthCounter;
 	bool enable, halt, constant, mode, envelopeReset;
@@ -42,7 +45,8 @@ struct Noise
 
 struct Dmc
 {
-	uint16_t freqTimer, freqCounter, address, addressLoad, samplesRemaining, sampleLength;
+	uint16_t freqTimer, address, addressLoad, samplesRemaining, sampleLength;
+	int16_t freqCounter;
 	uint8_t output, outputShift, bitsRemaining, sampleBuffer;
 	bool enableIrq, irqPending, loop, enable, silence, sampleBufferEmpty;
 };
