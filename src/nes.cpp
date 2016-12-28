@@ -895,7 +895,7 @@ void Nes::CpuWrite(const uint16_t address, const uint8_t data)
 			}
 			else if(mapper == 3)
 			{
-				ppu.SetPatternBanks(dataBus);
+				ppu.SetPatternBanks(dataBus & 0b0011);
 			}
 			else if(mapper == 7)
 			{
@@ -943,7 +943,7 @@ void Nes::CpuOpDone()
 			CpuRead(PC); //read what? doesn't really matter, maybe addressBus
 		}
 
-		for(uint16_t x=0; x<=255; ++x)
+		for(int x = 0; x < 256; ++x)
 		{
 			CpuRead(dmaAddress + x); //should dmaAddress be 1st or 2nd write from R&W ops (2nd currently)?
 			CpuWrite(0x2004, dataBus);

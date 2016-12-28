@@ -17,12 +17,14 @@ Apu::Apu()
 		// mixer.tnd[x] = std::round((163.67 / (24329.0 / x+100)) * 65535.0); //16-bit
 		mixer.tnd[x] = 163.67 / (24329.0 / x+100); //float
 	}
+
+	dmc.freqTimer = 428/2;
 }
 
 
 void Apu::Pulse0Write(uint8_t dataBus, bool channel)
 {
-	const std::array<uint8_t, 4> dutyTable{{0b0000010, 0b00000110, 0b00011110, 0b11111001}};
+	const std::array<uint8_t, 4> dutyTable{{0b00000010, 0b00000110, 0b00011110, 0b11111001}};
 
 	pulse[channel].duty = dutyTable[dataBus >> 6];
 	pulse[channel].halt = dataBus & 0b00100000;
@@ -33,7 +35,7 @@ void Apu::Pulse0Write(uint8_t dataBus, bool channel)
 
 void Apu::Pulse1Write(uint8_t dataBus, bool channel)
 {
-	pulse[channel].sweepTimer = ((dataBus >> 4) & 0b0111); //+1?
+	pulse[channel].sweepTimer = ((dataBus >> 4) & 0b0111);
 	pulse[channel].sweepNegate = dataBus & 0b1000;
 	pulse[channel].sweepShift = dataBus & 0b0111;
 	pulse[channel].sweepReload = true;
@@ -43,7 +45,7 @@ void Apu::Pulse1Write(uint8_t dataBus, bool channel)
 
 void Apu::Pulse2Write(uint8_t dataBus, bool channel)
 {
-	pulse[channel].freqTimer = (pulse[channel].freqTimer & 0x700) | dataBus; //save high 3 bits or not?
+	pulse[channel].freqTimer = (pulse[channel].freqTimer & 0x700) | dataBus;
 }
 
 
@@ -104,7 +106,7 @@ void Apu::Noise2Write(uint8_t dataBus)
 }
 
 
-void Apu::Noise3Write(uint8_t dataBus)
+void Apu::Noise3Write(uint8_t dataBus) //400F
 {
 	if(noise.enable)
 	{
@@ -269,7 +271,7 @@ void Apu::Tick()
 	}
 	if(triangle.lengthCounter && triangle.linearCounter && !ultrasonic)
 	{
-		if(--triangle.freqCounter <= 0)
+		if(triangle.freqCounter-- == 0)
 		{
 			triangle.freqCounter = triangle.freqTimer;
 			++triangle.sequencerStep &= 0b00011111;
@@ -299,15 +301,6 @@ void Apu::Tick()
 			QuarterFrame();
 		break;
 
-		case 29830: //step 4 of mode 0, part 2
-			if(sequencerMode == 0)
-			{
-				sequencerCounter = 1; //wrap to 0+1 now and set frameIRQ
-			}
-		case 29828: //pre-step 4 irq flag
-			frameIRQ = !(blockIRQ | sequencerMode);
-		break;
-
 		case 29829: //step 4 of mode 0
 			if(sequencerMode == 0)
 			{
@@ -317,13 +310,22 @@ void Apu::Tick()
 				//can't wrap sequencerCounter to 0 yet, need to set frameIRQ on wrap to 0
 			}
 		break;
+
+		case 29830: //step 4 of mode 0, part 2
+			if(sequencerMode == 0)
+			{
+				sequencerCounter = 1; //wrap to 0+1 now and set frameIRQ
+			}
+		case 29828: //pre-step 4 irq flag
+			frameIRQ = !(blockIRQ | sequencerMode);
+		break;
 	}
 
 	if(apuTick)
 	{
 		for(auto &p : pulse)
 		{
-			if(--p.freqCounter <= 0)
+			if(p.freqCounter-- == 0)
 			{
 				p.freqCounter = p.freqTimer;
 				p.dutyCounter <<= 1;
@@ -334,18 +336,18 @@ void Apu::Tick()
 			}
 		}
 
-		if(--noise.freqCounter <= 0)
+		if(noise.freqCounter-- == 0)
 		{
-			noise.freqCounter = noise.freqTimer;
+			noise.freqCounter = noise.freqTimer - 1; //-1?
 			bool feedback = (noise.mode) ? noise.lfsr & 0b01000000 : noise.lfsr & 0b00000010;
 			feedback ^= noise.lfsr & 1;
 			noise.lfsr >>= 1;
 			noise.lfsr |= feedback << 14;
 		}
 
-		if(--dmc.freqCounter <= 0)
+		if(dmc.freqCounter-- == 0)
 		{
-			dmc.freqCounter = dmc.freqTimer;
+			dmc.freqCounter = dmc.freqTimer - 1; //timer isn't t+1 unlike some others (improve explanation...)
 			if(!dmc.silence)
 			{
 				if(dmc.outputShift & 1)
@@ -391,7 +393,12 @@ void Apu::Tick()
 				}
 			}
 
-			const uint8_t triangleOutput = (ultrasonic) ? 7 : triangle.sequencerTable[triangle.sequencerStep]; //should be 7.5. HMM set to 0?
+			const std::array<uint8_t, 32> triangleSequencerTable
+			{{
+				15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0,
+				0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+			}};
+			const uint8_t triangleOutput = (ultrasonic) ? 7 : triangleSequencerTable[triangle.sequencerStep]; //should be 7.5. HMM set to 0?
 
 			uint8_t noiseOutput = 0;
 			if(!(noise.lfsr & 1) && noise.lengthCounter)
@@ -405,7 +412,6 @@ void Apu::Tick()
 			++sampleCount;
 		}
 	}
-
 	apuTick = !apuTick;
 }
 

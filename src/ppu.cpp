@@ -574,7 +574,7 @@ void Ppu::SetPatternBanks(const uint8_t dataBus)
 {
 	for(int x = 0; x < 8; x++)
 	{
-		pPattern[x] = pattern.data() + ((dataBus & 0b11) * 0x2000) + 0x400 * x;
+		pPattern[x] = pattern.data() + (dataBus * 0x2000) + 0x400 * x;
 	}
 }
 
