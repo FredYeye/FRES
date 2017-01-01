@@ -10,17 +10,17 @@ class Ppu
 {
 	public:
 		Ppu();
-		uint8_t StatusRead();
-		const uint8_t OamDataRead() const;
-		uint8_t DataRead();
 
-		void CtrlWrite(uint8_t dataBus);
-		void MaskWrite(uint8_t dataBus);
-		void OamAddrWrite(uint8_t dataBus);
-		void OamDataWrite(uint8_t dataBus);
-		void ScrollWrite(uint8_t dataBus);
-		void AddrWrite(uint8_t dataBus);
-		void DataWrite(uint8_t dataBus);
+		void CtrlWrite(uint8_t dataBus);    //2000
+		void MaskWrite(uint8_t dataBus);    //2001
+		uint8_t StatusRead();               //2002
+		void OamAddrWrite(uint8_t dataBus); //2003
+		const uint8_t OamDataRead() const;  //2004
+		void OamDataWrite(uint8_t dataBus); //2004
+		void ScrollWrite(uint8_t dataBus);  //2005
+		void AddrWrite(uint8_t dataBus);    //2006
+		uint8_t DataRead();                 //2007
+		void DataWrite(uint8_t dataBus);    //2007
 
 		void Tick();
 

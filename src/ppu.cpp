@@ -10,6 +10,20 @@ Ppu::Ppu()
 }
 
 
+void Ppu::CtrlWrite(uint8_t dataBus) //2000
+{
+	ppuCtrl = dataBus;
+	ppuAddressLatch &= 0x73FF;
+	ppuAddressLatch |= (dataBus & 0b11) << 10;
+}
+
+
+void Ppu::MaskWrite(uint8_t dataBus) //2001
+{
+	ppuMask = dataBus;
+}
+
+
 uint8_t Ppu::StatusRead() //2002
 {
 	if(scanlineV == 241)
@@ -31,6 +45,12 @@ uint8_t Ppu::StatusRead() //2002
 }
 
 
+void Ppu::OamAddrWrite(uint8_t dataBus) //2003
+{
+	oamAddr = dataBus;
+}
+
+
 const uint8_t Ppu::OamDataRead() const //2004
 {
 	//do more stuff (reads while sprite eval is running)
@@ -38,56 +58,11 @@ const uint8_t Ppu::OamDataRead() const //2004
 }
 
 
-uint8_t Ppu::DataRead() //2007
-{
-	if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18)) //figure out what happens otherwise
-	{
-		const uint8_t currentLatch = (ppuAddress >= 0x3F00) ? paletteIndices[ppuAddress & 0x1F] : ppuDataLatch;
-
-		if(ppuAddress >= 0x2000)
-		{
-			ppuDataLatch = *(pNametable[(ppuAddress >> 10) & 0b11] + (ppuAddress & 0x3FF));
-		}
-		else
-		{
-			ppuDataLatch = *(pPattern[ppuAddress >> 10] + (ppuAddress & 0x3FF));
-		}
-		ppuAddress += (ppuCtrl & 0b0100) ? 0x20 : 0x01;
-		return currentLatch;
-	}
-	// else
-	// {
-		//increment coarse Y and X
-		// if X has been updated already, skip
-		// is this during all dots?
-	// }
-
-	return 0;
-}
-
-
-void Ppu::CtrlWrite(uint8_t dataBus) //2000
-{
-	ppuCtrl = dataBus;
-	ppuAddressLatch &= 0x73FF;
-	ppuAddressLatch |= (dataBus & 0b11) << 10;
-}
-
-
-void Ppu::MaskWrite(uint8_t dataBus) //2001
-{
-	ppuMask = dataBus;
-}
-
-
-void Ppu::OamAddrWrite(uint8_t dataBus) //2003
-{
-	oamAddr = dataBus;
-}
-
-
 void Ppu::OamDataWrite(uint8_t dataBus) //2004
 {
+	// todo:
+	// Writes to OAMDATA during rendering (on the pre-render line and the visible lines 0-239, provided either sprite or
+	// background rendering is enabled) do not modify values in OAM, but do perform a glitchy increment of OAMADDR.
 	oam[oamAddr++] = dataBus;
 }
 
@@ -126,6 +101,34 @@ void Ppu::AddrWrite(uint8_t dataBus) //2006
 }
 
 
+uint8_t Ppu::DataRead() //2007
+{
+	if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18)) //figure out what happens otherwise
+	{
+		const uint8_t currentLatch = (ppuAddress >= 0x3F00) ? paletteIndices[ppuAddress & 0x1F] : ppuDataLatch;
+
+		if(ppuAddress >= 0x2000)
+		{
+			ppuDataLatch = *(pNametable[(ppuAddress >> 10) & 0b11] + (ppuAddress & 0x3FF));
+		}
+		else
+		{
+			ppuDataLatch = *(pPattern[ppuAddress >> 10] + (ppuAddress & 0x3FF));
+		}
+		ppuAddress += (ppuCtrl & 0b0100) ? 0x20 : 0x01;
+		return currentLatch;
+	}
+	// else
+	// {
+		//increment coarse Y and X
+		// if X or Y has been updated already, skip
+		// is this during all dots?
+	// }
+
+	return 0;
+}
+
+
 void Ppu::DataWrite(uint8_t dataBus) //2007
 {
 	if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18))
@@ -148,6 +151,7 @@ void Ppu::DataWrite(uint8_t dataBus) //2007
 		}
 		ppuAddress += (ppuCtrl & 0b0100) ? 0x20 : 0x01;
 	}
+	// else //see 2007 read
 }
 
 
@@ -211,7 +215,7 @@ void Ppu::VisibleScanlines()
 			{
 				if(!spriteXpos[x])
 				{
-					if(!spritePixel && !(scanlineH <= 8 && !(ppuMask & 0b00000100)))
+					if(!(scanlineH <= 8 && !(ppuMask & 0b00000100)))
 					{
 						spritePriority = spriteAttribute[x] & 0b00100000;
 						spritePixel = spriteBitmapLow[x] >> 7;
@@ -223,10 +227,9 @@ void Ppu::VisibleScanlines()
 							{
 								opaqueSprite0 = sprite0OnCurrent;
 							}
+							break;
 						}
 					}
-					spriteBitmapLow[x] <<= 1;
-					spriteBitmapHigh[x] <<= 1;
 				}
 			}
 		}
@@ -250,11 +253,19 @@ void Ppu::VisibleScanlines()
 		uint8_t pIndex;
 		if(spritePixel && (!spritePriority || !bgPixel))
 		{
+			// paletteIndices[0x1D] = 0x25; //contra right side flicker
 			pIndex = paletteIndices[0x10 + spritePixel];
 		}
 		else
 		{
-			pIndex = paletteIndices[bgPixel];
+			if(ppuMask & 0b00011000)
+			{
+				pIndex = paletteIndices[bgPixel];
+			}
+			else //rendering is turned off
+			{
+				pIndex = (ppuAddress >= 0x3F00) ? paletteIndices[ppuAddress & 0x1F] : paletteIndices[0];
+			}
 		}
 
 		render[renderPos++] = palette[pIndex];
@@ -270,38 +281,32 @@ void Ppu::VisibleScanlines()
 
 void Ppu::RenderFetches() //things done during visible and prerender scanlines
 {
-	if(scanlineH == 256) //Y increment
+	if((scanlineH && scanlineH <= 256) || scanlineH >= 321)
 	{
-		if(ppuAddress < 0x7000)
+		if(scanlineH == 256) //Y increment
 		{
-			ppuAddress += 0x1000;
-		}
-		else
-		{
-			ppuAddress &= 0xFFF;
-			if((ppuAddress & 0x3E0) == 0x3A0)
+			if(ppuAddress < 0x7000)
 			{
-				ppuAddress &= 0xC1F;
-				ppuAddress ^= 0x800;
-			}
-			else if((ppuAddress & 0x3E0) == 0x3E0)
-			{
-				ppuAddress &= 0xC1F;
+				ppuAddress += 0x1000;
 			}
 			else
 			{
-				ppuAddress += 0x20;
+				ppuAddress &= 0xFFF;
+				if((ppuAddress & 0x3E0) == 0x3A0)
+				{
+					ppuAddress ^= 0x3A0 | 0x800; //clear coarse Y (0x3A0) and flip nametable (0x800)
+				}
+				else if((ppuAddress & 0x3E0) == 0x3E0)
+				{
+					ppuAddress &= 0xC1F;
+				}
+				else
+				{
+					ppuAddress += 0x20;
+				}
 			}
 		}
-	}
-	else if(scanlineH == 257)
-	{
-		ppuAddress &= 0x7BE0;
-		ppuAddress |= ppuAddressLatch & 0x41F;
-	}
 
-	if((scanlineH && scanlineH <= 256) || scanlineH >= 321)
-	{
 		switch(scanlineH & 0x07)
 		{
 			case 0: //coarse X increment
@@ -311,8 +316,7 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 				}
 				else
 				{
-					ppuAddress &= 0x7FE0;
-					ppuAddress ^= 0x400;
+					ppuAddress ^= 0x1F | 0x400; //clear coarse X (0x1F) and flip nametable (0x400)
 				}
 			break;
 
@@ -353,11 +357,16 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 
 		if(scanlineH <= 256)
 		{
-			for(uint8_t &x : spriteXpos)
+			for(uint8_t x = 0; x < 8; ++x)
 			{
-				if(x)
+				if(spriteXpos[x])
 				{
-					--x;
+					--spriteXpos[x];
+				}
+				else
+				{
+					spriteBitmapLow[x] <<= 1;
+					spriteBitmapHigh[x] <<= 1;
 				}
 			}
 		}
@@ -371,11 +380,17 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 	}
 	else //257-320
 	{
+		if(scanlineH == 257)
+		{
+			ppuAddress &= 0x7BE0;
+			ppuAddress |= ppuAddressLatch & 0x41F;
+		}
+
 		sprite0OnCurrent = sprite0OnNext;
 		oamAddr = 0;
 
 		// sprite fetching
-		switch(scanlineH & 7) // do everything in case 7 / all sprites in one for loop?
+		switch(scanlineH & 7)
 		{
 			case 3: spriteAttribute[spriteIndex] = oam2[spriteIndex * 4 + 2]; break;
 			case 4: spriteXpos[spriteIndex] = oam2[spriteIndex * 4 + 3];      break;
@@ -445,11 +460,11 @@ void Ppu::OamScan()
 		}
 		else if(scanlineH <= 256)
 		{
-			if(!oamEvalPattern) //search for sprites in range
+			if(oamEvalPattern == 0) //search for sprites in range
 			{
-				oam2[oam2Index] = oam[oamSpritenum]; //oam search starts at oam[oamAddr]
+				oam2[oam2Index] = oam[oamSpritenum]; //oam should start searching at oam[oamAddr]
 
-				const uint8_t spriteHeight = 8 + ((ppuCtrl & 0b00100000) >> 2); //make a member var that updates when ppuCtrl is written to?
+				const uint8_t spriteHeight = 8 + ((ppuCtrl & 0b00100000) >> 2);
 				if(uint16_t(scanlineV - oam[oamSpritenum]) < spriteHeight) //if current scanline is on a sprite
 				{
 					++oamEvalPattern;
