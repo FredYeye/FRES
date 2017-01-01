@@ -169,6 +169,7 @@ void Ppu::Tick()
 	{
 		if(scanlineH == 1)
 		{
+			spriteHit = 0;
 			ppuStatus &= 0b00011111; //clear sprite overflow, sprite 0 hit and vblank
 			suppressNmi = false;
 		}
@@ -206,6 +207,8 @@ void Ppu::VisibleScanlines()
 {
 	if(scanlineH && scanlineH <= 256)
 	{
+		ppuStatus |= spriteHit; //sprite 0 hit, delayed by one dot
+
 		uint8_t spritePixel = 0;
 		bool spritePriority = true; //false puts sprite in front of BG
 		bool opaqueSprite0 = false;
@@ -245,7 +248,7 @@ void Ppu::VisibleScanlines()
 				bgPixel |= (attribute >> (28 - fineX * 2)) & 0b1100;
 				if(opaqueSprite0 && scanlineH != 256)
 				{
-					ppuStatus |= 0b01000000; //sprite 0 hit
+					spriteHit = 0b01000000;
 				}
 			}
 		}

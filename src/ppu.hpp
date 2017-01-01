@@ -100,6 +100,8 @@ class Ppu
 		std::array<uint8_t, 8> spriteXpos;
 		uint8_t spriteIndex = 0;
 
+		uint8_t spriteHit = 0;
+
 		bool sprite0OnNext = false;
 		bool sprite0OnCurrent = false;
 };
