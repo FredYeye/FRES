@@ -92,21 +92,24 @@ void Nes::RunOpcode()
 			++PC;
 			CpuWrite(0x0100 | rS--, PC >> 8);
 			CpuWrite(0x0100 | rS--, PC);
+		{
+			const uint16_t interruptVector = (nmiPending[0]) ? 0xFFFA : 0xFFFE;//possible NMI hijack
 			CpuWrite(0x0100 | rS--, rP.to_ulong() | 0b00010000);
 
 			rP.set(2);
-			CpuRead(0xFFFE);
+			CpuRead(interruptVector);
 			tempData = dataBus;
-			CpuRead(0xFFFF);
-
+			CpuRead(interruptVector + 1);
+		}
+			nmiPending[1] = false; //NMI delayed until after next instruction
 			PC = tempData | (dataBus << 8);
-			break;
+		break;
 
 		case 0x02: case 0x12: case 0x22: case 0x32: case 0x42: case 0x52: //KIL
 		case 0x62: case 0x72: case 0x92: case 0xB2: case 0xD2: case 0xF2:
 			std::cout << "CRASH" << std::endl;
 			exit(0);
-			break;
+		break;
 
 		case 0x08: //PHP
 			CpuWrite(0x0100 | rS--, rP.to_ulong() | 0b00010000);
@@ -126,7 +129,7 @@ void Nes::RunOpcode()
 			rA = dataBus;
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
-			break;
+		break;
 
 		case 0x0A: //ASL acc
 			rP[0] = rA & 0x80;
@@ -135,11 +138,11 @@ void Nes::RunOpcode()
 			rP[7] = rA & 0x80;
 			break;
 		case 0x2A: //ROL acc
-			{
+		{
 			const bool newCarry = rA & 0x80;
 			rA = (rA << 1) | rP[0];
 			rP[0] = newCarry;
-			}
+		}
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
 			break;
@@ -157,7 +160,7 @@ void Nes::RunOpcode()
 			}
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
-			break;
+		break;
 
 		case 0x10: //BPL
 			Branch(!rP[7], op1);
@@ -182,7 +185,7 @@ void Nes::RunOpcode()
 			break;
 		case 0xF0: //BEQ
 			Branch(rP[1], op1);
-			break;
+		break;
 
 		case 0x18: //CLC
 			rP.reset(0);
@@ -204,7 +207,7 @@ void Nes::RunOpcode()
 			break;
 		case 0xF8: //SED
 			rP.set(3);
-			break;
+		break;
 
 		case 0x20: //JSR
 			++PC;
@@ -254,7 +257,7 @@ void Nes::RunOpcode()
 			CpuRead((addressBus & 0xFF00) + uint8_t(addressBus + 1));
 
 			PC = tempData | (dataBus << 8);
-			break;
+		break;
 
 		case 0x88: //DEY
 			--rY; //set one cycle later? doesn't matter
@@ -275,7 +278,7 @@ void Nes::RunOpcode()
 			++rX;
 			rP[1] = !rX;
 			rP[7] = rX & 0x80;
-			break;
+		break;
 
 		case 0x81: //STA (ind,x) indexed indirect
 			++PC;
@@ -318,7 +321,7 @@ void Nes::RunOpcode()
 			++PC;
 			CpuRead(uint8_t(op1 + rX) | (dataBus << 8));
 			CpuWrite(addressBus + (op1 + rX & 0x0100), rA);
-			break;
+		break;
 
 		case 0x84: //STY zp
 			++PC;
@@ -333,7 +336,7 @@ void Nes::RunOpcode()
 			++PC;
 			CpuRead(op1);
 			CpuWrite(uint8_t(addressBus + rX), rY);
-			break;
+		break;
 
 		case 0x86: //STX zp
 			++PC;
@@ -348,7 +351,7 @@ void Nes::RunOpcode()
 			++PC;
 			CpuRead(op1);
 			CpuWrite(uint8_t(addressBus + rY), rX);
-			break;
+		break;
 
 		case 0x83: //SAX (ind,x)
 			++PC;
@@ -371,7 +374,7 @@ void Nes::RunOpcode()
 			++PC;
 			CpuRead(op1);
 			CpuWrite(uint8_t(addressBus + rY), rA & rX);
-			break;
+		break;
 
 		case 0x8A: //TXA
 			rA = rX;
@@ -400,7 +403,7 @@ void Nes::RunOpcode()
 			rX = rS;
 			rP[1] = !rX;
 			rP[7] = rX & 0x80;
-			break;
+		break;
 
 		case 0x0B: case 0x2B: //ANC
 			++PC;
@@ -408,7 +411,7 @@ void Nes::RunOpcode()
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
 			rP[0] = rA & 0x80;
-			break;
+		break;
 
 		case 0xCB: //AXS
 			++PC;
@@ -416,20 +419,21 @@ void Nes::RunOpcode()
 			rP[1] = !((rA & rX) - dataBus);
 			rP[7] = (rA & rX) - dataBus & 0x80;
 			rX = (rA & rX) - op1;
-			break;
+		break;
 
 		// case 0x1A: case 0x3A: case 0x5A: case 0x7A: case 0xDA: case 0xEA: case 0xFA: //NOP (1 byte)
 		// case 0x04: case 0x14: case 0x34: case 0x44: case 0x54: case 0x64: case 0x74: //NOP (2 bytes)
 		// case 0x80: case 0x82: case 0x89: case 0xC2: case 0xD4: case 0xE2: case 0xF4:
 		// case 0x0C: case 0x1C: case 0x3C: case 0x5C: case 0x7C: case 0xDC: case 0xFC: //NOP (3 bytes)
-			// break;
+		// break;
 
 		case 0x06: case 0x07: case 0x26: case 0x27: case 0x46: case 0x47: //z RW
 		case 0x66: case 0x67: case 0xC6: case 0xC7: case 0xE6: case 0xE7:
 			++PC;
 			CpuRead(op1);
 			CpuWrite(addressBus, dataBus);
-			break;
+		break;
+
 		case 0x0E: case 0x0F: case 0x2E: case 0x2F: case 0x4E: case 0x4F: //abs RW
 		case 0x6E: case 0x6F: case 0xCE: case 0xCF: case 0xEE: case 0xEF:
 			CpuRead(++PC);
@@ -437,14 +441,16 @@ void Nes::RunOpcode()
 			++PC;
 			CpuRead(op1 | (dataBus << 8));
 			CpuWrite(addressBus, dataBus);
-			break;
+		break;
+
 		case 0x16: case 0x17: case 0x36: case 0x37: case 0x56: case 0x57: //z,x RW
 		case 0x76: case 0x77: case 0xD6: case 0xD7: case 0xF6: case 0xF7:
 			++PC;
 			CpuRead(op1);
 			CpuRead(uint8_t(op1 + rX));
 			CpuWrite(addressBus, dataBus);
-			break;
+		break;
+
 		case 0x1E: case 0x1F: case 0x3E: case 0x3F: case 0x5E: case 0x5F: //abs,x RW
 		case 0x7E: case 0x7F: case 0xDE: case 0xDF: case 0xFE: case 0xFF:
 			CpuRead(++PC);
@@ -453,7 +459,8 @@ void Nes::RunOpcode()
 			CpuRead(uint8_t(op1 + rX) | (tempData << 8));
 			CpuRead(op1 + rX + (tempData << 8));
 			CpuWrite(addressBus, dataBus);
-			break;
+		break;
+
 		case 0x1B: case 0x3B: case 0x5B: case 0x7B: case 0xDB: case 0xFB: //abs,y RW
 			CpuRead(++PC);
 			tempData = dataBus;
@@ -461,7 +468,8 @@ void Nes::RunOpcode()
 			CpuRead(uint8_t(op1 + rY) | (tempData << 8));
 			CpuRead(op1 + rY + (tempData << 8));
 			CpuWrite(addressBus, dataBus);
-			break;
+		break;
+
 		case 0x03: case 0x23: case 0x43: case 0x63: case 0xC3: case 0xE3: //(indir,x) RW
 			++PC;
 			CpuRead(op1);
@@ -470,7 +478,8 @@ void Nes::RunOpcode()
 			CpuRead(uint8_t(addressBus + 1));
 			CpuRead(tempData | (dataBus << 8));
 			CpuWrite(addressBus, dataBus);
-			break;
+		break;
+
 		case 0x13: case 0x33: case 0x53: case 0x73: case 0xD3: case 0xF3: //(ind),y RW
 			++PC;
 			CpuRead(op1);
@@ -479,7 +488,7 @@ void Nes::RunOpcode()
 			CpuRead(uint8_t(tempData + rY) | (dataBus << 8));
 			CpuRead(addressBus + (tempData + rY & 0x0100));
 			CpuWrite(addressBus, dataBus);
-			break;
+		break;
 
 		case 0x01: case 0x21: case 0x41: case 0x61: //(indirect,x) / indexed indirect R
 		case 0xA1: case 0xA3: case 0xC1: case 0xE1:
@@ -953,40 +962,26 @@ void Nes::CpuOpDone()
 		dmaPending = false;
 	}
 
-	if(nmiPending[2])
+
+	if(nmiPending[2] | irqPending[2])
 	{
 		CpuRead(addressBus);                                //fetch op1, increment suppressed
 		CpuWrite(0x100 | rS--, PC >> 8);                    //push PC high on stack
 		CpuWrite(0x100 | rS--, PC);                         //push PC low on stack
+
+		//determine if this is an IRQ or NMI, also see if NMI will hijack an IRQ (0xFFFE -> 0xFFFA)
+		const uint16_t interruptVector = (nmiPending[0]) ? 0xFFFA : 0xFFFE;
+
 		CpuWrite(0x100 | rS--, rP.to_ulong() & 0b11101111); //push flags on stack with B clear
+		rP.set(2);                                          //read vector low, set I flag
+		CpuRead(interruptVector);                           //
+		tempData = dataBus;                                 //
 
-		rP.set(2);                                          //read nmi vector low, set I flag
-		CpuRead(0xFFFA);                                    //
-		tempData = dataBus;
-		CpuRead(0xFFFB);                                    //read nmi vector high
+		if(nmiPending[2]) nmiPending[0] = false;            //not quite correct but OK for now
 
+		CpuRead(interruptVector + 1);                       //read vector high
 		PC = tempData | (dataBus << 8);                     //fetch next opcode
 		CpuRead(PC);                                        //
-
-		nmiPending[0] = false;
-		irqPending[1] = false;
-	}
-	else if(irqPending[1])
-	{
-		CpuRead(addressBus);                                //fetch op1, increment suppressed
-		CpuWrite(0x100 | rS--, PC >> 8);                    //push PC high on stack
-		CpuWrite(0x100 | rS--, PC);                         //push PC low on stack
-		CpuWrite(0x100 | rS--, rP.to_ulong() & 0b11101111); //push flags on stack with B clear
-
-		rP.set(2);                                          //read irq vector low, set I flag
-		CpuRead(0xFFFE);                                    //
-		tempData = dataBus;
-		CpuRead(0xFFFF);                                    //read irq vector high
-
-		PC = tempData | (dataBus << 8);                     //fetch next opcode
-		CpuRead(PC);                                        //
-
-		irqPending[0] = false;
 	}
 }
 
@@ -1000,13 +995,17 @@ void Nes::PollInterrupts()
 	nmi = ppu.PollNmi();
 	nmiPending[0] |= !oldNmi & nmi; //nmiPending[0] gets set = nmi detected, but interrupt polling will miss
 
-	irqPending[1] = irqPending[0];                          //first cycle after irqPending[0] set, polling will see now
-	irqPending[0] = !rP.test(2) & apu.PollFrameInterrupt(); //irq detected but polling will miss
+
+	irqPending[2] = irqPending[1]; //same as nmi
+	irqPending[1] = irqPending[0];
+	irqPending[0] = !rP.test(2) & apu.PollFrameInterrupt();
 }
 
 
 void Nes::Branch(const bool flag, const uint8_t op1)
 {
+	//todo: interaction with interrupts
+
 	++PC;
 	if(flag)
 	{

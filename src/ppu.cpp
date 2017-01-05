@@ -21,6 +21,13 @@ void Ppu::CtrlWrite(uint8_t dataBus) //2000
 void Ppu::MaskWrite(uint8_t dataBus) //2001
 {
 	ppuMask = dataBus;
+
+	// grayscaleMask = (dataBus & 1) ? 0x30: 0xFF;
+
+	// emphasisMask = 0xFFFFFFFF;
+	// if(dataBus & 0b00100000) emphasisMask &= 0xC0C0FF; //red
+	// if(dataBus & 0b01000000) emphasisMask &= 0xC0FFC0; //green
+	// if(dataBus & 0b10000000) emphasisMask &= 0xFFC0C0; //blue
 }
 
 
@@ -182,7 +189,7 @@ void Ppu::Tick()
 		if(ppuMask & 0b00011000)
 		{
 			RenderFetches();
-			if(oddFrame && scanlineH == 339)
+			if(oddFrame && scanlineH == 339) //338 passes ppu_vbl_nmi 10
 			{
 				++scanlineH;
 			}
@@ -207,13 +214,12 @@ void Ppu::VisibleScanlines()
 {
 	if(scanlineH && scanlineH <= 256)
 	{
-		ppuStatus |= spriteHit; //sprite 0 hit, delayed by one dot
-
 		uint8_t spritePixel = 0;
 		bool spritePriority = true; //false puts sprite in front of BG
 		bool opaqueSprite0 = false;
 		if(ppuMask & 0b00010000)
 		{
+			ppuStatus |= spriteHit; //sprite 0 hit, delayed by one dot
 			for(uint8_t x = 0; x < 8; ++x)
 			{
 				if(!spriteXpos[x])
@@ -272,6 +278,7 @@ void Ppu::VisibleScanlines()
 		}
 
 		render[renderPos++] = palette[pIndex];
+		// render[renderPos++] = palette[pIndex & grayscaleMask] & emphasisMask;
 	}
 
 	if(ppuMask & 0b00011000)

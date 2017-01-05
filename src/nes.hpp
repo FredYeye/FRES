@@ -48,7 +48,7 @@ class Nes
 
 		bool nmi = false;
 		std::array<bool, 3> nmiPending{};
-		std::array<bool, 2> irqPending{};
+		std::array<bool, 3> irqPending{};
 
 		bool dmaPending = false;
 		bool dmcDmaActive = false;
