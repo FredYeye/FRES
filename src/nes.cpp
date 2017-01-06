@@ -962,7 +962,6 @@ void Nes::CpuOpDone()
 		dmaPending = false;
 	}
 
-
 	if(nmiPending[2] | irqPending[2])
 	{
 		CpuRead(addressBus);                                //fetch op1, increment suppressed

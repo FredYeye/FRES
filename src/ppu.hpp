@@ -90,6 +90,7 @@ class Ppu
 		uint8_t oam2Index = 0;
 		uint8_t oamEvalPattern = 0;
 		uint8_t oamSpritenum = 0; //0-3 = sprite0, 4-7 = sprite1 [...] 252-255 = sprite63
+		uint8_t oamDiagonal = 0;
 
 		bool renderFrame = false;
 		bool suppressNmi = false;

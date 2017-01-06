@@ -115,6 +115,7 @@ class Apu
 
 		//wood & water rage produces 741-744 samples on intro->menu transition, so add some extra for now
 		//is this supposed to happen?
+		//this should be because a dma or something similar happens when the emulator wants to render
 		std::array<float, 752*2> apuSamples{};
 		uint8_t nearestCounter = 0;
 		uint8_t outI = 0;

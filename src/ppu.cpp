@@ -503,16 +503,19 @@ void Ppu::OamScan()
 			}
 			else if(oamEvalPattern == 4) //entire oam searched
 			{
-				oamSpritenum += 4;
+				// oamSpritenum += 4; //do nothing
 			}
 			else //search for overflow
 			{
-				if(scanlineV >= oam[oamSpritenum] && scanlineV < oam[oamSpritenum] + 8 + ((ppuCtrl & 0b00100000) >> 2))
+				if(scanlineV >= oam[oamSpritenum + oamDiagonal] && scanlineV < oam[oamSpritenum + oamDiagonal] + 8 + ((ppuCtrl & 0b00100000) >> 2))
 				{
 					ppuStatus |= 0b00100000;
+					oamEvalPattern = 4;
 				}
-				oamSpritenum += 5; //incorrect, should be +=4, +0-3 (inc n and m w/o carry)
-				if(oamSpritenum <= 4) //stop searching. <= 4 instead of 0 since increment is bugged
+				oamSpritenum += 4;
+				++oamDiagonal &= 0b11; //HW bug: search oam "diagonally" by adding 0-3 per search
+
+				if(oamSpritenum == 0) //stop searching. <= 4 instead of 0 since increment is bugged
 				{
 					oamEvalPattern = 4;
 				}
@@ -523,6 +526,7 @@ void Ppu::OamScan()
 			oam2Index = 0;
 			oamSpritenum = 0;
 			oamEvalPattern = 0;
+			oamDiagonal = 0;
 		}
 	}
 }
@@ -535,7 +539,7 @@ void Ppu::OamUpdateIndex()
 	{
 		oamEvalPattern = 4;
 	}
-	else if(oam2Index < 32)
+	else if(oam2Index < 32) //search for next sprite
 	{
 		oamEvalPattern = 0;
 	}
