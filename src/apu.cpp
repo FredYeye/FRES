@@ -56,7 +56,6 @@ void Apu::Pulse3Write(uint8_t dataBus, bool channel)
 	{
 		pulse[channel].lengthCounter = lengthTable[dataBus >> 3];
 	}
-	pulse[channel].freqCounter = pulse[channel].freqTimer;
 	pulse[channel].dutyCounter = 1;
 	pulse[channel].envelopeReset = true;
 }
