@@ -20,6 +20,7 @@ void Ppu::CtrlWrite(uint8_t dataBus) //2000
 
 void Ppu::MaskWrite(uint8_t dataBus) //2001
 {
+	//delaying this write by 2-3 dots makes battletoads stage 2 function better, figure out why
 	ppuMask = dataBus;
 
 	// grayscaleMask = (dataBus & 1) ? 0x30: 0xFF;
@@ -61,6 +62,10 @@ void Ppu::OamAddrWrite(uint8_t dataBus) //2003
 const uint8_t Ppu::OamDataRead() const //2004
 {
 	//do more stuff (reads while sprite eval is running)
+	if((oamAddr & 0b11) == 0b10) //mask out unimplemented bits in attribyte byte
+	{
+		return oam[oamAddr] & 0b11100011;
+	}
 	return oam[oamAddr];
 }
 
@@ -125,12 +130,21 @@ uint8_t Ppu::DataRead() //2007
 		ppuAddress += (ppuCtrl & 0b0100) ? 0x20 : 0x01;
 		return currentLatch;
 	}
-	// else
-	// {
-		//increment coarse Y and X
-		// if X or Y has been updated already, skip
-		// is this during all dots?
-	// }
+	else
+	{
+		const uint16_t dot = scanlineH - 1; //same as 2002, -1 because it's already been incremented?
+		if(dot != 256)
+		{
+			YIncrement();
+		}
+		if(dot >= 1 && dot <= 256 || dot >= 321)
+		{
+			if(dot & 0b111 != 0)
+			{
+				CoarseXIncrement();
+			}
+		}
+	}
 
 	return 0;
 }
@@ -158,7 +172,21 @@ void Ppu::DataWrite(uint8_t dataBus) //2007
 		}
 		ppuAddress += (ppuCtrl & 0b0100) ? 0x20 : 0x01;
 	}
-	// else //see 2007 read
+	else
+	{
+		const uint16_t dot = scanlineH - 1; //same as 2002, -1 because it's already been incremented?
+		if(dot != 256)
+		{
+			YIncrement();
+		}
+		if(dot >= 1 && dot <= 256 || dot >= 321)
+		{
+			if(dot & 0b111 != 0)
+			{
+				CoarseXIncrement();
+			}
+		}
+	}
 }
 
 
@@ -293,42 +321,14 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 {
 	if((scanlineH && scanlineH <= 256) || scanlineH >= 321)
 	{
-		if(scanlineH == 256) //Y increment
+		if(scanlineH == 256)
 		{
-			if(ppuAddress < 0x7000)
-			{
-				ppuAddress += 0x1000;
-			}
-			else
-			{
-				ppuAddress &= 0xFFF;
-				if((ppuAddress & 0x3E0) == 0x3A0)
-				{
-					ppuAddress ^= 0x3A0 | 0x800; //clear coarse Y (0x3A0) and flip nametable (0x800)
-				}
-				else if((ppuAddress & 0x3E0) == 0x3E0)
-				{
-					ppuAddress &= 0xC1F;
-				}
-				else
-				{
-					ppuAddress += 0x20;
-				}
-			}
+			YIncrement();
 		}
 
 		switch(scanlineH & 0x07)
 		{
-			case 0: //coarse X increment
-				if((ppuAddress & 0x1F) != 0x1F)
-				{
-					++ppuAddress;
-				}
-				else
-				{
-					ppuAddress ^= 0x1F | 0x400; //clear coarse X (0x1F) and flip nametable (0x400)
-				}
-			break;
+			case 0: CoarseXIncrement(); break;
 
 			//value is determined on the first cycle of each fetch (1,3,5,7)
 			case 1: //NT
@@ -515,7 +515,7 @@ void Ppu::OamScan()
 				oamSpritenum += 4;
 				++oamDiagonal &= 0b11; //HW bug: search oam "diagonally" by adding 0-3 per search
 
-				if(oamSpritenum == 0) //stop searching. <= 4 instead of 0 since increment is bugged
+				if(oamSpritenum == 0) //stop searching
 				{
 					oamEvalPattern = 4;
 				}
@@ -546,6 +546,44 @@ void Ppu::OamUpdateIndex()
 	else if(oam2Index == 32) //8 sprites found
 	{
 		oamEvalPattern = 5;
+	}
+}
+
+
+void Ppu::YIncrement()
+{
+	if(ppuAddress < 0x7000)
+	{
+		ppuAddress += 0x1000;
+	}
+	else
+	{
+		ppuAddress &= 0xFFF;
+		if((ppuAddress & 0x3E0) == 0x3A0)
+		{
+			ppuAddress ^= 0x3A0 | 0x800; //clear coarse Y (0x3A0) and flip nametable (0x800)
+		}
+		else if((ppuAddress & 0x3E0) == 0x3E0)
+		{
+			ppuAddress &= 0xC1F;
+		}
+		else
+		{
+			ppuAddress += 0x20;
+		}
+	}
+}
+
+
+void Ppu::CoarseXIncrement()
+{
+	if((ppuAddress & 0x1F) != 0x1F)
+	{
+		++ppuAddress;
+	}
+	else
+	{
+		ppuAddress ^= 0x1F | 0x400; //clear coarse X (0x1F) and flip nametable (0x400)
 	}
 }
 
@@ -596,6 +634,12 @@ void Ppu::SetNametableMirroring(const std::array<NametableOffset, 4> &offset)
 	{
 		pNametable[x] = nametable.data() + offset[x];
 	}
+}
+
+
+void Ppu::SetPatternBank(uint8_t bank, uint16_t offset)
+{
+	pPattern[bank] = pattern.data() + (offset << 10);
 }
 
 

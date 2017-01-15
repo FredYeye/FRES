@@ -33,6 +33,7 @@ class Ppu
 		uint16_t GetScanlineV() const;
 
 		void SetNametableMirroring(const std::array<NametableOffset, 4> &offset);
+		void SetPatternBank(uint8_t bank, uint16_t offset);
 		void SetPatternBanks(const uint8_t dataBus);
 		void SetPattern(std::vector<uint8_t> &chr);
 
@@ -41,6 +42,10 @@ class Ppu
 		void RenderFetches();
 		void OamScan();
 		void OamUpdateIndex();
+
+		void YIncrement();
+		void CoarseXIncrement();
+
 		void ReverseBits(uint8_t &b) const;
 
 		std::array<uint32_t, 256*240> render;
