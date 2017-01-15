@@ -5,10 +5,10 @@
 
 #include "cart.hpp"
 #include "file.hpp"
-// #include "sha1.hpp"
+#include "sha1.hpp"
 
 
-Cart::Cart(const std::string inFile, std::vector<uint8_t> &prgRom)
+Cart::Cart(const std::string inFile, std::vector<uint8_t> &prgRom, std::vector<uint8_t> &prgRam)
 {
 	std::vector<uint8_t> fileContent = FileToU8Vec(inFile);
 
@@ -22,19 +22,82 @@ Cart::Cart(const std::string inFile, std::vector<uint8_t> &prgRom)
 	}
 	fileContent.erase(fileContent.begin(), fileContent.begin() + 0x10);
 
-	mapper = (header[6] >> 4) | (header[7] & 0b11110000);
-	if(mapper == 0 || mapper == 2 || mapper == 3 || mapper == 7)
-	{
-		prgRom.assign(fileContent.begin(), fileContent.begin() + header[4] * 0x4000);
-		SetDefaultPrgBanks(prgRom);
 
-		SetChrMem(fileContent);
-		SetDefaultNametableLayout();
+	const std::array<uint32_t, 5> sha1 = SHA1(fileContent);
+	if(cartInfo.count(sha1))
+	{
+		std::cout << "Game recognized\n";
+		const cartAttributes attr = cartInfo.at(sha1);
+		type = attr.type;
+
+		const auto prgRomEnd = fileContent.begin() + attr.prg * 1024;
+		prgRom.assign(fileContent.begin(), prgRomEnd);
+		SetDefaultPrgBanksSha(prgRom, attr);
+
+		if(attr.wram)
+		{
+			prgRam.resize(attr.wram * 1024);
+
+			for(int x = 0; x < 4; ++x)
+			{
+				pPrgRamBank[x] = prgRam.data() + (x & (attr.wram >> 1) - 1);
+			}
+		}
+
+		if(!attr.isChrRam)
+		{
+			const auto chrRomEnd = prgRomEnd + attr.chr * 1024;
+			chrMem.assign(prgRomEnd, chrRomEnd);
+		}
+		else
+		{
+			chrMem.resize(attr.chr * 1024);
+		}
+
+		switch(attr.nametableLayout)
+		{
+			case vertical  : nametableOffsets = {A, A, B, B}; break;
+			case horizontal: nametableOffsets = {A, B, A, B}; break;
+			case single    : nametableOffsets = {A, A, A, A}; break;
+		}
 	}
 	else
 	{
-		std::cout << "unsupported mapper\n" << +mapper;
-		exit(0);
+		mapper = (header[6] >> 4) | (header[7] & 0b11110000);
+		if(mapper == 0 || mapper == 2 || mapper == 3 || mapper == 7)
+		{
+			prgRom.assign(fileContent.begin(), fileContent.begin() + header[4] * 0x4000);
+			SetDefaultPrgBanks(prgRom);
+
+			SetChrMem(fileContent);
+			SetDefaultNametableLayout();
+		}
+		else
+		{
+			std::cout << "unsupported mapper\n" << +mapper;
+			exit(0);
+		}
+	}
+}
+
+
+void Cart::SetDefaultPrgBanksSha(std::vector<uint8_t> &prgRom, cartAttributes attr)
+{
+	switch(attr.type)
+	{
+		case NES_NROM: case NES_UNROM: case NES_CNROM: case KONAMI_VRC_4:
+			pPrgBank[0] = prgRom.data();
+			pPrgBank[1] = prgRom.data() + 0x2000;
+			pPrgBank[2] = prgRom.data() + (attr.prg - 16) * 1024;
+			pPrgBank[3] = prgRom.data() + (attr.prg - 8) * 1024;
+		break;
+
+		case NES_AOROM:
+			pPrgBank[0] = prgRom.data();
+			pPrgBank[1] = prgRom.data() + 0x2000;
+			pPrgBank[2] = prgRom.data() + 0x4000;
+			pPrgBank[3] = prgRom.data() + 0x6000;
+		break;
 	}
 }
 
@@ -106,7 +169,7 @@ void Cart::SetDefaultNametableLayout()
 		}
 		else
 		{
-			nametableOffsets = {A, A, C, C}; //vertical arrangement
+			nametableOffsets = {A, A, B, B}; //vertical arrangement
 		}
 	}
 	else if(mapper == 7)
