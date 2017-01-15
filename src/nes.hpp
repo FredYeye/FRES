@@ -6,6 +6,21 @@
 
 #include "apu.hpp"
 #include "ppu.hpp"
+#include "cart.hpp"
+
+
+struct VRC4
+{
+	std::array<uint16_t, 8> chrSelect{};
+	int16_t prescalerCounter2 = 341;
+	uint8_t prgMode = 0;
+	uint8_t irqLatch = 0;
+	uint8_t irqCounter = 0;
+	bool irqPending = false;
+	bool irqEnable = false;
+	bool irqAckEnable = false;
+	bool irqMode = false;
+};
 
 
 class Nes
@@ -29,6 +44,10 @@ class Nes
 		void DebugCpu(uint8_t opcode);
 		uint8_t DebugRead(uint16_t address);
 
+		void Addons();
+		void VRC4Registers();
+		bool VRC4Interrupt();
+
 		uint32_t cycleCount = 0;
 
 		uint16_t PC;
@@ -44,6 +63,9 @@ class Nes
 		std::vector<uint8_t> prgRom;
 		std::array<uint8_t*, 4> pPrgBank;
 
+		std::vector<uint8_t> prgRam;
+		std::array<uint8_t*, 4> pPrgRamBank;
+
 		bool readJoy1 = false;
 
 		bool nmi = false;
@@ -54,5 +76,8 @@ class Nes
 		bool dmcDmaActive = false;
 
 		uint8_t mapper;
+		Type type;
 		uint8_t tempData;
+
+		VRC4 vrc4;
 };

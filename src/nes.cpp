@@ -8,15 +8,15 @@
 #include "nes.hpp"
 #include "apu.hpp"
 #include "ppu.hpp"
-#include "cart.hpp"
 
 
 Nes::Nes(std::string inFile)
 {
-	Cart cart(inFile, prgRom);
+	Cart cart(inFile, prgRom, prgRam);
 	mapper = cart.mapper;
-	// prgRom = cart.prgRom;
+	type = cart.type;
 	pPrgBank = cart.pPrgBank;
+	pPrgRamBank = cart.pPrgRamBank;
 	ppu.SetPattern(cart.chrMem);
 	ppu.SetNametableMirroring(cart.nametableOffsets);
 
@@ -93,7 +93,7 @@ void Nes::RunOpcode()
 			CpuWrite(0x0100 | rS--, PC >> 8);
 			CpuWrite(0x0100 | rS--, PC);
 		{
-			const uint16_t interruptVector = (nmiPending[0]) ? 0xFFFA : 0xFFFE;//possible NMI hijack
+			const uint16_t interruptVector = (nmiPending[0]) ? 0xFFFA : 0xFFFE; //possible NMI hijack
 			CpuWrite(0x0100 | rS--, rP.to_ulong() | 0b00010000);
 
 			rP.set(2);
@@ -113,15 +113,15 @@ void Nes::RunOpcode()
 
 		case 0x08: //PHP
 			CpuWrite(0x0100 | rS--, rP.to_ulong() | 0b00010000);
-			break;
+		break;
 		case 0x28: //PLP
 			CpuRead(0x0100 | rS++);
 			CpuRead(0x0100 | rS);
 			rP = dataBus | 0x20;
-			break;
+		break;
 		case 0x48: //PHA
 			CpuWrite(0x0100 | rS--, rA);
-			break;
+		break;
 		case 0x68: //PLA
 			CpuRead(0x0100 | rS++);
 			CpuRead(0x0100 | rS);
@@ -136,7 +136,7 @@ void Nes::RunOpcode()
 			rA <<= 1;
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
-			break;
+		break;
 		case 0x2A: //ROL acc
 		{
 			const bool newCarry = rA & 0x80;
@@ -145,69 +145,39 @@ void Nes::RunOpcode()
 		}
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
-			break;
+		break;
 		case 0x4A: //LSR acc
 			rP[0] = rA & 0x01;
 			rA >>= 1;
 			rP[1] = !rA;
 			rP.reset(7);
-			break;
+		break;
 		case 0x6A: //ROR acc
-			{
+		{
 			const bool newCarry = rA & 0x01;
 			rA = (rA >> 1) | (rP[0] << 7);
 			rP[0] = newCarry;
-			}
+		}
 			rP[1] = !rA;
 			rP[7] = rA & 0x80;
 		break;
 
-		case 0x10: //BPL
-			Branch(!rP[7], op1);
-			break;
-		case 0x30: //BMI
-			Branch(rP[7], op1);
-			break;
-		case 0x50: //BVC
-			Branch(!rP[6], op1);
-			break;
-		case 0x70: //BVS
-			Branch(rP[6], op1);
-			break;
-		case 0x90: //BCC
-			Branch(!rP[0], op1);
-			break;
-		case 0xB0: //BCS
-			Branch(rP[0], op1);
-			break;
-		case 0xD0: //BNE
-			Branch(!rP[1], op1);
-			break;
-		case 0xF0: //BEQ
-			Branch(rP[1], op1);
-		break;
+		case 0x10: Branch(!rP[7], op1); break; //BPL
+		case 0x30: Branch(rP[7], op1);  break; //BMI
+		case 0x50: Branch(!rP[6], op1); break; //BVC
+		case 0x70: Branch(rP[6], op1);  break; //BVS
+		case 0x90: Branch(!rP[0], op1); break; //BCC
+		case 0xB0: Branch(rP[0], op1);  break; //BCS
+		case 0xD0: Branch(!rP[1], op1); break; //BNE
+		case 0xF0: Branch(rP[1], op1);  break; //BEQ
 
-		case 0x18: //CLC
-			rP.reset(0);
-			break;
-		case 0x38: //SEC
-			rP.set(0);
-			break;
-		case 0x58: //CLI
-			rP.reset(2);
-			break;
-		case 0x78: //SEI
-			rP.set(2);
-			break;
-		case 0xB8: //CLV
-			rP.reset(6);
-			break;
-		case 0xD8: //CLD
-			rP.reset(3);
-			break;
-		case 0xF8: //SED
-			rP.set(3);
-		break;
+		case 0x18: rP.reset(0); break; //CLC
+		case 0x38: rP.set(0);   break; //SEC
+		case 0x58: rP.reset(2); break; //CLI
+		case 0x78: rP.set(2);   break; //SEI
+		case 0xB8: rP.reset(6); break; //CLV
+		case 0xD8: rP.reset(3); break; //CLD
+		case 0xF8: rP.set(3);   break; //SED
 
 		case 0x20: //JSR
 			++PC;
@@ -805,7 +775,17 @@ void Nes::CpuRead(const uint16_t address)
 			}
 		break;
 
-		case 0x6000: break;
+		case 0x6000:
+			if(prgRam.size()) //do something else if 7000 && vrc4
+			{
+				dataBus = *(pPrgRamBank[(addressBus >> 11) & 0b11] + (addressBus & 0x7FF));
+			}
+			else
+			{
+				dataBus = addressBus >> 8;
+			}
+		break;
+
 		case 0x8000: dataBus = *(pPrgBank[0] + (addressBus & 0x1FFF)); break;
 		case 0xA000: dataBus = *(pPrgBank[1] + (addressBus & 0x1FFF)); break;
 		case 0xC000: dataBus = *(pPrgBank[2] + (addressBus & 0x1FFF)); break;
@@ -894,34 +874,15 @@ void Nes::CpuWrite(const uint16_t address, const uint8_t data)
 			}
 		break;
 
-		case 0x6000: break;
+		case 0x6000:
+			if(prgRam.size()) //do something else if 7000 && vrc4
+			{
+				*(pPrgRamBank[(addressBus >> 11) & 0b11] + (addressBus & 0x7FF)) = dataBus;
+			}
+		break;
 
 		case 0x8000: case 0xA000: case 0xC000: case 0xE000:
-			if(mapper == 2)
-			{
-				pPrgBank[0] = &prgRom[(dataBus & 0b1111) * 0x4000];
-				pPrgBank[1] = pPrgBank[0] + 0x2000;
-			}
-			else if(mapper == 3)
-			{
-				ppu.SetPatternBanks(dataBus & 0b0011);
-			}
-			else if(mapper == 7)
-			{
-				pPrgBank[0] = &prgRom[(dataBus & 0b0111) * 0x8000];
-				pPrgBank[1] = pPrgBank[0] + 0x2000;
-				pPrgBank[2] = pPrgBank[0] + 0x4000;
-				pPrgBank[3] = pPrgBank[0] + 0x6000;
-
-				if(dataBus & 0b00010000)
-				{
-					ppu.SetNametableMirroring({B,B,B,B});
-				}
-				else
-				{
-					ppu.SetNametableMirroring({A,A,A,A});
-				}
-			}
+			Addons();
 		break;
 	}
 
@@ -994,10 +955,9 @@ void Nes::PollInterrupts()
 	nmi = ppu.PollNmi();
 	nmiPending[0] |= !oldNmi & nmi; //nmiPending[0] gets set = nmi detected, but interrupt polling will miss
 
-
 	irqPending[2] = irqPending[1]; //same as nmi
 	irqPending[1] = irqPending[0];
-	irqPending[0] = !rP.test(2) & apu.PollFrameInterrupt();
+	irqPending[0] = !rP.test(2) & (apu.PollFrameInterrupt() | VRC4Interrupt()); //or with some general cartIRQ later
 }
 
 
@@ -1074,4 +1034,138 @@ uint8_t Nes::DebugRead(uint16_t address)
 	}
 
 	return a;
+}
+
+
+//put this elsewhere later
+void Nes::Addons()
+{
+	if(mapper == 2 || type == NES_UNROM)
+	{
+		pPrgBank[0] = &prgRom[(dataBus & 0b1111) * 0x4000];
+		pPrgBank[1] = pPrgBank[0] + 0x2000;
+	}
+	else if(mapper == 3 || type == NES_CNROM)
+	{
+		ppu.SetPatternBanks(dataBus & 0b0011);
+	}
+	else if(mapper == 7 || type == NES_AOROM)
+	{
+		pPrgBank[0] = &prgRom[(dataBus & 0b0111) * 0x8000];
+		pPrgBank[1] = pPrgBank[0] + 0x2000;
+		pPrgBank[2] = pPrgBank[0] + 0x4000;
+		pPrgBank[3] = pPrgBank[0] + 0x6000;
+
+		if(dataBus & 0b00010000)
+		{
+			ppu.SetNametableMirroring({B,B,B,B});
+		}
+		else
+		{
+			ppu.SetNametableMirroring({A,A,A,A});
+		}
+	}
+	else if(type == KONAMI_VRC_4)
+	{
+		VRC4Registers();
+	}
+}
+
+
+void Nes::VRC4Registers()
+{
+	const uint16_t vrc4Address = (addressBus & 0xFF00) | ((addressBus & 0xFF) >> 2);
+	switch(vrc4Address)
+	{
+		case 0x8000: case 0x8001: case 0x8002: case 0x8003:
+			pPrgBank[vrc4.prgMode] = prgRom.data() + ((dataBus & 0b00011111) << 13);
+		break;
+		case 0x9000: case 0x9001:
+			switch(dataBus & 0b11)
+			{
+				case 0: ppu.SetNametableMirroring({A,B,A,B}); break;
+				case 1: ppu.SetNametableMirroring({A,A,B,B}); break;
+				case 2: ppu.SetNametableMirroring({A,A,A,A}); break;
+				case 3: ppu.SetNametableMirroring({B,B,B,B}); break;
+			}
+		break;
+		case 0x9002: case 0x9003:
+			if(vrc4.prgMode != dataBus & 0b10)
+			{
+				uint8_t *tempBank = pPrgBank[0];
+				pPrgBank[0] = pPrgBank[2];
+				pPrgBank[2] = tempBank;
+			}
+			vrc4.prgMode = dataBus & 0b10;
+		break;
+		case 0xA000: case 0xA001: case 0xA002: case 0xA003:
+			pPrgBank[1] = prgRom.data() + ((dataBus & 0b00011111) << 13);
+		break;
+
+		case 0xB000: case 0xB002: case 0xC000: case 0xC002: case 0xD000: case 0xD002: case 0xE000: case 0xE002:
+		{
+			const uint8_t regSelect = ((vrc4Address >> 11) - 0x16) | ((vrc4Address >> 1) & 1);
+			vrc4.chrSelect[regSelect] = (vrc4.chrSelect[regSelect] & 0x01F0) | (dataBus & 0b1111);
+			ppu.SetPatternBank(regSelect, vrc4.chrSelect[regSelect]);
+		}
+		break;
+		case 0xB001: case 0xB003: case 0xC001: case 0xC003: case 0xD001: case 0xD003: case 0xE001: case 0xE003:
+		{
+			const uint8_t regSelect = ((vrc4Address >> 11) - 0x16) | ((vrc4Address >> 1) & 1);
+			vrc4.chrSelect[regSelect] = (vrc4.chrSelect[regSelect] & 0x0F) | ((dataBus & 0b00011111) << 4);
+			ppu.SetPatternBank(regSelect, vrc4.chrSelect[regSelect]);
+		}
+		break;
+
+		case 0xF000:
+			vrc4.irqLatch &= 0b11110000;
+			vrc4.irqLatch |= dataBus & 0b1111;
+		break;
+		case 0xF001:
+			vrc4.irqLatch &= 0b1111;
+			vrc4.irqLatch |= dataBus << 4;
+		break;
+		case 0xF002:
+			vrc4.irqPending = false;
+			vrc4.irqAckEnable = dataBus & 1;
+			vrc4.irqEnable = dataBus & 0b10;
+			vrc4.irqMode = dataBus & 0b0100;
+			if(vrc4.irqEnable)
+			{
+				vrc4.irqCounter = vrc4.irqLatch;
+				vrc4.prescalerCounter2 = 341;
+			}
+		break;
+		case 0xF003:
+			vrc4.irqPending = false;
+			vrc4.irqEnable = vrc4.irqAckEnable;
+		break;
+	}
+}
+
+
+bool Nes::VRC4Interrupt()
+{
+	if(vrc4.irqEnable)
+	{
+		if(vrc4.irqCounter == 0xFF)
+		{
+			vrc4.irqPending = true;
+			vrc4.irqCounter = vrc4.irqLatch;
+		}
+		else if(vrc4.irqMode == true)
+		{
+			++vrc4.irqCounter;
+		}
+		else
+		{
+			vrc4.prescalerCounter2 -= 3;
+			if(vrc4.prescalerCounter2 <= 0)
+			{
+				++vrc4.irqCounter;
+				vrc4.prescalerCounter2 += 341;
+			}
+		}
+	}
+	return vrc4.irqPending;
 }
