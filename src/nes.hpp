@@ -22,6 +22,18 @@ struct VRC4
 	bool irqMode = false;
 };
 
+struct MMC1
+{
+	uint32_t lastWrittenTo = 0;
+	uint8_t shiftReg = 0b100000;
+	uint8_t prgMode = 0b11;
+	uint8_t prg = 0;
+	bool wramEnable = 0;
+	bool chrMode = 0;
+	uint8_t chr0 = 0;
+	uint8_t chr1 = 0;
+};
+
 
 class Nes
 {
@@ -45,6 +57,7 @@ class Nes
 		uint8_t DebugRead(uint16_t address);
 
 		void Addons();
+		void MMC1Registers();
 		void VRC4Registers();
 		bool VRC4Interrupt();
 
@@ -80,4 +93,5 @@ class Nes
 		uint8_t tempData;
 
 		VRC4 vrc4;
+		MMC1 mmc1;
 };

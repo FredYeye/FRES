@@ -1047,7 +1047,7 @@ void Nes::Addons()
 	}
 	else if(mapper == 3 || type == NES_CNROM)
 	{
-		ppu.SetPatternBanks(dataBus & 0b0011);
+		ppu.SetPatternBanks8(dataBus & 0b0011);
 	}
 	else if(mapper == 7 || type == NES_AOROM)
 	{
@@ -1069,6 +1069,122 @@ void Nes::Addons()
 	{
 		VRC4Registers();
 	}
+	else if(type == NES_SLROM)
+	{
+		MMC1Registers();
+	}
+}
+
+
+void Nes::MMC1Registers()
+{
+	if(mmc1.lastWrittenTo != cycleCount - 1) //compare with previous write to disallow consecutive writes
+	{
+		if(dataBus & 0x80)
+		{
+			mmc1.shiftReg = 0b100000;
+			mmc1.prgMode = 0b11;
+			pPrgBank[0] = prgRom.data() + (mmc1.prg << 14);
+			pPrgBank[1] = pPrgBank[0] + 8 * 1024;
+			pPrgBank[2] = prgRom.data() + prgRom.size() - 16 * 1024;
+			pPrgBank[3] = pPrgBank[2] + 8 * 1024;
+		}
+		else
+		{
+			mmc1.shiftReg |= (dataBus & 1) << 6;
+			mmc1.shiftReg >>= 1;
+			if(mmc1.shiftReg & 1)
+			{
+				mmc1.shiftReg >>= 1;
+				switch(addressBus >> 13)
+				{
+					case 0x8000 >> 13:
+						switch(mmc1.shiftReg & 0b11)
+						{
+							case 0: ppu.SetNametableMirroring({A,A,A,A}); break;
+							case 1: ppu.SetNametableMirroring({B,B,B,B}); break;
+							case 2: ppu.SetNametableMirroring({A,B,A,B}); break;
+							case 3: ppu.SetNametableMirroring({A,A,B,B}); break;
+						}
+
+						mmc1.prgMode = (mmc1.shiftReg >> 2) & 0b11;
+						switch(mmc1.prgMode)
+						{
+							case 0: case 1: //32k mode
+								pPrgBank[0] = prgRom.data() + ((mmc1.prg & 0b11110) << 15);
+								pPrgBank[2] = pPrgBank[0] + 16 * 1024;
+							break;
+							case 2: //low bank fixed, high switchable
+								pPrgBank[0] = prgRom.data();
+								pPrgBank[2] = prgRom.data() + (mmc1.prg << 14);
+							break;
+							case 3: //high bank fixed, low switchable
+								pPrgBank[0] = prgRom.data() + (mmc1.prg << 14);
+								pPrgBank[2] = prgRom.data() + prgRom.size() - 16 * 1024;
+							break;
+						}
+						pPrgBank[1] = pPrgBank[0] + 8 * 1024;
+						pPrgBank[3] = pPrgBank[2] + 8 * 1024;
+
+						mmc1.chrMode = mmc1.shiftReg >> 4;
+						if(mmc1.chrMode == 1)
+						{
+							ppu.SetPatternBanks4(0, mmc1.chr0);
+							ppu.SetPatternBanks4(1, mmc1.chr1);
+						}
+						else
+						{
+							ppu.SetPatternBanks8(mmc1.chr0 & 0b11110);
+						}
+					break;
+
+					case 0xA000 >> 13:
+						mmc1.chr0 = mmc1.shiftReg;
+						if(mmc1.chrMode == 1)
+						{
+							ppu.SetPatternBanks4(0, mmc1.chr0);
+						}
+						else
+						{
+							ppu.SetPatternBanks8(mmc1.chr0 & 0b11110);
+						}
+					break;
+
+					case 0xC000 >> 13:
+						mmc1.chr1 = mmc1.shiftReg;
+						if(mmc1.chrMode == 1)
+						{
+							ppu.SetPatternBanks4(1, mmc1.chr1);
+						}
+					break;
+
+					case 0xE000 >> 13:
+						mmc1.prg = mmc1.shiftReg & 0b01111;
+						switch(mmc1.prgMode)
+						{
+							case 0: case 1: //32k mode
+								pPrgBank[0] = prgRom.data() + ((mmc1.prg & 0b11110) << 15);
+								pPrgBank[2] = pPrgBank[0] + 16 * 1024;
+							break;
+							case 2: //low bank fixed, high switchable
+								pPrgBank[0] = prgRom.data();
+								pPrgBank[2] = prgRom.data() + (mmc1.prg << 14);
+							break;
+							case 3: //high bank fixed, low switchable
+								pPrgBank[0] = prgRom.data() + (mmc1.prg << 14);
+								pPrgBank[2] = prgRom.data() + prgRom.size() - 16 * 1024;
+							break;
+						}
+						pPrgBank[1] = pPrgBank[0] + 8 * 1024;
+						pPrgBank[3] = pPrgBank[2] + 8 * 1024;
+						mmc1.wramEnable = mmc1.shiftReg & 0b10000;
+					break;
+				}
+				mmc1.shiftReg = 0b100000;
+			}
+		}
+	}
+	mmc1.lastWrittenTo = cycleCount;
 }
 
 

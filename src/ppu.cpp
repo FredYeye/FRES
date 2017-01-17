@@ -637,17 +637,26 @@ void Ppu::SetNametableMirroring(const std::array<NametableOffset, 4> &offset)
 }
 
 
-void Ppu::SetPatternBank(uint8_t bank, uint16_t offset)
+void Ppu::SetPatternBank(const uint8_t bank, const uint16_t offset)
 {
 	pPattern[bank] = pattern.data() + (offset << 10);
 }
 
 
-void Ppu::SetPatternBanks(const uint8_t dataBus)
+void Ppu::SetPatternBanks4(const bool bank, const uint8_t offset)
+{
+	for(int x = 0; x < 4; x++)
+	{
+		pPattern[(bank << 2) + x] = pattern.data() + (offset << 12) + 0x400 * x;
+	}
+}
+
+
+void Ppu::SetPatternBanks8(const uint8_t offset)
 {
 	for(int x = 0; x < 8; x++)
 	{
-		pPattern[x] = pattern.data() + (dataBus * 0x2000) + 0x400 * x;
+		pPattern[x] = pattern.data() + (offset << 13) + 0x400 * x;
 	}
 }
 
