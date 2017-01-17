@@ -744,11 +744,11 @@ void Nes::CpuRead(const uint16_t address)
 {
 	addressBus = address;
 
-	switch(addressBus & 0xE000)
+	switch(addressBus >> 13)
 	{
 		case 0x0000: dataBus = cpuRam[addressBus & 0x07FF]; break;
 
-		case 0x2000:
+		case 0x2000 >> 13:
 			switch(addressBus & 7)
 			{
 				case 2: dataBus = ppu.StatusRead();  break;
@@ -757,7 +757,7 @@ void Nes::CpuRead(const uint16_t address)
 			}
 		break;
 
-		case 0x4000:
+		case 0x4000 >> 13:
 			switch(addressBus)
 			{
 				case 0x4014: dataBus = 0x40;             break; //open bus, maybe hax something better later
@@ -775,7 +775,7 @@ void Nes::CpuRead(const uint16_t address)
 			}
 		break;
 
-		case 0x6000:
+		case 0x6000 >> 13:
 			if(prgRam.size()) //do something else if 7000 && vrc4
 			{
 				dataBus = *(pPrgRamBank[(addressBus >> 11) & 0b11] + (addressBus & 0x7FF));
@@ -786,10 +786,10 @@ void Nes::CpuRead(const uint16_t address)
 			}
 		break;
 
-		case 0x8000: dataBus = *(pPrgBank[0] + (addressBus & 0x1FFF)); break;
-		case 0xA000: dataBus = *(pPrgBank[1] + (addressBus & 0x1FFF)); break;
-		case 0xC000: dataBus = *(pPrgBank[2] + (addressBus & 0x1FFF)); break;
-		case 0xE000: dataBus = *(pPrgBank[3] + (addressBus & 0x1FFF)); break;
+		case 0x8000 >> 13: dataBus = *(pPrgBank[0] + (addressBus & 0x1FFF)); break;
+		case 0xA000 >> 13: dataBus = *(pPrgBank[1] + (addressBus & 0x1FFF)); break;
+		case 0xC000 >> 13: dataBus = *(pPrgBank[2] + (addressBus & 0x1FFF)); break;
+		case 0xE000 >> 13: dataBus = *(pPrgBank[3] + (addressBus & 0x1FFF)); break;
 	}
 
 	if(apu.dmcDma & !dmcDmaActive) //where to do this?
@@ -820,11 +820,11 @@ void Nes::CpuWrite(const uint16_t address, const uint8_t data)
 	addressBus = address;
 	dataBus = data;
 
-	switch(addressBus & 0xE000)
+	switch(addressBus >> 13)
 	{
 		case 0x0000: cpuRam[addressBus & 0x07FF] = dataBus; break;
 
-		case 0x2000:
+		case 0x2000 >> 13:
 			switch(addressBus & 7)
 			{
 				case 0: ppu.CtrlWrite(dataBus);    break;
@@ -837,7 +837,7 @@ void Nes::CpuWrite(const uint16_t address, const uint8_t data)
 			}
 		break;
 
-		case 0x4000:
+		case 0x4000 >> 13:
 			switch(addressBus)
 			{
 				case 0x4000: apu.Pulse0Write(dataBus, 0); break;
@@ -874,14 +874,14 @@ void Nes::CpuWrite(const uint16_t address, const uint8_t data)
 			}
 		break;
 
-		case 0x6000:
+		case 0x6000 >> 13:
 			if(prgRam.size()) //do something else if 7000 && vrc4
 			{
 				*(pPrgRamBank[(addressBus >> 11) & 0b11] + (addressBus & 0x7FF)) = dataBus;
 			}
 		break;
 
-		case 0x8000: case 0xA000: case 0xC000: case 0xE000:
+		case 0x8000 >> 13: case 0xA000 >> 13: case 0xC000 >> 13: case 0xE000 >> 13:
 			Addons();
 		break;
 	}
