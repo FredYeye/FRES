@@ -85,7 +85,7 @@ void Cart::SetDefaultPrgBanksSha(std::vector<uint8_t> &prgRom, cartAttributes at
 {
 	switch(attr.type)
 	{
-		case NES_NROM: case NES_SGROM: case NES_SLROM: case NES_UNROM: case NES_CNROM: case KONAMI_VRC_4:
+		case NES_NROM: case NES_SGROM: case NES_UNROM: case NES_CNROM: case KONAMI_VRC_4:
 			pPrgBank[0] = prgRom.data();
 			pPrgBank[1] = prgRom.data() + 0x2000;
 			pPrgBank[2] = prgRom.data() + (attr.prg - 16) * 1024;
