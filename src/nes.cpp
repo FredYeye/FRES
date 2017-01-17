@@ -746,7 +746,7 @@ void Nes::CpuRead(const uint16_t address)
 
 	switch(addressBus >> 13)
 	{
-		case 0x0000: dataBus = cpuRam[addressBus & 0x07FF]; break;
+		case 0x0000 >> 13: dataBus = cpuRam[addressBus & 0x07FF]; break;
 
 		case 0x2000 >> 13:
 			switch(addressBus & 7)
@@ -776,9 +776,10 @@ void Nes::CpuRead(const uint16_t address)
 		break;
 
 		case 0x6000 >> 13:
-			if(prgRam.size()) //do something else if 7000 && vrc4
+			if(prgRam.size()) //todo: maybe & with some generic cart.ramEnabled
 			{
-				dataBus = *(pPrgRamBank[(addressBus >> 11) & 0b11] + (addressBus & 0x7FF));
+				//todo: vrc4 with 2kb wram should return open bus if addressBus >= 0x7000
+				dataBus = *(pPrgRamBank[(addressBus >> 11) & 0b11] + (addressBus & 0x1FFF));
 			}
 			else
 			{
@@ -822,7 +823,7 @@ void Nes::CpuWrite(const uint16_t address, const uint8_t data)
 
 	switch(addressBus >> 13)
 	{
-		case 0x0000: cpuRam[addressBus & 0x07FF] = dataBus; break;
+		case 0x0000 >> 13: cpuRam[addressBus & 0x07FF] = dataBus; break;
 
 		case 0x2000 >> 13:
 			switch(addressBus & 7)
@@ -875,9 +876,10 @@ void Nes::CpuWrite(const uint16_t address, const uint8_t data)
 		break;
 
 		case 0x6000 >> 13:
-			if(prgRam.size()) //do something else if 7000 && vrc4
+			if(prgRam.size()) //todo: maybe & with some generic cart.ramEnabled
 			{
-				*(pPrgRamBank[(addressBus >> 11) & 0b11] + (addressBus & 0x7FF)) = dataBus;
+				//todo: writes to vrc4 with 2kb wram should do nothing if addressBus >= 0x7000
+				*(pPrgRamBank[(addressBus >> 11) & 0b11] + (addressBus & 0x1FFF)) = dataBus;
 			}
 		break;
 
@@ -1111,7 +1113,7 @@ void Nes::MMC1Registers()
 						switch(mmc1.prgMode)
 						{
 							case 0: case 1: //32k mode
-								pPrgBank[0] = prgRom.data() + ((mmc1.prg & 0b11110) << 15);
+								pPrgBank[0] = prgRom.data() + ((mmc1.prg & 0b11110) << 14);
 								pPrgBank[2] = pPrgBank[0] + 16 * 1024;
 							break;
 							case 2: //low bank fixed, high switchable
@@ -1134,7 +1136,7 @@ void Nes::MMC1Registers()
 						}
 						else
 						{
-							ppu.SetPatternBanks8(mmc1.chr0 & 0b11110);
+							ppu.SetPatternBanks8(mmc1.chr0 >> 1);
 						}
 					break;
 
@@ -1146,7 +1148,7 @@ void Nes::MMC1Registers()
 						}
 						else
 						{
-							ppu.SetPatternBanks8(mmc1.chr0 & 0b11110);
+							ppu.SetPatternBanks8(mmc1.chr0 >> 1);
 						}
 					break;
 
@@ -1163,7 +1165,7 @@ void Nes::MMC1Registers()
 						switch(mmc1.prgMode)
 						{
 							case 0: case 1: //32k mode
-								pPrgBank[0] = prgRom.data() + ((mmc1.prg & 0b11110) << 15);
+								pPrgBank[0] = prgRom.data() + ((mmc1.prg & 0b11110) << 14);
 								pPrgBank[2] = pPrgBank[0] + 16 * 1024;
 							break;
 							case 2: //low bank fixed, high switchable

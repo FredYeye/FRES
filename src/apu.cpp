@@ -294,7 +294,7 @@ void Apu::Tick()
 			{
 				sequencerCounter = 0;
 			}
-		case 14913: //steps 2 of both modes
+		case 14913: //step 2 of both modes
 			HalfFrame();
 		case 7457: case 22371: //steps 1 and 3 of both modes
 			QuarterFrame();
