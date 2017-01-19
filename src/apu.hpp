@@ -109,7 +109,7 @@ class Apu
 		bool frameIRQ = false;
 		uint16_t sequencerCounter = 0;
 		bool sequencerMode = false;
-		std::array<bool, 5> sequencerResetDelay{};
+		uint8_t sequencerResetDelay = 0;
 
 		bool apuTick = false;
 

@@ -223,14 +223,10 @@ void Apu::FrameCounterWrite(uint8_t dataBus) //4017
 	}
 
 	sequencerMode = dataBus & 0b10000000;
-	if(sequencerMode == 1)
-	{
-		QuarterFrame();
-		HalfFrame();
-	}
 
-	sequencerResetDelay[3] = apuTick; //reset the sequencer timer 3 cycles later if on a apu tick, else 4. add one cycle because the current cycle doesn't count
-	sequencerResetDelay[4] = true;
+	//reset the sequencer timer 2 cycles later if on a apu tick, else 3
+	sequencerResetDelay = 0b00010000;
+	sequencerResetDelay |= apuTick << 3;
 }
 
 
@@ -277,14 +273,17 @@ void Apu::Tick()
 		}
 	}
 
-	for(int x = 0; x < 4; x++)
+	sequencerResetDelay >>= 1;
+	if(sequencerResetDelay & 1)
 	{
-		sequencerResetDelay[x] = sequencerResetDelay[x+1];
-	}
-	if(sequencerResetDelay[0])
-	{
+		sequencerResetDelay = 0;
 		sequencerCounter = 0;
-		sequencerResetDelay.fill(false);
+
+		if(sequencerMode == 1)
+		{
+			QuarterFrame();
+			HalfFrame();
+		}
 	}
 
 	switch(sequencerCounter++)
