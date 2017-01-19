@@ -135,7 +135,8 @@ void Audio::SetFormat()
 
 	if(channels != 2 || sampleRate != 44100 || bitRate != 32 || floatPCM != true)
 	{
-		std::cout << "shiiet i need to be fixed to play on that\n";
+		std::cout << "shiiet i need to be fixed to play on that\n"
+				  << "channels:" << channels << "  sample rate:" << sampleRate << "  bitrate:" << bitRate << "  float:" << floatPCM << "\n";
 	}
 }
 
