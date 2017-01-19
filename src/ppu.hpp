@@ -63,11 +63,15 @@ class Ppu
 			0xFFA4EAED, 0xFFA4F4D6, 0xFFB8F8C5, 0xFFD3F6BE, 0xFFF1F1BF, 0xFFB9B9B9, 0xFF000000, 0xFF000000
 		}};
 
-		std::vector<uint8_t> pattern;
-		std::array<uint8_t, 0x1000> nametable; //alt. vector
-		std::array<uint8_t, 32> paletteIndices;
 		std::array<uint8_t*, 8> pPattern;
 		std::array<uint8_t*, 4> pNametable;
+		std::vector<uint8_t> pattern;
+		std::array<uint8_t, 0x1000> nametable; //alt. vector
+
+		std::array<uint8_t, 32> paletteIndices;
+		uint32_t emphasisMask = 0xFFFFFFFF;
+		uint8_t grayscaleMask = 0xFF;
+
 		std::array<uint8_t, 64*4> oam;
 		std::array<uint8_t, 8*4> oam2;
 

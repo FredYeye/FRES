@@ -23,12 +23,12 @@ void Ppu::MaskWrite(uint8_t dataBus) //2001
 	//delaying this write by 2-3 dots makes battletoads stage 2 function better, figure out why
 	ppuMask = dataBus;
 
-	// grayscaleMask = (dataBus & 1) ? 0x30: 0xFF;
+	grayscaleMask = (dataBus & 1) ? 0x30: 0xFF;
 
-	// emphasisMask = 0xFFFFFFFF;
-	// if(dataBus & 0b00100000) emphasisMask &= 0xC0C0FF; //red
-	// if(dataBus & 0b01000000) emphasisMask &= 0xC0FFC0; //green
-	// if(dataBus & 0b10000000) emphasisMask &= 0xFFC0C0; //blue
+	emphasisMask = 0xFFFFFFFF; //crude implementation of color desaturation, actually attenuates signal by ~25% or something
+	if(dataBus & 0b00100000) emphasisMask &= 0xFFC0C0FF; //red
+	if(dataBus & 0b01000000) emphasisMask &= 0xFFC0FFC0; //green
+	if(dataBus & 0b10000000) emphasisMask &= 0xFFFFC0C0; //blue
 }
 
 
@@ -39,9 +39,9 @@ uint8_t Ppu::StatusRead() //2002
 		if(uint16_t(scanlineH - 1) < 3) //-1 because the scanlineH variable has already been incremented... i think
 		{
 			suppressNmi = true;
-			//dot      0: reads it as clear and never sets the flag or generates NMI for that frame
-			//dots   1-2: reads it as set, clears it, and suppresses the NMI for that frame
-			//dots 340,3: behaves normally (reads flag's value, clears it, and doesn't affect NMI operation)
+			//dot      0: block NMI flag from getting set this frame
+			//dots   1-2: suppress NMIs for this frame
+			//dots 340,3: behaves normally
 		}
 	}
 
@@ -117,7 +117,7 @@ uint8_t Ppu::DataRead() //2007
 {
 	if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18)) //figure out what happens otherwise
 	{
-		const uint8_t currentLatch = (ppuAddress >= 0x3F00) ? paletteIndices[ppuAddress & 0x1F] : ppuDataLatch;
+		const uint8_t currentLatch = (ppuAddress >= 0x3F00) ? paletteIndices[ppuAddress & 0x1F] & grayscaleMask : ppuDataLatch;
 
 		if(ppuAddress >= 0x2000)
 		{
@@ -248,6 +248,7 @@ void Ppu::VisibleScanlines()
 		if(ppuMask & 0b00010000)
 		{
 			ppuStatus |= spriteHit; //sprite 0 hit, delayed by one dot
+
 			for(uint8_t x = 0; x < 8; ++x)
 			{
 				if(!spriteXpos[x])
@@ -305,8 +306,8 @@ void Ppu::VisibleScanlines()
 			}
 		}
 
-		render[renderPos++] = palette[pIndex];
-		// render[renderPos++] = palette[pIndex & grayscaleMask] & emphasisMask;
+		// render[renderPos++] = palette[pIndex];
+		render[renderPos++] = palette[pIndex & grayscaleMask] & emphasisMask;
 	}
 
 	if(ppuMask & 0b00011000)
