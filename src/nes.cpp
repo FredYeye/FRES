@@ -92,13 +92,12 @@ void Nes::RunOpcode()
 			++PC;
 			CpuWrite(0x0100 | rS--, PC >> 8);
 			CpuWrite(0x0100 | rS--, PC);
-		{
-			const uint16_t interruptVector = (nmiPending[0]) ? 0xFFFA : 0xFFFE; //possible NMI hijack
 			CpuWrite(0x0100 | rS--, rP.to_ulong() | 0b00010000);
-
-			rP.set(2);
+		{
+			const uint16_t interruptVector = 0xFFFE ^ (nmiPending[1] << 2); //possible NMI hijack
 			CpuRead(interruptVector);
 			tempData = dataBus;
+			rP.set(2);
 			CpuRead(interruptVector + 1);
 		}
 			nmiPending[1] = false; //NMI delayed until after next instruction
@@ -735,6 +734,9 @@ void Nes::RunOpcode()
 		break;
 	}
 
+	irqPending[2] = irqPending[1]; //interrupt polling
+	nmiPending[2] = nmiPending[1]; //
+
 	CpuRead(PC); //fetch next opcode
 	CpuOpDone();
 }
@@ -894,12 +896,11 @@ void Nes::CpuWrite(const uint16_t address, const uint8_t data)
 
 void Nes::CpuTick()
 {
-	apu.Tick();
 	ppu.Tick();
 	PollInterrupts();
 	ppu.Tick();
 	ppu.Tick();
-
+	apu.Tick();
 	++cycleCount;
 }
 
@@ -930,16 +931,19 @@ void Nes::CpuOpDone()
 		CpuRead(addressBus);                                //fetch op1, increment suppressed
 		CpuWrite(0x100 | rS--, PC >> 8);                    //push PC high on stack
 		CpuWrite(0x100 | rS--, PC);                         //push PC low on stack
+		CpuWrite(0x100 | rS--, rP.to_ulong() & 0b11101111); //push flags on stack with B clear
 
 		//determine if this is an IRQ or NMI, also see if NMI will hijack an IRQ (0xFFFE -> 0xFFFA)
-		const uint16_t interruptVector = (nmiPending[0]) ? 0xFFFA : 0xFFFE;
+		#ifdef DEBUG
+			if(nmiPending[1]) std::cout << "NMI ";
+			else              std::cout << "IRQ ";
+		#endif
+		const uint16_t interruptVector = 0xFFFE ^ (nmiPending[1] << 2);
+		nmiPending[0] &= !nmiPending[1];                    //ack nmi
 
-		CpuWrite(0x100 | rS--, rP.to_ulong() & 0b11101111); //push flags on stack with B clear
-		rP.set(2);                                          //read vector low, set I flag
-		CpuRead(interruptVector);                           //
+		CpuRead(interruptVector);                           //read vector low, set I flag
 		tempData = dataBus;                                 //
-
-		if(nmiPending[2]) nmiPending[0] = false;            //not quite correct but OK for now
+		rP.set(2);                                          //
 
 		CpuRead(interruptVector + 1);                       //read vector high
 		PC = tempData | (dataBus << 8);                     //fetch next opcode
@@ -950,29 +954,30 @@ void Nes::CpuOpDone()
 
 void Nes::PollInterrupts()
 {
-	nmiPending[2] = nmiPending[1]; //second cycle after nmiPending set, interrupt polling will see nmi now. or something like that
-	nmiPending[1] = nmiPending[0]; //first cycle after nmiPending set, still too early
-
+	nmiPending[1] = nmiPending[0]; //first cycle after nmiPending set, polling will see now
 	const bool oldNmi = nmi;
 	nmi = ppu.PollNmi();
 	nmiPending[0] |= !oldNmi & nmi; //nmiPending[0] gets set = nmi detected, but interrupt polling will miss
 
-	irqPending[2] = irqPending[1]; //same as nmi
-	irqPending[1] = irqPending[0];
+	irqPending[1] = irqPending[0]; //same as nmi
 	irqPending[0] = !rP.test(2) & (apu.PollFrameInterrupt() | VRC4Interrupt()); //or with some general cartIRQ later
 }
 
 
 void Nes::Branch(const bool flag, const uint8_t op1)
 {
-	//todo: interaction with interrupts
-
 	++PC;
 	if(flag)
 	{
+		irqPending[2] = irqPending[1]; //branches check irq on the first cycle
+		nmiPending[2] = nmiPending[1];
+		irqPending[1] = false; //taken branch without page crossing doesn't check for irqs
+		nmiPending[1] = false; //still not 100% correct
+
 		const uint16_t pagePC = PC + int8_t(op1);
 		PC = (PC & 0xFF00) | (pagePC & 0x00FF);
 		CpuRead(PC);
+
 		if(PC != pagePC)
 		{
 			PC = pagePC;
