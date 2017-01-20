@@ -88,6 +88,7 @@ class Apu
 		bool dmcDma = false;
 
 	private:
+		void IncrementSequencer();
 		void QuarterFrame();
 		void HalfFrame();
 		bool SweepForcingSilence(const Pulse &p) const;

@@ -273,52 +273,6 @@ void Apu::Tick()
 		}
 	}
 
-	sequencerResetDelay >>= 1;
-	if(sequencerResetDelay & 1)
-	{
-		sequencerResetDelay = 0;
-		sequencerCounter = 0;
-
-		if(sequencerMode == 1)
-		{
-			QuarterFrame();
-			HalfFrame();
-		}
-	}
-
-	switch(sequencerCounter++)
-	{
-		case 37281: //step 4 of mode 1
-			if(sequencerMode == 1)
-			{
-				sequencerCounter = 0;
-			}
-		case 14913: //step 2 of both modes
-			HalfFrame();
-		case 7457: case 22371: //steps 1 and 3 of both modes
-			QuarterFrame();
-		break;
-
-		case 29829: //step 4 of mode 0
-			if(sequencerMode == 0)
-			{
-				frameIRQ = !blockIRQ;
-				QuarterFrame();
-				HalfFrame();
-				//can't wrap sequencerCounter to 0 yet, need to set frameIRQ on wrap to 0
-			}
-		break;
-
-		case 29830: //step 4 of mode 0, part 2
-			if(sequencerMode == 0)
-			{
-				sequencerCounter = 1; //wrap to 0+1 now and set frameIRQ
-			}
-		case 29828: //pre-step 4 irq flag
-			frameIRQ = !(blockIRQ | sequencerMode);
-		break;
-	}
-
 	if(apuTick)
 	{
 		for(auto &p : pulse)
@@ -411,6 +365,8 @@ void Apu::Tick()
 		}
 	}
 	apuTick = !apuTick;
+
+	IncrementSequencer();
 }
 
 
@@ -423,6 +379,56 @@ const void* const Apu::GetOutput() const //734 samples/frame = 60.0817), use as 
 bool Apu::PollFrameInterrupt() const
 {
 	return frameIRQ;
+}
+
+
+void Apu::IncrementSequencer()
+{
+	sequencerResetDelay >>= 1;
+	if(sequencerResetDelay & 1)
+	{
+		sequencerResetDelay = 0;
+		sequencerCounter = 0; //i thought it would be -1, but 0 Passes The Tests™
+
+		if(sequencerMode == 1)
+		{
+			QuarterFrame();
+			HalfFrame();
+		}
+	}
+
+	switch(sequencerCounter++)
+	{
+		case 37281: //step 4 of mode 1
+			if(sequencerMode == 1)
+			{
+				sequencerCounter = 0;
+			}
+		case 14913: //step 2 of both modes
+			HalfFrame();
+		case 7457: case 22371: //steps 1 and 3 of both modes
+			QuarterFrame();
+		break;
+
+		case 29829: //step 4 of mode 0
+			if(sequencerMode == 0)
+			{
+				frameIRQ = !blockIRQ;
+				QuarterFrame();
+				HalfFrame();
+				//can't wrap sequencerCounter to 0 yet, need to set frameIRQ on wrap to 0
+			}
+		break;
+
+		case 29830: //step 4 of mode 0, part 2
+			if(sequencerMode == 0)
+			{
+				sequencerCounter = 1; //wrap to 0+1 now and set frameIRQ
+			}
+		case 29828: //pre-step 4 irq flag
+			frameIRQ = !(blockIRQ | sequencerMode);
+		break;
+	}
 }
 
 
