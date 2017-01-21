@@ -734,8 +734,8 @@ void Nes::RunOpcode()
 		break;
 	}
 
-	irqPending[2] = irqPending[1]; //interrupt polling
-	nmiPending[2] = nmiPending[1]; //
+	irqPending[2] |= irqPending[1]; //interrupt polling
+	nmiPending[2] |= nmiPending[1]; //
 
 	CpuRead(PC); //fetch next opcode
 	CpuOpDone();
@@ -933,17 +933,21 @@ void Nes::CpuOpDone()
 		CpuWrite(0x100 | rS--, PC);                         //push PC low on stack
 		CpuWrite(0x100 | rS--, rP.to_ulong() & 0b11101111); //push flags on stack with B clear
 
-		//determine if this is an IRQ or NMI, also see if NMI will hijack an IRQ (0xFFFE -> 0xFFFA)
 		#ifdef DEBUG
 			if(nmiPending[1]) std::cout << "NMI ";
 			else              std::cout << "IRQ ";
 		#endif
+
+		//determine if this is an IRQ or NMI, also see if NMI will hijack an IRQ (0xFFFE -> 0xFFFA)
 		const uint16_t interruptVector = 0xFFFE ^ (nmiPending[1] << 2);
-		nmiPending[0] &= !nmiPending[1];                    //ack nmi
+		nmiPending[0] &= !nmiPending[1];                    //toggle nmi[0] since it gets stuck on
 
 		CpuRead(interruptVector);                           //read vector low, set I flag
 		tempData = dataBus;                                 //
 		rP.set(2);                                          //
+
+		irqPending[2] = false;                              //clear interrupts
+		nmiPending[2] = false;                              //
 
 		CpuRead(interruptVector + 1);                       //read vector high
 		PC = tempData | (dataBus << 8);                     //fetch next opcode
@@ -969,14 +973,15 @@ void Nes::Branch(const bool flag, const uint8_t op1)
 	++PC;
 	if(flag)
 	{
-		irqPending[2] = irqPending[1]; //branches check irq on the first cycle
-		nmiPending[2] = nmiPending[1];
-		irqPending[1] = false; //taken branch without page crossing doesn't check for irqs
-		nmiPending[1] = false; //still not 100% correct
+		irqPending[2] |= irqPending[1]; //branches check irq on the first cycle
+		nmiPending[2] |= nmiPending[1];
 
 		const uint16_t pagePC = PC + int8_t(op1);
 		PC = (PC & 0xFF00) | (pagePC & 0x00FF);
 		CpuRead(PC);
+
+		irqPending[1] = false; //taken branch without page crossing doesn't check for irqs on second cycle
+		nmiPending[1] = false; //
 
 		if(PC != pagePC)
 		{
