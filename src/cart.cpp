@@ -72,7 +72,7 @@ void Cart::GameInfoSha(std::array<uint32_t, 5> sha1)
 		}
 	}
 
-	if(!attr.isChrRam)
+	if(attr.chrType == ChrRom)
 	{
 		const auto chrRomEnd = prgRomEnd + attr.chr * 1024;
 		chrMem.assign(prgRomEnd, chrRomEnd);
@@ -81,6 +81,7 @@ void Cart::GameInfoSha(std::array<uint32_t, 5> sha1)
 	{
 		chrMem.resize(attr.chr * 1024);
 	}
+	chrType = attr.chrType;
 
 	switch(attr.nametableLayout)
 	{
@@ -153,18 +154,18 @@ void Cart::SetChrMem(const std::vector<uint8_t> &fileContent)
 		if(header[5])
 		{
 			chrMem.assign(fileContent.begin() + header[4] * 0x4000, fileContent.begin() + header[4] * 0x4000 + header[5] * 0x2000);
-			isChrRam = false;
+			chrType = ChrRom;
 		}
 		else
 		{
 			chrMem.resize(0x2000);
-			isChrRam = true;
+			chrType = ChrRam;
 		}
 	}
 	else if(mapper == 7)
 	{
 		chrMem.resize(0x2000);
-		isChrRam = true;
+		chrType = ChrRam;
 	}
 }
 

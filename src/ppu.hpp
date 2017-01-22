@@ -37,6 +37,8 @@ class Ppu
 		void SetPatternBanks4(const bool bank, const uint8_t offset);
 		void SetPatternBanks8(const uint8_t offset);
 		void SetPattern(std::vector<uint8_t> &chr);
+		void SetChrType(bool type);
+
 		bool renderFrame = false;
 
 	private:
@@ -115,4 +117,6 @@ class Ppu
 
 		bool sprite0OnNext = false;
 		bool sprite0OnCurrent = false;
+
+		bool isChrRam;
 };

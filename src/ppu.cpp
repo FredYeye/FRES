@@ -155,7 +155,10 @@ void Ppu::DataWrite(uint8_t dataBus) //2007
 	{
 		if(ppuAddress < 0x2000)
 		{
-			*(pPattern[ppuAddress >> 10] + (ppuAddress & 0x3FF)) = dataBus;
+			if(isChrRam == 1)
+			{
+				*(pPattern[ppuAddress >> 10] + (ppuAddress & 0x3FF)) = dataBus;
+			}
 		}
 		else if(ppuAddress < 0x3F00)
 		{
@@ -289,7 +292,8 @@ void Ppu::VisibleScanlines()
 		uint8_t pIndex;
 		if(spritePixel && (!spritePriority || !bgPixel))
 		{
-			// paletteIndices[0x1D] = 0x25; //contra right side flicker
+			//the right-most column flickers, always with indices 0x1D, 0x1E or 0x1F
+			//afflicted games: contra, rad gravity, blaster master
 			pIndex = paletteIndices[0x10 + spritePixel];
 		}
 		else
@@ -304,7 +308,6 @@ void Ppu::VisibleScanlines()
 			}
 		}
 
-		// render[renderPos++] = palette[pIndex];
 		render[renderPos++] = palette[pIndex & grayscaleMask] & emphasisMask;
 	}
 
@@ -659,4 +662,9 @@ void Ppu::SetPattern(std::vector<uint8_t> &chr)
 	{
 		pPattern[x] = pattern.data() + 0x400 * x;
 	}
+}
+
+void Ppu::SetChrType(bool type)
+{
+	isChrRam = type;
 }

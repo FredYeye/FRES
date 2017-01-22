@@ -19,6 +19,7 @@ Nes::Nes(std::string inFile)
 	pPrgRamBank = cart.pPrgRamBank;
 	ppu.SetPattern(cart.chrMem);
 	ppu.SetNametableMirroring(cart.nametableOffsets);
+	ppu.SetChrType(cart.chrType);
 
 	CpuRead(PC); //PC?
 	CpuRead(PC);
