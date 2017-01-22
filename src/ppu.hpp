@@ -37,6 +37,7 @@ class Ppu
 		void SetPatternBanks4(const bool bank, const uint8_t offset);
 		void SetPatternBanks8(const uint8_t offset);
 		void SetPattern(std::vector<uint8_t> &chr);
+		bool renderFrame = false;
 
 	private:
 		void VisibleScanlines();
@@ -102,7 +103,6 @@ class Ppu
 		uint8_t oamSpritenum = 0; //0-3 = sprite0, 4-7 = sprite1 [...] 252-255 = sprite63
 		uint8_t oamDiagonal = 0;
 
-		bool renderFrame = false;
 		bool suppressNmi = false;
 
 		std::array<uint8_t, 8> spriteBitmapLow;

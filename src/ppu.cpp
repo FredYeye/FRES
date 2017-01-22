@@ -36,7 +36,7 @@ uint8_t Ppu::StatusRead() //2002
 {
 	if(scanlineV == 241)
 	{
-		if(uint16_t(scanlineH - 1) < 3) //-1 because the scanlineH variable has already been incremented... i think
+		if(scanlineH < 3)
 		{
 			suppressNmi = true;
 			//dot      0: block NMI flag from getting set this frame
@@ -115,7 +115,7 @@ void Ppu::AddrWrite(uint8_t dataBus) //2006
 
 uint8_t Ppu::DataRead() //2007
 {
-	if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18)) //figure out what happens otherwise
+	if((scanlineV >= 240 && scanlineV <= 260) || !(ppuMask & 0x18))
 	{
 		const uint8_t currentLatch = (ppuAddress >= 0x3F00) ? paletteIndices[ppuAddress & 0x1F] & grayscaleMask : ppuDataLatch;
 
@@ -132,14 +132,13 @@ uint8_t Ppu::DataRead() //2007
 	}
 	else
 	{
-		const uint16_t dot = scanlineH - 1; //same as 2002, -1 because it's already been incremented?
-		if(dot != 256)
+		if(scanlineH != 256)
 		{
 			YIncrement();
 		}
-		if(dot >= 1 && dot <= 256 || dot >= 321)
+		if(scanlineH >= 1 && scanlineH <= 256 || scanlineH >= 321)
 		{
-			if(dot & 0b111 != 0)
+			if(scanlineH & 0b111 != 0)
 			{
 				CoarseXIncrement();
 			}
@@ -174,14 +173,13 @@ void Ppu::DataWrite(uint8_t dataBus) //2007
 	}
 	else
 	{
-		const uint16_t dot = scanlineH - 1; //same as 2002, -1 because it's already been incremented?
-		if(dot != 256)
+		if(scanlineH != 256)
 		{
 			YIncrement();
 		}
-		if(dot >= 1 && dot <= 256 || dot >= 321)
+		if(scanlineH >= 1 && scanlineH <= 256 || scanlineH >= 321)
 		{
-			if(dot & 0b111 != 0)
+			if(scanlineH & 0b111 != 0)
 			{
 				CoarseXIncrement();
 			}
@@ -192,6 +190,18 @@ void Ppu::DataWrite(uint8_t dataBus) //2007
 
 void Ppu::Tick()
 {
+	if(scanlineH++ == 340)
+	{
+		scanlineH = 0;
+		if(scanlineV++ == 261)
+		{
+			scanlineV = 0;
+			oddFrame = !oddFrame;
+			renderFrame = true;
+			renderPos = 0;
+		}
+	}
+
 	if(scanlineV < 240) //visible scanlines
 	{
 		VisibleScanlines();
@@ -221,18 +231,6 @@ void Ppu::Tick()
 			{
 				++scanlineH;
 			}
-		}
-	}
-
-	if(scanlineH++ == 340)
-	{
-		scanlineH = 0;
-		if(scanlineV++ == 261)
-		{
-			scanlineV = 0;
-			oddFrame = !oddFrame;
-			renderFrame = true;
-			renderPos = 0;
 		}
 	}
 }
@@ -600,14 +598,6 @@ void Ppu::ReverseBits(uint8_t &b) const
 	b = b >> 4 | b << 4;
 	b = (b & 0b11001100) >> 2 | (b & 0b00110011) << 2;
 	b = (b & 0b10101010) >> 1 | (b & 0b01010101) << 1;
-}
-
-
-const bool Ppu::RenderFrame()
-{
-	const bool currentRenderFrame = renderFrame;
-	renderFrame = false;
-	return currentRenderFrame;
 }
 
 
