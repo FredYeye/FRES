@@ -46,12 +46,12 @@ class Nes
 
 	private:
 		void RunOpcode();
+		void Branch(const bool flag, const uint8_t op1);
 		void CpuRead(const uint16_t address);
 		void CpuWrite(const uint16_t address, const uint8_t data);
 		void CpuTick();
 		void CpuOpDone();
 		void PollInterrupts();
-		void Branch(const bool flag, const uint8_t op1);
 
 		void DebugCpu(uint8_t opcode);
 		uint8_t DebugRead(uint16_t address);

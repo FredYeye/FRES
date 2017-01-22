@@ -39,7 +39,7 @@ Nes::Nes(std::string inFile)
 
 void Nes::AdvanceFrame(uint8_t input, uint8_t input2)
 {
-	while(!ppu.RenderFrame())
+	while(!ppu.renderFrame)
 	{
 		RunOpcode();
 
@@ -49,6 +49,7 @@ void Nes::AdvanceFrame(uint8_t input, uint8_t input2)
 			controller_reg2 = input2;
 		}
 	}
+	ppu.renderFrame = false;
 }
 
 
@@ -742,6 +743,30 @@ void Nes::RunOpcode()
 }
 
 
+void Nes::Branch(const bool flag, const uint8_t op1)
+{
+	++PC;
+	if(flag)
+	{
+		irqPending[2] |= irqPending[1]; //branches check irq on the first cycle
+		nmiPending[2] |= nmiPending[1];
+
+		const uint16_t pagePC = PC + int8_t(op1);
+		PC = (PC & 0xFF00) | (pagePC & 0x00FF);
+		CpuRead(PC);
+
+		irqPending[1] = false; //taken branch without page crossing doesn't check for irqs on second cycle
+		nmiPending[1] = false;
+
+		if(PC != pagePC)
+		{
+			PC = pagePC;
+			CpuRead(PC);
+		}
+	}
+}
+
+
 void Nes::CpuRead(const uint16_t address)
 {
 	addressBus = address;
@@ -965,30 +990,6 @@ void Nes::PollInterrupts()
 
 	irqPending[1] = irqPending[0]; //same as nmi
 	irqPending[0] = !rP.test(2) & (apu.PollFrameInterrupt() | VRC4Interrupt()); //or with some general cartIRQ later
-}
-
-
-void Nes::Branch(const bool flag, const uint8_t op1)
-{
-	++PC;
-	if(flag)
-	{
-		irqPending[2] |= irqPending[1]; //branches check irq on the first cycle
-		nmiPending[2] |= nmiPending[1];
-
-		const uint16_t pagePC = PC + int8_t(op1);
-		PC = (PC & 0xFF00) | (pagePC & 0x00FF);
-		CpuRead(PC);
-
-		irqPending[1] = false; //taken branch without page crossing doesn't check for irqs on second cycle
-		nmiPending[1] = false; //
-
-		if(PC != pagePC)
-		{
-			PC = pagePC;
-			CpuRead(PC);
-		}
-	}
 }
 
 

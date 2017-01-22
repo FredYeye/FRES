@@ -203,28 +203,29 @@ GLuint LoadAndCompileShader(const std::string &shaderName, GLenum shaderType)
 
 static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-	std::map<int, uint8_t> keys
+	if(action != GLFW_REPEAT)
 	{
-		{GLFW_KEY_Z,     0b00000001}, {GLFW_KEY_X,     0b00000010},
-		{GLFW_KEY_S,     0b00000100}, {GLFW_KEY_A,     0b00001000},
-		{GLFW_KEY_UP,    0b00010000}, {GLFW_KEY_DOWN,  0b00100000},
-		{GLFW_KEY_LEFT,  0b01000000}, {GLFW_KEY_RIGHT, 0b10000000},
-	};
-	const uint8_t asd = (keys.find(key) != keys.end()) ? keys.at(key) : 0;
-	if(action != GLFW_REPEAT) input ^= asd;
+		std::map<int, uint8_t> keys
+		{
+			{GLFW_KEY_Z,     0b00000001}, {GLFW_KEY_X,     0b00000010},
+			{GLFW_KEY_S,     0b00000100}, {GLFW_KEY_A,     0b00001000},
+			{GLFW_KEY_UP,    0b00010000}, {GLFW_KEY_DOWN,  0b00100000},
+			{GLFW_KEY_LEFT,  0b01000000}, {GLFW_KEY_RIGHT, 0b10000000},
+		};
+		if(keys.find(key) != keys.end()) input ^= keys.at(key);
 
-	std::map<int, uint8_t> keys2
-	{
-		{GLFW_KEY_G,  0b00000001}, {GLFW_KEY_H, 0b00000010},
-		{GLFW_KEY_Y,  0b00000100}, {GLFW_KEY_T, 0b00001000},
-		{GLFW_KEY_I,  0b00010000}, {GLFW_KEY_K, 0b00100000},
-		{GLFW_KEY_J,  0b01000000}, {GLFW_KEY_L, 0b10000000},
-	};
-	const uint8_t asd2 = (keys2.find(key) != keys2.end()) ? keys2.at(key) : 0;
-	if(action != GLFW_REPEAT) input2 ^= asd2;
+		std::map<int, uint8_t> keys2
+		{
+			{GLFW_KEY_G,  0b00000001}, {GLFW_KEY_H, 0b00000010},
+			{GLFW_KEY_Y,  0b00000100}, {GLFW_KEY_T, 0b00001000},
+			{GLFW_KEY_I,  0b00010000}, {GLFW_KEY_K, 0b00100000},
+			{GLFW_KEY_J,  0b01000000}, {GLFW_KEY_L, 0b10000000},
+		};
+		if(keys2.find(key) != keys2.end()) input2 ^= keys2.at(key);
 
-	if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-	{
-		glfwSetWindowShouldClose(window, GL_TRUE);
+		if(key == GLFW_KEY_ESCAPE)
+		{
+			glfwSetWindowShouldClose(window, GL_TRUE);
+		}
 	}
 }
