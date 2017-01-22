@@ -8,13 +8,17 @@
 #include "sha1.hpp"
 
 
-Cart::Cart(const std::string inFile, std::vector<uint8_t> &prgRom, std::vector<uint8_t> &prgRam)
+Cart::Cart(const std::string inFile, std::vector<uint8_t> &prgRom, std::vector<uint8_t> &prgRam) : prgRom(prgRom), prgRam(prgRam)
 {
-	std::vector<uint8_t> fileContent = FileToU8Vec(inFile);
+	fileContent = FileToU8Vec(inFile);
+	if(fileContent.size() < 512) //just some number
+	{
+		std::cout << "File is too small to be a nes rom\n";
+		exit(0);
+	}
 
-	//ines header stuff
+	//ines header
 	std::copy_n(fileContent.begin(), 16, header.begin());
-
 	if(header[0] != 0x4E && header[1] != 0x45 && header[2] != 0x53 && header[3] != 0x1A)
 	{
 		std::cout << "Not a valid .nes file" << std::endl;
@@ -26,40 +30,7 @@ Cart::Cart(const std::string inFile, std::vector<uint8_t> &prgRom, std::vector<u
 	const std::array<uint32_t, 5> sha1 = SHA1(fileContent);
 	if(cartInfo.count(sha1))
 	{
-		std::cout << "Game recognized\n";
-		const cartAttributes attr = cartInfo.at(sha1);
-		type = attr.type;
-
-		const auto prgRomEnd = fileContent.begin() + attr.prg * 1024;
-		prgRom.assign(fileContent.begin(), prgRomEnd);
-		SetDefaultPrgBanksSha(prgRom, attr);
-
-		if(attr.wram)
-		{
-			prgRam.resize(attr.wram * 1024);
-
-			for(int x = 0; x < 4; ++x)
-			{
-				pPrgRamBank[x] = prgRam.data() + (x & (attr.wram >> 1) - 1);
-			}
-		}
-
-		if(!attr.isChrRam)
-		{
-			const auto chrRomEnd = prgRomEnd + attr.chr * 1024;
-			chrMem.assign(prgRomEnd, chrRomEnd);
-		}
-		else
-		{
-			chrMem.resize(attr.chr * 1024);
-		}
-
-		switch(attr.nametableLayout)
-		{
-			case vertical  : nametableOffsets = {A, A, B, B}; break;
-			case horizontal: nametableOffsets = {A, B, A, B}; break;
-			case single    : nametableOffsets = {A, A, A, A}; break;
-		}
+		GameInfoSha(sha1);
 	}
 	else
 	{
@@ -77,6 +48,45 @@ Cart::Cart(const std::string inFile, std::vector<uint8_t> &prgRom, std::vector<u
 			std::cout << "unsupported mapper\n" << +mapper;
 			exit(0);
 		}
+	}
+}
+
+
+void Cart::GameInfoSha(std::array<uint32_t, 5> sha1)
+{
+	std::cout << "Game recognized\n";
+	const cartAttributes attr = cartInfo.at(sha1);
+	type = attr.type;
+
+	const auto prgRomEnd = fileContent.begin() + attr.prg * 1024;
+	prgRom.assign(fileContent.begin(), prgRomEnd);
+	SetDefaultPrgBanksSha(prgRom, attr);
+
+	if(attr.wram)
+	{
+		prgRam.resize(attr.wram * 1024);
+
+		for(int x = 0; x < 4; ++x)
+		{
+			pPrgRamBank[x] = prgRam.data() + (x & (attr.wram >> 1) - 1);
+		}
+	}
+
+	if(!attr.isChrRam)
+	{
+		const auto chrRomEnd = prgRomEnd + attr.chr * 1024;
+		chrMem.assign(prgRomEnd, chrRomEnd);
+	}
+	else
+	{
+		chrMem.resize(attr.chr * 1024);
+	}
+
+	switch(attr.nametableLayout)
+	{
+		case vertical  : nametableOffsets = {A, A, B, B}; break;
+		case horizontal: nametableOffsets = {A, B, A, B}; break;
+		case single    : nametableOffsets = {A, A, A, A}; break;
 	}
 }
 
