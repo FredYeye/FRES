@@ -293,8 +293,6 @@ void Ppu::VisibleScanlines()
 		uint8_t pIndex;
 		if(spritePixel && (!spritePriority || !bgPixel))
 		{
-			//the right-most column flickers, always with indices 0x1D, 0x1E or 0x1F
-			//afflicted games: contra, rad gravity, blaster master
 			pIndex = paletteIndices[0x10 + spritePixel];
 		}
 		else
@@ -448,10 +446,8 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 					ReverseBits(spriteBitmapHigh[spriteIndex]);
 				}
 
-				if(oam2[spriteIndex*4] >= 239 || scanlineV == 261) // correct solution? sprite 63's Y coord check, does it need to be a range check?
+				if(uint16_t(scanlineV - oam2[spriteIndex * 4]) >= 8 + ((ppuCtrl & 0b00100000) >> 2)) //prevent copying if Y coord is out of range
 				{
-					//also check if we are on line 261. it doesn't eval sprites but draws from the sprite buffer, which can have been filled on line 239.
-					//what actually prevents this from happening?
 					spriteBitmapLow[spriteIndex] = 0;
 					spriteBitmapHigh[spriteIndex] = 0;
 				}
