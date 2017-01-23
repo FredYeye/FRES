@@ -203,6 +203,7 @@ void Ppu::Tick()
 			renderFrame = true;
 			renderPos = 0;
 		}
+		return; //idle at dot 0
 	}
 
 	if(scanlineV < 240) //visible scanlines
@@ -241,10 +242,10 @@ void Ppu::Tick()
 
 void Ppu::VisibleScanlines()
 {
-	if(scanlineH && scanlineH <= 256)
+	if(scanlineH <= 256)
 	{
 		uint8_t spritePixel = 0;
-		bool spritePriority = true; //false puts sprite in front of BG
+		bool spritePriority; //false puts sprite in front of BG
 		bool opaqueSprite0 = false;
 		if(ppuMask & 0b00010000)
 		{
@@ -256,12 +257,12 @@ void Ppu::VisibleScanlines()
 				{
 					if(!(scanlineH <= 8 && !(ppuMask & 0b00000100)))
 					{
-						spritePriority = spriteAttribute[x] & 0b00100000;
 						spritePixel = spriteBitmapLow[x] >> 7;
 						spritePixel |= (spriteBitmapHigh[x] >> 6) & 0b10;
 						if(spritePixel)
 						{
 							spritePixel |= (spriteAttribute[x] & 0b11) << 2;
+							spritePriority = spriteAttribute[x] & 0b00100000;
 							if(!x)
 							{
 								opaqueSprite0 = sprite0OnCurrent;
@@ -321,7 +322,7 @@ void Ppu::VisibleScanlines()
 
 void Ppu::RenderFetches() //things done during visible and prerender scanlines
 {
-	if((scanlineH && scanlineH <= 256) || scanlineH >= 321)
+	if(scanlineH <= 256 || scanlineH >= 321)
 	{
 		if(scanlineH == 256)
 		{
@@ -462,9 +463,9 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 }
 
 
-void Ppu::OamScan()
+void Ppu::OamScan() //dots 1-256
 {
-	if(scanlineH && !(scanlineH & 1))
+	if((scanlineH & 1) == 0)
 	{
 		if(scanlineH <= 64)
 		{
@@ -522,13 +523,14 @@ void Ppu::OamScan()
 					oamEvalPattern = 4;
 				}
 			}
-		}
-		else
-		{
-			oam2Index = 0;
-			oamSpritenum = 0;
-			oamEvalPattern = 0;
-			oamDiagonal = 0;
+
+			if(scanlineH == 256)
+			{
+				oam2Index = 0;
+				oamSpritenum = 0;
+				oamEvalPattern = 0;
+				oamDiagonal = 0;
+			}
 		}
 	}
 }
