@@ -166,10 +166,10 @@ void Ppu::DataWrite(uint8_t dataBus) //2007
 		}
 		else
 		{
-			paletteIndices[ppuAddress & 0x1F] = dataBus;
+			paletteIndices[ppuAddress & 0x1F] = dataBus & 0x3F;
 			if(!(ppuAddress & 0b11)) //sprite palette mirror write
 			{
-				paletteIndices[(ppuAddress & 0x1F) ^ 0x10] = dataBus;
+				paletteIndices[(ppuAddress & 0x1F) ^ 0x10] = dataBus & 0x3F;
 			}
 		}
 		ppuAddress += (ppuCtrl & 0b0100) ? 0x20 : 0x01;
