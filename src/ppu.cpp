@@ -20,7 +20,6 @@ void Ppu::CtrlWrite(uint8_t dataBus) //2000
 
 void Ppu::MaskWrite(uint8_t dataBus) //2001
 {
-	//delaying this write by 2-3 dots makes battletoads stage 2 function better, figure out why
 	ppuMask = dataBus;
 
 	grayscaleMask = (dataBus & 1) ? 0x30: 0xFF;
@@ -34,16 +33,16 @@ void Ppu::MaskWrite(uint8_t dataBus) //2001
 
 uint8_t Ppu::StatusRead() //2002
 {
-	if(scanlineV == 241)
+	if(scanlineV == 241 && scanlineH < 2) //does dot 2 really suppress?
 	{
-		if(scanlineH < 3)
-		{
-			suppressNmi = true;
-			//dot      0: block NMI flag from getting set this frame
-			//dots   1-2: suppress NMIs for this frame
-			//dots 340,3: behaves normally
-		}
+		nmiFlag = scanlineH << 7; //0=prevent flag from getting set, 1=set flag
+		suppressNmi = true; //nmis can't happen regardless
+
+		//dot      0: block NMI flag from getting set this frame
+		//dots   1-2: suppress NMIs for this frame
+		//dots 340,3: behaves normally
 	}
+	// else if(scanlineV == 261 && scanlineH == 0) ppuStatus &= 0b10011111; //makes spr overflow and hit timing tests pass
 
 	const uint8_t status = ppuStatus;
 	ppuStatus &= 0x7F; //clear nmi_occurred bit
@@ -107,7 +106,7 @@ void Ppu::AddrWrite(uint8_t dataBus) //2006
 	{
 		ppuAddressLatch &= 0x7F00;
 		ppuAddressLatch |= dataBus;
-		ppuAddress = ppuAddressLatch;
+		TToVDelay = 0b00000100; //T->V copy should be delayed by 3 clocks. check if this impl is the correct amount later
 	}
 	wToggle = !wToggle;
 }
@@ -193,10 +192,10 @@ void Ppu::DataWrite(uint8_t dataBus) //2007
 
 void Ppu::Tick()
 {
-	if(scanlineH++ == 340)
+	if(++scanlineH == 341)
 	{
 		scanlineH = 0;
-		if(scanlineV++ == 261)
+		if(++scanlineV == 262)
 		{
 			scanlineV = 0;
 			oddFrame = !oddFrame;
@@ -210,15 +209,15 @@ void Ppu::Tick()
 	{
 		VisibleScanlines();
 	}
-	else if(scanlineV == 241 && scanlineH == 1 && !suppressNmi) //vblank scanlines
+	else if(scanlineV == 241 && scanlineH == 1) //vblank scanlines
 	{
-		ppuStatus |= 0x80; //VBL nmi
+		ppuStatus |= nmiFlag; //VBL nmi
+		nmiFlag = 0x80; //restore flag if it was prevented from getting set
 	}
 	else if(scanlineV == 261) //prerender scanline
 	{
 		if(scanlineH == 1)
 		{
-			spriteHit = 0;
 			ppuStatus &= 0b00011111; //clear sprite overflow, sprite 0 hit and vblank
 			suppressNmi = false;
 		}
@@ -237,6 +236,12 @@ void Ppu::Tick()
 			}
 		}
 	}
+
+	TToVDelay >>= 1;
+	if(TToVDelay & 1)
+	{
+		ppuAddress = ppuAddressLatch;
+	}
 }
 
 
@@ -249,8 +254,6 @@ void Ppu::VisibleScanlines()
 		bool opaqueSprite0 = false;
 		if(ppuMask & 0b00010000)
 		{
-			ppuStatus |= spriteHit; //sprite 0 hit, delayed by one dot
-
 			for(uint8_t x = 0; x < 8; ++x)
 			{
 				if(!spriteXpos[x])
@@ -285,7 +288,7 @@ void Ppu::VisibleScanlines()
 				bgPixel |= (attribute >> (28 - fineX * 2)) & 0b1100;
 				if(opaqueSprite0 && scanlineH != 256)
 				{
-					spriteHit = 0b01000000;
+					ppuStatus = 0b01000000; //sprite 0 hit
 				}
 			}
 		}

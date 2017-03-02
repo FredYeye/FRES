@@ -32,8 +32,7 @@ int main(int argc, char* argv[])
 		exit(1);
 	}
 
-	// GLFWwindow* window = glfwCreateWindow(256, 240, "FRES++", 0, 0);
-	GLFWwindow* window = glfwCreateWindow(512, 480, "FRES++", 0, 0);
+	GLFWwindow* window = glfwCreateWindow(256*2, 240*2, "FRES++", 0, 0);
 	if(!window)
 	{
 		glfwTerminate();

@@ -54,16 +54,16 @@ class Ppu
 
 		std::array<uint32_t, 256*240> render;
 
-		const std::array<uint32_t, 64> palette //Finalized Nostalgia (FBX) http://www.firebrandx.com/nespalette.html
+		const std::array<uint32_t, 64> palette //PVM Style (FBX) http://www.firebrandx.com/nespalette.html
 		{{
-			0xFF656565, 0xFF7D1200, 0xFF8E0018, 0xFF820036, 0xFF5D0056, 0xFF18005A, 0xFF00054F, 0xFF001938,
-			0xFF00311D, 0xFF003D00, 0xFF004100, 0xFF173B00, 0xFF552E00, 0xFF000000, 0xFF000000, 0xFF000000,
-			0xFFAFAFAF, 0xFFC84E19, 0xFFE32F47, 0xFFD71F6B, 0xFFAE1B93, 0xFF5E1A9E, 0xFF003297, 0xFF004B7B,
-			0xFF00675B, 0xFF007A26, 0xFF008200, 0xFF3E7A00, 0xFF8A6E00, 0xFF000000, 0xFF000000, 0xFF000000,
-			0xFFFFFFFF, 0xFFFFA964, 0xFFFF898E, 0xFFFF76B6, 0xFFFF6FE0, 0xFFC46CEF, 0xFF6A80F0, 0xFF2C98D8,
-			0xFF0AB4B9, 0xFF0CCB83, 0xFF3FD65B, 0xFF7ED14A, 0xFFCBC74D, 0xFF4C4C4C, 0xFF000000, 0xFF000000,
-			0xFFFFFFFF, 0xFFFFE5C7, 0xFFFFD9D9, 0xFFFFD1E9, 0xFFFFCEF9, 0xFFF1CCFF, 0xFFCBD4FF, 0xFFB1DFF8,
-			0xFFA4EAED, 0xFFA4F4D6, 0xFFB8F8C5, 0xFFD3F6BE, 0xFFF1F1BF, 0xFFB9B9B9, 0xFF000000, 0xFF000000
+			0xFF646969, 0xFF741700, 0xFF7D0028, 0xFF6D003E, 0xFF570056, 0xFF13005E, 0xFF001A53, 0xFF00243B,
+			0xFF00302A, 0xFF003A14, 0xFF003F00, 0xFF1E3B00, 0xFF503000, 0xFF000000, 0xFF000000, 0xFF000000,
+			0xFFB4B9B9, 0xFFB95314, 0xFFDA2C4D, 0xFFC81E7A, 0xFF9C1898, 0xFF44239D, 0xFF003EA0, 0xFF00558D,
+			0xFF006D65, 0xFF00792C, 0xFF008100, 0xFF427D00, 0xFF8A7800, 0xFF000000, 0xFF000000, 0xFF000000,
+			0xFFFFFFFF, 0xFFFFA869, 0xFFFF969A, 0xFFFA8AC2, 0xFFFA7DEA, 0xFFB487F3, 0xFF6C98F1, 0xFF27B3E6,
+			0xFF05C8D7, 0xFF07DF90, 0xFF3CE564, 0xFF7DE245, 0xFFD9D548, 0xFF464B4B, 0xFF000000, 0xFF000000,
+			0xFFFFFFFF, 0xFFFFEAD2, 0xFFFFE2E2, 0xFFFFD8F2, 0xFFFFD2F8, 0xFFEAD9F8, 0xFFB9DEFA, 0xFF9BE8F9,
+			0xFF8CF2F3, 0xFF91FAD3, 0xFFA8FCB8, 0xFFCAFAAE, 0xFFF3F3CA, 0xFFB9BEBE, 0xFF000000, 0xFF000000,
 		}};
 
 		std::array<uint8_t*, 8> pPattern;
@@ -85,7 +85,7 @@ class Ppu
 		uint8_t ppuStatus = 0;
 		uint8_t oamAddr = 0;
 
-		uint16_t scanlineH = 0, scanlineV = 0;
+		uint16_t scanlineH = 340, scanlineV = 261;
 		uint16_t ppuAddress, ppuAddressLatch;
 
 		uint16_t bgAddress;
@@ -106,6 +106,7 @@ class Ppu
 		uint8_t oamDiagonal = 0;
 
 		bool suppressNmi = false;
+		uint8_t nmiFlag = 0x80;
 
 		std::array<uint8_t, 8> spriteBitmapLow;
 		std::array<uint8_t, 8> spriteBitmapHigh;
@@ -113,10 +114,10 @@ class Ppu
 		std::array<uint8_t, 8> spriteXpos;
 		uint8_t spriteIndex = 0;
 
-		uint8_t spriteHit = 0;
-
 		bool sprite0OnNext = false;
 		bool sprite0OnCurrent = false;
 
 		bool isChrRam;
+
+		uint8_t TToVDelay = 0;
 };

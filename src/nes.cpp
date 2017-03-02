@@ -97,6 +97,7 @@ void Nes::RunOpcode()
 			CpuWrite(0x0100 | rS--, rP.to_ulong() | 0b00010000);
 		{
 			const uint16_t interruptVector = 0xFFFE ^ (nmiPending[1] << 2); //possible NMI hijack
+			nmiPending[0] &= !nmiPending[1]; //haven't tested, but should be correct
 			CpuRead(interruptVector);
 			tempData = dataBus;
 			rP.set(2);
