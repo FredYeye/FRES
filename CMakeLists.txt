@@ -3,7 +3,7 @@ set(project_name nes)
 project(${project_name})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -march=native") #-flto -static -fno-math-errno?
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -march=native") #-flto -fprofile-generate/use -static -fno-math-errno?
 
 set(source_files
 	src/main.cpp
