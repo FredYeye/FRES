@@ -20,6 +20,7 @@ void Ppu::CtrlWrite(uint8_t dataBus) //2000
 
 void Ppu::MaskWrite(uint8_t dataBus) //2001
 {
+	// bg & spr masks take 1 cycle to apply?
 	ppuMask = dataBus;
 
 	grayscaleMask = (dataBus & 1) ? 0x30: 0xFF;
@@ -120,11 +121,11 @@ uint8_t Ppu::DataRead() //2007
 
 		if(ppuAddress >= 0x2000)
 		{
-			ppuDataLatch = *(pNametable[(ppuAddress >> 10) & 0b11] + (ppuAddress & 0x3FF));
+			ppuDataLatch = pNametable[(ppuAddress >> 10) & 0b11][ppuAddress & 0x3FF];
 		}
 		else
 		{
-			ppuDataLatch = *(pPattern[ppuAddress >> 10] + (ppuAddress & 0x3FF));
+			ppuDataLatch = pPattern[ppuAddress >> 10][ppuAddress & 0x3FF];
 		}
 		ppuAddress += (ppuCtrl & 0b0100) ? 0x20 : 0x01;
 		return currentLatch;
@@ -156,12 +157,12 @@ void Ppu::DataWrite(uint8_t dataBus) //2007
 		{
 			if(isChrRam == 1)
 			{
-				*(pPattern[ppuAddress >> 10] + (ppuAddress & 0x3FF)) = dataBus;
+				pPattern[ppuAddress >> 10][ppuAddress & 0x3FF] = dataBus;
 			}
 		}
 		else if(ppuAddress < 0x3F00)
 		{
-			*(pNametable[(ppuAddress >> 10) & 0b11] + (ppuAddress & 0x3FF)) = dataBus;
+			pNametable[(ppuAddress >> 10) & 0b11][ppuAddress & 0x3FF] = dataBus;
 		}
 		else
 		{
@@ -237,7 +238,7 @@ void Ppu::Tick()
 		}
 	}
 
-	TToVDelay >>= 1;
+	TToVDelay >>= 1; //place this before the dot 0 skip?
 	if(TToVDelay & 1)
 	{
 		ppuAddress = ppuAddressLatch;
@@ -342,7 +343,7 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 					bgHigh |= bgHighLatch;
 					attribute |= (attributeLatch & 0b11) * 0x5555; //2-bit splat
 				}
-				nametableA = *(pNametable[(ppuAddress >> 10) & 0b11] + (ppuAddress & 0x3FF));
+				nametableA = pNametable[(ppuAddress >> 10) & 0b11][ppuAddress & 0x3FF];
 			break;
 
 			case 3: //AT
@@ -350,22 +351,22 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 				{
 					uint16_t attributeAddr = 0x23C0 | (ppuAddress & 0xC00);
 					attributeAddr |= (ppuAddress >> 4 & 0x38) | (ppuAddress >> 2 & 0b0111);
-					attributeLatch = *(pNametable[(attributeAddr >> 10) & 0b11] + (attributeAddr & 0x3FF));
+					attributeLatch = pNametable[(attributeAddr >> 10) & 0b11][attributeAddr & 0x3FF];
 					attributeLatch >>= (((ppuAddress >> 1) & 1) | ((ppuAddress >> 5) & 0b10)) * 2;
 				}
 				else
 				{
-					nametableA = *(pNametable[(ppuAddress >> 10) & 0b11] + (ppuAddress & 0x3FF));
+					nametableA = pNametable[(ppuAddress >> 10) & 0b11][ppuAddress & 0x3FF];
 				}
 			break;
 
 			case 5: //low
 				bgAddress = (nametableA << 4) + (ppuAddress >> 12) | ((ppuCtrl & 0x10) << 8);
-				bgLowLatch = *(pPattern[(bgAddress >> 10) & 7] + (bgAddress & 0x3FF));
+				bgLowLatch = pPattern[(bgAddress >> 10) & 7][bgAddress & 0x3FF];
 			break;
 
 			case 7: //high
-				bgHighLatch = *(pPattern[(bgAddress >> 10) & 7] + (bgAddress + 8 & 0x3FF));
+				bgHighLatch = pPattern[(bgAddress >> 10) & 7][bgAddress + 8 & 0x3FF];
 			break;
 		}
 
@@ -435,7 +436,7 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 				}
 				}
 
-				spriteBitmapLow[spriteIndex] = *(pPattern[(bgAddress >> 10) & 7] + (bgAddress & 0x3FF));
+				spriteBitmapLow[spriteIndex] = pPattern[(bgAddress >> 10) & 7][bgAddress & 0x3FF];
 				if(spriteAttribute[spriteIndex] & 0b01000000) //flip H
 				{
 					ReverseBits(spriteBitmapLow[spriteIndex]);
@@ -443,7 +444,7 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 			break;
 
 			case 7:
-				spriteBitmapHigh[spriteIndex] = *(pPattern[(bgAddress >> 10) & 7] + ((bgAddress | 8) & 0x3FF));
+				spriteBitmapHigh[spriteIndex] = pPattern[(bgAddress >> 10) & 7][(bgAddress | 8) & 0x3FF];
 				if(spriteAttribute[spriteIndex] & 0b01000000) //flip H
 				{
 					ReverseBits(spriteBitmapHigh[spriteIndex]);
@@ -611,13 +612,13 @@ const uint32_t* const Ppu::GetPixelPtr() const
 }
 
 
-uint16_t Ppu::GetScanlineH() const
+const uint16_t Ppu::GetScanlineH() const
 {
 	return scanlineH;
 }
 
 
-uint16_t Ppu::GetScanlineV() const
+const uint16_t Ppu::GetScanlineV() const
 {
 	return scanlineV;
 }
@@ -632,9 +633,18 @@ void Ppu::SetNametableMirroring(const std::array<NametableOffset, 4> &offset)
 }
 
 
-void Ppu::SetPatternBank(const uint8_t bank, const uint16_t offset)
+void Ppu::SetPatternBanks1(const uint8_t bank, const uint16_t offset)
 {
 	pPattern[bank] = pattern.data() + (offset << 10);
+}
+
+
+void Ppu::SetPatternBanks2(const uint8_t bank, const uint8_t offset)
+{
+	for(int x = 0; x < 2; x++)
+	{
+		pPattern[(bank << 1) + x] = &pattern[(offset << 11) + 0x400 * x];
+	}
 }
 
 
@@ -642,7 +652,7 @@ void Ppu::SetPatternBanks4(const bool bank, const uint8_t offset)
 {
 	for(int x = 0; x < 4; x++)
 	{
-		pPattern[(bank << 2) + x] = pattern.data() + (offset << 12) + 0x400 * x;
+		pPattern[(bank << 2) + x] = &pattern[(offset << 12) + 0x400 * x];
 	}
 }
 
@@ -651,19 +661,20 @@ void Ppu::SetPatternBanks8(const uint8_t offset)
 {
 	for(int x = 0; x < 8; x++)
 	{
-		pPattern[x] = pattern.data() + (offset << 13) + 0x400 * x;
+		pPattern[x] = &pattern[(offset << 13) + 0x400 * x];
 	}
 }
 
 
-void Ppu::SetPattern(std::vector<uint8_t> &chr)
+void Ppu::SetPattern(std::vector<uint8_t> &chr) //better name for this function?
 {
 	pattern = chr;
 	for(int x = 0; x < 8; x++)
 	{
-		pPattern[x] = pattern.data() + 0x400 * x;
+		pPattern[x] = &pattern[0x400 * x];
 	}
 }
+
 
 void Ppu::SetChrType(bool type)
 {

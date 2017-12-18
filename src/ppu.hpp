@@ -29,11 +29,12 @@ class Ppu
 		const bool RenderFrame();
 		const uint32_t* const GetPixelPtr() const;
 
-		uint16_t GetScanlineH() const;
-		uint16_t GetScanlineV() const;
+		const uint16_t GetScanlineH() const;
+		const uint16_t GetScanlineV() const;
 
 		void SetNametableMirroring(const std::array<NametableOffset, 4> &offset);
-		void SetPatternBank(const uint8_t bank, const uint16_t offset);
+		void SetPatternBanks1(const uint8_t bank, const uint16_t offset);
+		void SetPatternBanks2(const uint8_t bank, const uint8_t offset);
 		void SetPatternBanks4(const bool bank, const uint8_t offset);
 		void SetPatternBanks8(const uint8_t offset);
 		void SetPattern(std::vector<uint8_t> &chr);
