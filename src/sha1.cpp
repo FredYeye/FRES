@@ -76,6 +76,5 @@ const std::array<uint32_t, 5> SHA1(std::vector<uint8_t> message)
 		h4 += e;
 	}
 
-	std::array<uint32_t, 5> digest{h0, h1, h2, h3, h4};
-	return digest;
+	return {h0, h1, h2, h3, h4};
 }

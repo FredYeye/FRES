@@ -56,10 +56,9 @@ void Audio::StreamSource() const
 	// }
 
 	// uint8_t *pData;
-	// const uint32_t flags = 0;
 	// pRenderClient->GetBuffer(frameAmount, &pData);
 	// std::memcpy(pData, audioSource, frameAmount * 2 * 4);
-	// pRenderClient->ReleaseBuffer(frameAmount, flags);
+	// pRenderClient->ReleaseBuffer(frameAmount, 0);
 
 	uint8_t *pData;
 	while(pRenderClient->GetBuffer(frameAmount, &pData))
@@ -67,8 +66,7 @@ void Audio::StreamSource() const
 		Sleep(1);
 	}
 	std::memcpy(pData, audioSource, frameAmount * 2 * 4);
-	const uint32_t flags = 0;
-	pRenderClient->ReleaseBuffer(frameAmount, flags);
+	pRenderClient->ReleaseBuffer(frameAmount, 0);
 }
 
 

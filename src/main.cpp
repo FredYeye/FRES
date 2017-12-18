@@ -32,7 +32,7 @@ int main(int argc, char* argv[])
 		exit(1);
 	}
 
-	GLFWwindow* window = glfwCreateWindow(256*2, 240*2, "FRES++", 0, 0);
+	GLFWwindow* window = glfwCreateWindow(878, 240*3, "FRES++", 0, 0);
 	if(!window)
 	{
 		glfwTerminate();
@@ -67,8 +67,10 @@ int main(int argc, char* argv[])
 
 		nes.AdvanceFrame(input, input2);
 
+		scale(nes.ppu.GetPixelPtr());
+
 		glClear(GL_COLOR_BUFFER_BIT);
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 240, GL_RGBA, GL_UNSIGNED_BYTE, nes.ppu.GetPixelPtr());
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texWidth, texHeight, GL_RGBA, GL_UNSIGNED_BYTE, scaledOutput.data());
 		glBindVertexArray(vao);
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, 0);
 
@@ -122,9 +124,9 @@ void Initialize(GLuint &vao, const uint32_t *const pixelPtr)
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture); //Specify that we work with a 2D texture
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 256, 240, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixelPtr);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, texWidth, texHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, scaledOutput.data());
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 	const GLuint shaderProgram = CreateProgram();
 
@@ -226,5 +228,26 @@ static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, i
 		{
 			glfwSetWindowShouldClose(window, GL_TRUE);
 		}
+	}
+}
+
+
+void scale(const uint32_t *const pixelPtr)
+{
+	auto *pOutput = scaledOutput.data();
+	auto *pInput = pixelPtr;
+
+	for(int y = 0; y < 240; ++y)
+	{
+		for(int x = 0; x < 256; ++x)
+		{
+			(*pOutput++) = (*pInput);
+			(*pOutput++) = (*pInput);
+			(*pOutput++) = (*pInput++);
+		}
+
+		memcpy(pOutput, pOutput - 256*3, 256*3*4);
+		memcpy(pOutput + 256*3, pOutput - 256*3, 256*3*4);
+		pOutput += 256*3*2;
 	}
 }
