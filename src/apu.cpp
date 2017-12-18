@@ -17,8 +17,14 @@ Apu::Apu()
 		// mixer.tnd[x] = std::round((163.67 / (24329.0 / x+100)) * 65535.0); //16-bit
 		mixer.tnd[x] = 163.67 / (24329.0 / x+100); //float
 	}
+}
 
-	dmc.freqTimer = 428/2;
+
+void Apu::Reset()
+{
+	StatusWrite(0);
+	FrameCounterWrite(sequencerMode << 7); // ) | (blockIRQ << 6) blockIRQ isn't always cleared?
+	frameIRQ = false;
 }
 
 
@@ -117,7 +123,7 @@ void Apu::Noise3Write(uint8_t dataBus) //400F
 
 void Apu::Dmc0Write(uint8_t dataBus) //4010
 {
-	const std::array<uint16_t, 16> rateIndex
+	const std::array<uint8_t, 16> rateIndex
 	{{
 		428/2, 380/2, 340/2, 320/2, 286/2, 254/2, 226/2, 214/2,
 		190/2, 160/2, 142/2, 128/2, 106/2,  84/2,  72/2,  54/2
@@ -204,11 +210,10 @@ const uint8_t Apu::StatusRead() //4015
 	data |= bool(triangle.lengthCounter) << 2;
 	data |= bool(noise.lengthCounter   ) << 3;
 	data |= bool(dmc.samplesRemaining  ) << 4;
+	data |= frameIRQ                     << 6;
+	data |= dmc.irqPending               << 7;
 
-	data |= frameIRQ << 6;
 	frameIRQ = false;
-
-	data |= dmc.irqPending << 7;
 
 	return data;
 }
@@ -224,9 +229,9 @@ void Apu::FrameCounterWrite(uint8_t dataBus) //4017
 
 	sequencerMode = dataBus & 0b10000000;
 
-	//reset the sequencer timer 2 cycles later if on a apu tick, else 3
-	sequencerResetDelay = 0b00010000;
-	sequencerResetDelay |= apuTick << 3;
+	//reset the sequencer timer 2 cpu cycles later if on a apu tick, else 3
+	sequencerResetDelay = 0b1000;
+	sequencerResetDelay |= apuTick << 2;
 }
 
 
@@ -250,9 +255,9 @@ void Apu::DmcDma(uint8_t sample)
 			dmc.samplesRemaining = dmc.sampleLength;
 			dmc.address = dmc.addressLoad;
 		}
-		else if(dmc.enableIrq)
+		else
 		{
-			dmc.irqPending = true;
+			dmc.irqPending |= dmc.enableIrq;
 		}
 	}
 }
@@ -291,14 +296,14 @@ void Apu::Tick()
 
 		if(noise.freqCounter-- == 0)
 		{
-			noise.freqCounter = noise.freqTimer - 1; //-1?
+			noise.freqCounter = noise.freqTimer;
 			bool feedback = (noise.mode) ? noise.lfsr & 0b01000000 : noise.lfsr & 0b00000010;
 			feedback ^= noise.lfsr & 1;
 			noise.lfsr >>= 1;
 			noise.lfsr |= feedback << 14;
 		}
 
-		if(--dmc.freqCounter == 0)
+		if(--dmc.freqCounter == 0) //why does dmc need pre-decrement?
 		{
 			dmc.freqCounter = dmc.freqTimer;
 			if(!dmc.silence)
@@ -376,7 +381,6 @@ const bool Apu::PollFrameInterrupt() const
 
 void Apu::IncrementSequencer()
 {
-	sequencerResetDelay >>= 1;
 	if(sequencerResetDelay & 1)
 	{
 		sequencerResetDelay = 0;
@@ -388,6 +392,7 @@ void Apu::IncrementSequencer()
 			HalfFrame();
 		}
 	}
+	sequencerResetDelay >>= 1;
 
 	switch(sequencerCounter++)
 	{

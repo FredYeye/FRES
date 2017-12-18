@@ -36,9 +36,9 @@ struct Noise
 
 struct Dmc
 {
-	uint16_t freqTimer, freqCounter;
 	uint16_t address, addressLoad, samplesRemaining, sampleLength;
-	uint8_t output, outputShift, bitsRemaining, sampleBuffer;
+	uint8_t freqTimer = 428/2, freqCounter;
+	uint8_t output, outputShift, bitsRemaining = 1, sampleBuffer;
 	bool enableIrq, irqPending, loop, enable, silence, sampleBufferEmpty;
 };
 
@@ -53,6 +53,8 @@ class Apu
 {
 	public:
 		Apu();
+
+		void Reset();
 
 		void Pulse0Write(uint8_t dataBus, bool channel); //4000 / 4004
 		void Pulse1Write(uint8_t dataBus, bool channel); //4001 / 4005
@@ -112,13 +114,13 @@ class Apu
 		}};
 
 		uint8_t frameCounter = 0;
-		bool blockIRQ = false; //true?
+		bool blockIRQ = false;
 		bool frameIRQ = false;
 		uint16_t sequencerCounter = 0;
-		bool sequencerMode = false;
+		bool sequencerMode = 0;
 		uint8_t sequencerResetDelay = 0;
 
-		bool apuTick = false;
+		bool apuTick = true;
 
 		//wood & water rage produces 741-744 samples on intro->menu transition, so add some extra for now
 		//is this supposed to happen?

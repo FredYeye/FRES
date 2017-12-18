@@ -51,6 +51,8 @@ class Nes
 		Apu apu;
 
 	private:
+		void Reset();
+
 		void RunOpcode();
 		void Branch(const bool flag, const uint8_t op1);
 		void CpuRead(const uint16_t address);

@@ -20,20 +20,7 @@ Nes::Nes(std::string inFile)
 	ppu.SetNametableMirroring(cart.nametableOffsets);
 	ppu.SetChrType(cart.chrType);
 
-	CpuRead(PC); //PC?
-	CpuRead(PC);
-	CpuRead(PC);
-	CpuRead(0x100 | rS--);
-	CpuRead(0x100 | rS--);
-	CpuRead(0x100 | rS--);
-	CpuRead(0xFFFC);
-	tempData = dataBus;
-
-	rP = 0x36;
-	CpuRead(0xFFFD);
-
-	PC = tempData | (dataBus << 8);
-	CpuRead(PC);
+	Reset();
 }
 
 
@@ -50,6 +37,29 @@ void Nes::AdvanceFrame(uint8_t input, uint8_t input2)
 		}
 	}
 	ppu.renderFrame = false;
+
+	if(input2 & 1) Reset(); //G
+}
+
+
+void Nes::Reset()
+{
+	apu.Reset();
+
+	CpuRead(PC); //PC?
+	CpuRead(PC);
+	CpuRead(PC);
+	CpuRead(0x100 | rS--);
+	CpuRead(0x100 | rS--);
+	CpuRead(0x100 | rS--);
+	CpuRead(0xFFFC);
+	tempData = dataBus;
+
+	rP = 0x36;
+	CpuRead(0xFFFD);
+
+	PC = tempData | (dataBus << 8);
+	CpuRead(PC);
 }
 
 
