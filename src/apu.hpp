@@ -73,7 +73,7 @@ class Apu
 		void Dmc3Write(uint8_t dataBus);                 //4013
 
 		void StatusWrite(uint8_t dataBus);               //4015
-		uint8_t StatusRead();                            //4015
+		const uint8_t StatusRead();                      //4015
 		void FrameCounterWrite(uint8_t dataBus);         //4017
 
 		const uint16_t GetDmcAddr() const;
@@ -84,7 +84,7 @@ class Apu
 		const void* const GetOutput() const;
 		uint16_t sampleCount = 0;
 
-		bool PollFrameInterrupt() const;
+		const bool PollFrameInterrupt() const;
 		bool dmcDma = false;
 
 	private:
@@ -103,6 +103,12 @@ class Apu
 		{{
 			10,254, 20,  2, 40,  4, 80,  6,160,  8, 60, 10, 14, 12, 26, 14,
 			12, 16, 24, 18, 48, 20, 96, 22,192, 24, 72, 26, 16, 28, 32, 30
+		}};
+
+		const std::array<uint8_t, 32> triangleSequencerTable
+		{{
+			15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0,
+			0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
 		}};
 
 		uint8_t frameCounter = 0;

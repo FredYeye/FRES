@@ -195,7 +195,7 @@ void Apu::StatusWrite(uint8_t dataBus) //4015
 }
 
 
-uint8_t Apu::StatusRead() //4015
+const uint8_t Apu::StatusRead() //4015
 {
 	uint8_t data = 0;
 
@@ -238,6 +238,7 @@ const uint16_t Apu::GetDmcAddr() const
 
 void Apu::DmcDma(uint8_t sample)
 {
+	dmcDma = false;
 	dmc.sampleBuffer = sample;
 	++dmc.address |= 0x8000;
 	dmc.sampleBufferEmpty = false;
@@ -297,9 +298,9 @@ void Apu::Tick()
 			noise.lfsr |= feedback << 14;
 		}
 
-		if(dmc.freqCounter-- == 0)
+		if(--dmc.freqCounter == 0)
 		{
-			dmc.freqCounter = dmc.freqTimer - 1; //timer isn't t+1 unlike some others (improve explanation...)
+			dmc.freqCounter = dmc.freqTimer;
 			if(!dmc.silence)
 			{
 				if(dmc.outputShift & 1)
@@ -318,18 +319,14 @@ void Apu::Tick()
 			dmc.outputShift >>= 1;
 			if(--dmc.bitsRemaining == 0)
 			{
-				dmc.bitsRemaining = 8; //doing this in the if case below makes dmc_basics pass, but not the correct solution (i think...)
+				dmc.bitsRemaining = 8;
 				dmc.outputShift = dmc.sampleBuffer;
 				dmc.silence = dmc.sampleBufferEmpty;
 				dmc.sampleBufferEmpty = true;
 			}
 		}
 
-		if(dmc.samplesRemaining && dmc.sampleBufferEmpty)
-		{
-			dmc.bitsRemaining = 8;
-			dmcDma = true;
-		}
+		dmcDma = dmc.samplesRemaining && dmc.sampleBufferEmpty;
 
 		if(++nearestCounter == outputCounter[outI])
 		{
@@ -345,11 +342,6 @@ void Apu::Tick()
 				}
 			}
 
-			const std::array<uint8_t, 32> triangleSequencerTable
-			{{
-				15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0,
-				0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
-			}};
 			const uint8_t triangleOutput = (ultrasonic) ? 7 : triangleSequencerTable[triangle.sequencerStep]; //should be 7.5. HMM set to 0?
 
 			uint8_t noiseOutput = 0;
@@ -376,7 +368,7 @@ const void* const Apu::GetOutput() const //734 samples/frame = 60.0817), use as 
 }
 
 
-bool Apu::PollFrameInterrupt() const
+const bool Apu::PollFrameInterrupt() const
 {
 	return frameIRQ;
 }
@@ -388,7 +380,7 @@ void Apu::IncrementSequencer()
 	if(sequencerResetDelay & 1)
 	{
 		sequencerResetDelay = 0;
-		sequencerCounter = 0; //i thought it would be -1, but 0 Passes The Tests™
+		sequencerCounter = 0;
 
 		if(sequencerMode == 1)
 		{
