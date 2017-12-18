@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
 
 		nes.AdvanceFrame(input, input2);
 
-		scale(nes.ppu.GetPixelPtr());
+		Scale(nes.ppu.GetPixelPtr());
 
 		glClear(GL_COLOR_BUFFER_BIT);
 		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texWidth, texHeight, GL_RGBA, GL_UNSIGNED_BYTE, scaledOutput.data());
@@ -232,7 +232,7 @@ static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, i
 }
 
 
-void scale(const uint32_t *const pixelPtr)
+void Scale(const uint32_t *const pixelPtr)
 {
 	auto *pOutput = scaledOutput.data();
 	auto *pInput = pixelPtr;
