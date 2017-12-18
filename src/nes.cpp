@@ -13,7 +13,6 @@
 Nes::Nes(std::string inFile)
 {
 	Cart cart(inFile, prgRom, prgRam);
-	mapper = cart.mapper;
 	type = cart.type;
 	pPrgBank = cart.pPrgBank;
 	pPrgRamBank = cart.pPrgRamBank;
@@ -165,13 +164,13 @@ void Nes::RunOpcode()
 		break;
 
 		case 0x10: Branch(!rP[7], op1); break; //BPL
-		case 0x30: Branch(rP[7], op1);  break; //BMI
+		case 0x30: Branch( rP[7], op1); break; //BMI
 		case 0x50: Branch(!rP[6], op1); break; //BVC
-		case 0x70: Branch(rP[6], op1);  break; //BVS
+		case 0x70: Branch( rP[6], op1); break; //BVS
 		case 0x90: Branch(!rP[0], op1); break; //BCC
-		case 0xB0: Branch(rP[0], op1);  break; //BCS
+		case 0xB0: Branch( rP[0], op1); break; //BCS
 		case 0xD0: Branch(!rP[1], op1); break; //BNE
-		case 0xF0: Branch(rP[1], op1);  break; //BEQ
+		case 0xF0: Branch( rP[1], op1); break; //BEQ
 
 		case 0x18: rP.reset(0); break; //CLC
 		case 0x38: rP.set(0);   break; //SEC
@@ -639,6 +638,9 @@ void Nes::RunOpcode()
 			rP[7] = rY - dataBus & 0x80;
 		break;
 
+		case 0xA3: case 0xA7: case 0xAF: case 0xB3: case 0xB7: case 0xAB: case 0xBF: //lax
+			rA = dataBus;
+
 		case 0xA2: case 0xA6: case 0xAE: case 0xB6: case 0xBE: //ldx
 			rX = dataBus;
 			rP[1] = !rX;
@@ -655,13 +657,6 @@ void Nes::RunOpcode()
 			rP[1] = !(dataBus & rA);
 			rP[6] = dataBus & 0x40;
 			rP[7] = dataBus & 0x80;
-		break;
-
-		case 0xA3: case 0xA7: case 0xAF: case 0xB3: case 0xB7: case 0xAB: case 0xBF: //lax
-			rA = dataBus;
-			rX = dataBus;
-			rP[1] = !rX;
-			rP[7] = rX & 0x80;
 		break;
 
 		case 0x46: case 0x4E: case 0x56: case 0x5E: //lsr
@@ -771,6 +766,7 @@ void Nes::Branch(const bool flag, const uint8_t op1)
 
 void Nes::CpuRead(const uint16_t address)
 {
+	rw = 1;
 	addressBus = address;
 
 	switch(addressBus >> 13)
@@ -808,7 +804,7 @@ void Nes::CpuRead(const uint16_t address)
 			if(prgRam.size()) //todo: maybe & with some generic cart.ramEnabled
 			{
 				//todo: vrc4 with 2kb wram should return open bus if addressBus >= 0x7000
-				dataBus = *(pPrgRamBank[(addressBus >> 11) & 0b11] + (addressBus & 0x1FFF));
+				dataBus = pPrgRamBank[(addressBus >> 11) & 0b11][addressBus & 0x07FF];
 			}
 			else
 			{
@@ -816,29 +812,10 @@ void Nes::CpuRead(const uint16_t address)
 			}
 		break;
 
-		case 0x8000 >> 13: dataBus = *(pPrgBank[0] + (addressBus & 0x1FFF)); break;
-		case 0xA000 >> 13: dataBus = *(pPrgBank[1] + (addressBus & 0x1FFF)); break;
-		case 0xC000 >> 13: dataBus = *(pPrgBank[2] + (addressBus & 0x1FFF)); break;
-		case 0xE000 >> 13: dataBus = *(pPrgBank[3] + (addressBus & 0x1FFF)); break;
-	}
-
-	if(apu.dmcDma & !dmcDmaActive) //where to do this?
-	{
-		const uint16_t tempAdr = addressBus; //better solution?
-
-		dmcDmaActive = true;
-
-		CpuRead(addressBus); //current read becomes the halt/1st dummy, this is the 2nd dummy read
-		if(cycleCount & 1)
-		{
-			CpuRead(addressBus); //alignment
-		}
-		CpuRead(apu.GetDmcAddr()); //dma fetch
-		apu.DmcDma(dataBus);
-		CpuRead(tempAdr); //resume (addressBus)
-
-		dmcDmaActive = false;
-		apu.dmcDma = false;
+		case 0x8000 >> 13: dataBus = pPrgBank[0][addressBus & 0x1FFF]; break;
+		case 0xA000 >> 13: dataBus = pPrgBank[1][addressBus & 0x1FFF]; break;
+		case 0xC000 >> 13: dataBus = pPrgBank[2][addressBus & 0x1FFF]; break;
+		case 0xE000 >> 13: dataBus = pPrgBank[3][addressBus & 0x1FFF]; break;
 	}
 
 	CpuTick();
@@ -847,6 +824,7 @@ void Nes::CpuRead(const uint16_t address)
 
 void Nes::CpuWrite(const uint16_t address, const uint8_t data)
 {
+	rw = 0;
 	addressBus = address;
 	dataBus = data;
 
@@ -908,7 +886,7 @@ void Nes::CpuWrite(const uint16_t address, const uint8_t data)
 			if(prgRam.size()) //todo: maybe & with some generic cart.ramEnabled
 			{
 				//todo: writes to vrc4 with 2kb wram should do nothing if addressBus >= 0x7000
-				*(pPrgRamBank[(addressBus >> 11) & 0b11] + (addressBus & 0x1FFF)) = dataBus;
+				pPrgRamBank[(addressBus >> 11) & 0b11][addressBus & 0x07FF] = dataBus;
 			}
 		break;
 
@@ -923,6 +901,28 @@ void Nes::CpuWrite(const uint16_t address, const uint8_t data)
 
 void Nes::CpuTick()
 {
+	if(apu.dmcDma && !dmcDmaActive)
+	{
+		dmcDmaActive = true;
+
+		const uint16_t tempAddr = addressBus;
+
+		if(!dmaPending)
+		{
+			if(rw == 1)
+			{
+				CpuRead(addressBus);
+			}
+			CpuRead(addressBus);
+		}
+
+		CpuRead(apu.GetDmcAddr()); //dma fetch
+		apu.DmcDma(dataBus);
+		CpuRead(tempAddr); //resume
+
+		dmcDmaActive = false;
+	}
+
 	ppu.Tick();
 	PollInterrupts();
 	ppu.Tick();
@@ -991,7 +991,7 @@ void Nes::PollInterrupts()
 	nmiPending[0] |= !oldNmi & nmi; //nmiPending[0] gets set = nmi detected, but interrupt polling will miss
 
 	irqPending[1] = irqPending[0]; //same as nmi
-	irqPending[0] = !rP.test(2) & (apu.PollFrameInterrupt() | VRC4Interrupt()); //or with some general cartIRQ later
+	irqPending[0] = !rP.test(2) & (apu.PollFrameInterrupt() | VRC4Interrupt()); //OR with some general cartIRQ later
 }
 
 
@@ -1042,10 +1042,10 @@ uint8_t Nes::DebugRead(uint16_t address)
 				<< std::uppercase << std::hex << std::setfill('0') << std::setw(4) << address << "\n";
 		break;
 
-		case 0x8000: a = *(pPrgBank[0] + (address & 0x1FFF)); break;
-		case 0xA000: a = *(pPrgBank[1] + (address & 0x1FFF)); break;
-		case 0xC000: a = *(pPrgBank[2] + (address & 0x1FFF)); break;
-		case 0xE000: a = *(pPrgBank[3] + (address & 0x1FFF)); break;
+		case 0x8000: a = pPrgBank[0][address & 0x1FFF]; break;
+		case 0xA000: a = pPrgBank[1][address & 0x1FFF]; break;
+		case 0xC000: a = pPrgBank[2][address & 0x1FFF]; break;
+		case 0xE000: a = pPrgBank[3][address & 0x1FFF]; break;
 	}
 
 	return a;
@@ -1055,38 +1055,36 @@ uint8_t Nes::DebugRead(uint16_t address)
 //put this elsewhere later
 void Nes::Addons()
 {
-	if(mapper == 2 || type == NES_UNROM)
+	switch(type)
 	{
-		pPrgBank[0] = &prgRom[(dataBus & 0b1111) * 0x4000];
-		pPrgBank[1] = pPrgBank[0] + 0x2000;
-	}
-	else if(mapper == 3 || type == NES_CNROM)
-	{
-		ppu.SetPatternBanks8(dataBus & 0b0011);
-	}
-	else if(mapper == 7 || type == NES_AOROM)
-	{
-		pPrgBank[0] = &prgRom[(dataBus & 0b0111) * 0x8000];
-		pPrgBank[1] = pPrgBank[0] + 0x2000;
-		pPrgBank[2] = pPrgBank[0] + 0x4000;
-		pPrgBank[3] = pPrgBank[0] + 0x6000;
+		case UNROM:
+			pPrgBank[0] = &prgRom[(dataBus & 0b1111) * 0x4000];
+			pPrgBank[1] = pPrgBank[0] + 0x2000;
+		break;
 
-		if(dataBus & 0b00010000)
-		{
-			ppu.SetNametableMirroring({B,B,B,B});
-		}
-		else
-		{
-			ppu.SetNametableMirroring({A,A,A,A});
-		}
-	}
-	else if(type == KONAMI_VRC_4)
-	{
-		VRC4Registers();
-	}
-	else if(type == NES_SLROM)
-	{
-		MMC1Registers();
+		case CNROM:
+			ppu.SetPatternBanks8(dataBus & 0b0011);
+		break;
+
+		case AOROM:
+			pPrgBank[0] = &prgRom[(dataBus & 0b0111) * 0x8000];
+			pPrgBank[1] = pPrgBank[0] + 0x2000;
+			pPrgBank[2] = pPrgBank[0] + 0x4000;
+			pPrgBank[3] = pPrgBank[0] + 0x6000;
+
+			if(dataBus & 0b00010000)
+			{
+				ppu.SetNametableMirroring({B,B,B,B});
+			}
+			else
+			{
+				ppu.SetNametableMirroring({A,A,A,A});
+			}
+		break;
+
+		case SFROM: MMC1Registers(); break;
+		case TLROM: MMC3Registers(); break;
+		case VRC_4: VRC4Registers(); break;
 	}
 }
 
@@ -1203,6 +1201,85 @@ void Nes::MMC1Registers()
 }
 
 
+void Nes::MMC3Registers()
+{
+	switch(((addressBus >> 12) & 0b0110) | (addressBus & 1))
+	{
+		case 0: //8000
+			mmc3.bankRegSelect = dataBus & 0b0111;
+			mmc3.prgMode = dataBus & 0b01000000;
+			mmc3.chrMode = dataBus & 0b10000000;
+
+			pPrgBank[mmc3.prgMode << 1] = &prgRom[mmc3.bankReg[6] << 13];
+			pPrgBank[!mmc3.prgMode << 1] = &prgRom[prgRom.size() - 16 * 1024];
+
+			ppu.SetPatternBanks2((mmc3.chrMode << 1)    , mmc3.bankReg[0]);
+			ppu.SetPatternBanks2((mmc3.chrMode << 1) | 1, mmc3.bankReg[1]);
+
+			ppu.SetPatternBanks1((!mmc3.chrMode << 2)    , mmc3.bankReg[2]);
+			ppu.SetPatternBanks1((!mmc3.chrMode << 2) | 1, mmc3.bankReg[3]);
+			ppu.SetPatternBanks1((!mmc3.chrMode << 2) | 2, mmc3.bankReg[4]);
+			ppu.SetPatternBanks1((!mmc3.chrMode << 2) | 3, mmc3.bankReg[5]);
+
+		break;
+
+		case 1: //8001
+			mmc3.bankReg[mmc3.bankRegSelect] = dataBus;
+
+			switch(mmc3.bankRegSelect)
+			{
+				case 0: case 1:
+					mmc3.bankReg[mmc3.bankRegSelect] >>= 1;
+					ppu.SetPatternBanks2((mmc3.chrMode << 1) | mmc3.bankRegSelect, mmc3.bankReg[mmc3.bankRegSelect]);
+				break;
+
+				case 2: case 3: case 4: case 5:
+					ppu.SetPatternBanks1((!mmc3.chrMode << 2) | (mmc3.bankRegSelect - 2), mmc3.bankReg[mmc3.bankRegSelect]);
+				break;
+
+				case 6:
+					mmc3.bankReg[6] &= 0b00111111;
+					pPrgBank[mmc3.prgMode << 1] = &prgRom[mmc3.bankReg[6] << 13];
+				break;
+
+				case 7:
+					mmc3.bankReg[7] &= 0b00111111;
+					pPrgBank[1] = &prgRom[mmc3.bankReg[7] << 13];
+				break;
+			}
+		break;
+
+		case 2: //A000
+			if(dataBus & 1 == 0)
+			{
+				ppu.SetNametableMirroring({A, A, B, B});
+			}
+			else
+			{
+				ppu.SetNametableMirroring({A, B, A, B});
+			}
+		break;
+
+		case 3: //A001
+		break;
+
+		case 4: //C000
+			mmc3.irqLatch = dataBus;
+		break;
+
+		case 5: //C001
+		break;
+
+		case 6: //E000
+		break;
+
+		case 7: //E001
+			mmc3.irqEnable = true;
+		break;
+	}
+}
+
+
 void Nes::VRC4Registers()
 {
 	const uint16_t vrc4Address = (addressBus & 0xFF00) | ((addressBus & 0xFF) >> 2);
@@ -1237,14 +1314,14 @@ void Nes::VRC4Registers()
 		{
 			const uint8_t regSelect = ((vrc4Address >> 11) - 0x16) | ((vrc4Address >> 1) & 1);
 			vrc4.chrSelect[regSelect] = (vrc4.chrSelect[regSelect] & 0x01F0) | (dataBus & 0b1111);
-			ppu.SetPatternBank(regSelect, vrc4.chrSelect[regSelect]);
+			ppu.SetPatternBanks1(regSelect, vrc4.chrSelect[regSelect]);
 		}
 		break;
 		case 0xB001: case 0xB003: case 0xC001: case 0xC003: case 0xD001: case 0xD003: case 0xE001: case 0xE003:
 		{
 			const uint8_t regSelect = ((vrc4Address >> 11) - 0x16) | ((vrc4Address >> 1) & 1);
 			vrc4.chrSelect[regSelect] = (vrc4.chrSelect[regSelect] & 0x0F) | ((dataBus & 0b00011111) << 4);
-			ppu.SetPatternBank(regSelect, vrc4.chrSelect[regSelect]);
+			ppu.SetPatternBanks1(regSelect, vrc4.chrSelect[regSelect]);
 		}
 		break;
 

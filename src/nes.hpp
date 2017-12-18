@@ -34,6 +34,12 @@ struct MMC1
 	uint8_t chr1 = 0;
 };
 
+struct MMC3
+{
+	std::array<uint8_t, 8> bankReg{};
+	uint8_t bankRegSelect, irqLatch;
+	bool prgMode, chrMode, irqEnable;
+};
 
 class Nes
 {
@@ -58,6 +64,7 @@ class Nes
 
 		void Addons();
 		void MMC1Registers();
+		void MMC3Registers();
 		void VRC4Registers();
 		bool VRC4Interrupt();
 
@@ -87,11 +94,12 @@ class Nes
 
 		bool dmaPending = false;
 		bool dmcDmaActive = false;
+		bool rw;
 
-		uint8_t mapper;
 		Type type;
 		uint8_t tempData;
 
 		VRC4 vrc4;
 		MMC1 mmc1;
+		MMC3 mmc3;
 };
