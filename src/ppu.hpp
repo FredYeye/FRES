@@ -32,7 +32,7 @@ class Ppu
 		const uint16_t GetScanlineH() const;
 		const uint16_t GetScanlineV() const;
 
-		void SetNametableMirroring(const std::array<NametableOffset, 4> &offset);
+		void SetNametableArrangement(const std::array<NametableOffset, 4> &offset);
 		void SetPatternBanks1(const uint8_t bank, const uint16_t offset);
 		void SetPatternBanks2(const uint8_t bank, const uint8_t offset);
 		void SetPatternBanks4(const bool bank, const uint8_t offset);
@@ -41,6 +41,9 @@ class Ppu
 		void SetChrType(bool type);
 
 		bool renderFrame = false;
+
+
+		bool GetA12();
 
 	private:
 		void VisibleScanlines();
@@ -87,9 +90,9 @@ class Ppu
 		uint8_t oamAddr = 0;
 
 		uint16_t scanlineH = 340, scanlineV = 261;
-		uint16_t ppuAddress, ppuAddressLatch;
+		uint16_t ppuAddress, ppuAddressLatch; //v,t rename?
 
-		uint16_t bgAddress;
+		uint16_t ppuAddressBus;
 		uint8_t nametableA; //rename
 		uint32_t attribute;
 		uint8_t attributeLatch;

@@ -17,7 +17,7 @@ Nes::Nes(std::string inFile)
 	pPrgBank = cart.pPrgBank;
 	pPrgRamBank = cart.pPrgRamBank;
 	ppu.SetPattern(cart.chrMem);
-	ppu.SetNametableMirroring(cart.nametableOffsets);
+	ppu.SetNametableArrangement(cart.nametableOffsets);
 	ppu.SetChrType(cart.chrType);
 
 	Reset();
@@ -38,7 +38,10 @@ void Nes::AdvanceFrame(uint8_t input, uint8_t input2)
 	}
 	ppu.renderFrame = false;
 
-	if(input2 & 1) Reset(); //G
+	if(input2 & 1)
+	{
+		Reset(); //G key
+	}
 }
 
 
@@ -1001,7 +1004,7 @@ void Nes::PollInterrupts()
 	nmiPending[0] |= !oldNmi & nmi; //nmiPending[0] gets set = nmi detected, but interrupt polling will miss
 
 	irqPending[1] = irqPending[0]; //same as nmi
-	irqPending[0] = !rP.test(2) & (apu.PollFrameInterrupt() | VRC4Interrupt()); //OR with some general cartIRQ later
+	irqPending[0] = !rP.test(2) & (apu.PollFrameInterrupt() | VRC4Interrupt() | MMC3Interrupt()); //OR with some general cartIRQ later
 }
 
 
@@ -1084,11 +1087,11 @@ void Nes::Addons()
 
 			if(dataBus & 0b00010000)
 			{
-				ppu.SetNametableMirroring({B,B,B,B});
+				ppu.SetNametableArrangement({B,B,B,B});
 			}
 			else
 			{
-				ppu.SetNametableMirroring({A,A,A,A});
+				ppu.SetNametableArrangement({A,A,A,A});
 			}
 		break;
 
@@ -1124,10 +1127,10 @@ void Nes::MMC1Registers()
 					case 0x8000 >> 13:
 						switch(mmc1.shiftReg & 0b11)
 						{
-							case 0: ppu.SetNametableMirroring({A,A,A,A}); break;
-							case 1: ppu.SetNametableMirroring({B,B,B,B}); break;
-							case 2: ppu.SetNametableMirroring({A,B,A,B}); break;
-							case 3: ppu.SetNametableMirroring({A,A,B,B}); break;
+							case 0: ppu.SetNametableArrangement({A,A,A,A}); break;
+							case 1: ppu.SetNametableArrangement({B,B,B,B}); break;
+							case 2: ppu.SetNametableArrangement({A,B,A,B}); break;
+							case 3: ppu.SetNametableArrangement({A,A,B,B}); break;
 						}
 
 						mmc1.prgMode = (mmc1.shiftReg >> 2) & 0b11;
@@ -1260,13 +1263,13 @@ void Nes::MMC3Registers()
 		break;
 
 		case 2: //A000
-			if(dataBus & 1 == 0)
+			if(dataBus & 1)
 			{
-				ppu.SetNametableMirroring({A, A, B, B});
+				ppu.SetNametableArrangement({A, A, B, B});
 			}
 			else
 			{
-				ppu.SetNametableMirroring({A, B, A, B});
+				ppu.SetNametableArrangement({A, B, A, B});
 			}
 		break;
 
@@ -1278,15 +1281,49 @@ void Nes::MMC3Registers()
 		break;
 
 		case 5: //C001
+			mmc3.irqReload = true;
+			//also set counter to 0?
 		break;
 
 		case 6: //E000
+			mmc3.irqEnable = false;
+			mmc3.irqPending = false;
 		break;
 
 		case 7: //E001
 			mmc3.irqEnable = true;
 		break;
 	}
+}
+
+
+bool Nes::MMC3Interrupt()
+{
+	//todo: investigate revision differences
+
+	mmc3.A12[2] = mmc3.A12[1];
+	mmc3.A12[1] = mmc3.A12[0];
+	mmc3.A12[0] = ppu.GetA12();
+
+	if(mmc3.A12[0] && !(mmc3.A12[1] | mmc3.A12[2])) //clock irq via A12 0 -> 0 -> 1 change
+	{
+		if(mmc3.irqCounter == 0)
+		{
+			mmc3.irqCounter = mmc3.irqLatch;
+			mmc3.irqPending |= mmc3.irqEnable;
+		}
+		else if(mmc3.irqReload)
+		{
+			mmc3.irqCounter = mmc3.irqLatch;
+			mmc3.irqReload = false;
+		}
+		else
+		{
+			--mmc3.irqCounter;
+		}
+	}
+
+	return mmc3.irqPending;
 }
 
 
@@ -1301,10 +1338,10 @@ void Nes::VRC4Registers()
 		case 0x9000: case 0x9001:
 			switch(dataBus & 0b11)
 			{
-				case 0: ppu.SetNametableMirroring({A,B,A,B}); break;
-				case 1: ppu.SetNametableMirroring({A,A,B,B}); break;
-				case 2: ppu.SetNametableMirroring({A,A,A,A}); break;
-				case 3: ppu.SetNametableMirroring({B,B,B,B}); break;
+				case 0: ppu.SetNametableArrangement({A,B,A,B}); break;
+				case 1: ppu.SetNametableArrangement({A,A,B,B}); break;
+				case 2: ppu.SetNametableArrangement({A,A,A,A}); break;
+				case 3: ppu.SetNametableArrangement({B,B,B,B}); break;
 			}
 		break;
 		case 0x9002: case 0x9003:

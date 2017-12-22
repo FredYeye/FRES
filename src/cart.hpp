@@ -12,7 +12,7 @@ enum Type : uint16_t
     SFROM = 1, SGROM = 1, SKROM = 1, SLROM = 1, SNROM = 1,
     UNROM = 2,
     CNROM = 3,
-    TLROM = 4, TSROM = 4,
+    TGROM = 4, TKROM = 4, TLROM = 4, TSROM = 4,
     AOROM = 7,
     VRC_4 = 21
 };
@@ -94,8 +94,11 @@ struct Cart
             {{0x5AFD9664, 0x716116B4, 0x98354B40, 0x48D743D9, 0x8540BF79}, {Ntsc, CNROM, 32 , 32 , ChrRom, 0, 0, horizontal, none  }}, //wood & water rage
 
             //4
+            {{0xC70DB279, 0x964E0F83, 0x5427CA0A, 0x406D54A4, 0x5AE7783A}, {Ntsc, TGROM, 512, 8  , ChrRam, 0, 0, vertical  , MMC3B }}, //mega man 4 revA
+            {{0x8A49FE60, 0xB6A151C0, 0x55A63639, 0x894CD366, 0x935A7EE9}, {Ntsc, TKROM, 256, 128, ChrRom, 8, 1, vertical  , MMC3B }}, //crystalis
             {{0xA6C56AC7, 0x87FF11A6, 0x7921867F, 0xFC9F79A5, 0x7A382657}, {Ntsc, TLROM, 128, 128, ChrRom, 0, 0, vertical  , MMC3B }}, //batman
             {{0x6780B3FC, 0xC547C013, 0xEE45AFAC, 0x6BB30C6F, 0xC6D8B46E}, {Ntsc, TLROM, 256, 128, ChrRom, 0, 0, vertical  , MMC3B }}, //mega man 3
+            {{0x503EB239, 0x55475D10, 0x5029FDD6, 0xAE082BCC, 0x14E7306A}, {Ntsc, TLROM, 128, 128, ChrRom, 0, 0, vertical  , MMC3B }}, //shatterhand
             {{0xBB894D10, 0x4C796F69, 0xBA16587E, 0xB66C0275, 0xF5C2FC02}, {Ntsc, TSROM, 256, 128, ChrRom, 8, 0, vertical  , MMC3B }}, //super mario bros. 3 revA
 
             //7

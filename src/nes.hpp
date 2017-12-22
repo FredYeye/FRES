@@ -37,8 +37,9 @@ struct MMC1
 struct MMC3
 {
 	std::array<uint8_t, 8> bankReg{};
-	uint8_t bankRegSelect, irqLatch;
-	bool prgMode, chrMode, irqEnable;
+	uint8_t bankRegSelect, irqLatch = 0, irqCounter = 0;
+	bool prgMode, chrMode, irqEnable = 0, irqPending = 0, irqReload = 0;
+	std::array<bool, 3> A12{};
 };
 
 class Nes
@@ -67,6 +68,7 @@ class Nes
 		void Addons();
 		void MMC1Registers();
 		void MMC3Registers();
+		bool MMC3Interrupt();
 		void VRC4Registers();
 		bool VRC4Interrupt();
 

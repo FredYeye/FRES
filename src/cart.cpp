@@ -42,12 +42,13 @@ Cart::Cart(const std::string inFile, std::vector<uint8_t> &prgRom, std::vector<u
 			case 1: type = SFROM; break;
 			case 2: type = UNROM; break;
 			case 3: type = CNROM; break;
+			case 4: type = TGROM; break;
 			case 7: type = AOROM; break;
 			case 21: type = VRC_4; break;
 		}
 
 
-		if(mapper == 0 || mapper == 1 || mapper == 2 || mapper == 3 || mapper == 7)
+		if(mapper == 0 || mapper == 1 || mapper == 2 || mapper == 3 || mapper == 4 || mapper == 7)
 		{
 			prgRom.assign(fileContent.begin(), fileContent.begin() + header[4] * 0x4000);
 			SetDefaultPrgBanks(prgRom);
@@ -108,7 +109,7 @@ void Cart::SetDefaultPrgBanksSha(std::vector<uint8_t> &prgRom, cartAttributes at
 {
 	switch(attr.type)
 	{
-		case NROM: case SFROM: case UNROM: case CNROM: case TLROM: case VRC_4:
+		case NROM: case SFROM: case UNROM: case CNROM: case TGROM: case VRC_4:
 			pPrgBank[0] = prgRom.data();
 			pPrgBank[1] = prgRom.data() + 0x2000;
 			pPrgBank[2] = prgRom.data() + (attr.prg - 16) * 1024;
@@ -127,7 +128,7 @@ void Cart::SetDefaultPrgBanksSha(std::vector<uint8_t> &prgRom, cartAttributes at
 
 void Cart::SetDefaultPrgBanks(std::vector<uint8_t> &prgRom)
 {
-	if(mapper == 0 || mapper == 1 || mapper == 2 || mapper == 3 || mapper == 21)
+	if(mapper == 0 || mapper == 1 || mapper == 2 || mapper == 3 || mapper == 4 || mapper == 21)
 	{
 		pPrgBank[0] = &prgRom[0];
 		pPrgBank[1] = &prgRom[0x2000];
@@ -146,7 +147,7 @@ void Cart::SetDefaultPrgBanks(std::vector<uint8_t> &prgRom)
 
 void Cart::SetChrMem(const std::vector<uint8_t> &fileContent)
 {
-	if(mapper == 0 || mapper == 1 || mapper == 2 || mapper == 3)
+	if(mapper == 0 || mapper == 1 || mapper == 2 || mapper == 3 || mapper == 4)
 	{
 		if(header[5])
 		{
@@ -179,6 +180,10 @@ void Cart::SetDefaultNametableLayout()
 		{
 			nametableOffsets = {A, A, B, B}; //vertical arrangement
 		}
+	}
+	else if(mapper == 4)
+	{
+		nametableOffsets = {A, A, B, B}; //vertical arrangement
 	}
 	else if(mapper == 1 || mapper == 7)
 	{

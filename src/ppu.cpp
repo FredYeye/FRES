@@ -107,7 +107,10 @@ void Ppu::AddrWrite(uint8_t dataBus) //2006
 	{
 		ppuAddressLatch &= 0x7F00;
 		ppuAddressLatch |= dataBus;
-		TToVDelay = 0b00000100; //T->V copy should be delayed by 3 clocks. check if this impl is the correct amount later
+
+		//T->V copy should be delayed by 3 clocks.
+		//current impl doesn't do that i think. investigate
+		TToVDelay = 0b00000100;
 	}
 	wToggle = !wToggle;
 }
@@ -209,6 +212,11 @@ void Ppu::Tick()
 	if(scanlineV < 240) //visible scanlines
 	{
 		VisibleScanlines();
+		if(ppuMask & 0b00011000)
+		{
+			RenderFetches();
+			OamScan();
+		}
 	}
 	else if(scanlineV == 241 && scanlineH == 1) //vblank scanlines
 	{
@@ -238,10 +246,11 @@ void Ppu::Tick()
 		}
 	}
 
-	TToVDelay >>= 1; //place this before the dot 0 skip?
+	TToVDelay >>= 1; //place this before the dot 0 skip or not?
 	if(TToVDelay & 1)
 	{
 		ppuAddress = ppuAddressLatch;
+		// ppuAddressBus = ppuAddress;
 	}
 }
 
@@ -313,12 +322,6 @@ void Ppu::VisibleScanlines()
 
 		render[renderPos++] = palette[pIndex & grayscaleMask] & emphasisMask;
 	}
-
-	if(ppuMask & 0b00011000)
-	{
-		RenderFetches();
-		OamScan();
-	}
 }
 
 
@@ -343,30 +346,33 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 					bgHigh |= bgHighLatch;
 					attribute |= (attributeLatch & 0b11) * 0x5555; //2-bit splat
 				}
+				ppuAddressBus = (ppuAddress & 0x0FFF) | 0x2000;
 				nametableA = pNametable[(ppuAddress >> 10) & 0b11][ppuAddress & 0x3FF];
 			break;
 
 			case 3: //AT
 				if(scanlineH != 339)
 				{
-					uint16_t attributeAddr = 0x23C0 | (ppuAddress & 0xC00);
-					attributeAddr |= (ppuAddress >> 4 & 0x38) | (ppuAddress >> 2 & 0b0111);
-					attributeLatch = pNametable[(attributeAddr >> 10) & 0b11][attributeAddr & 0x3FF];
+					ppuAddressBus = 0x23C0 | (ppuAddress & 0xC00);
+					ppuAddressBus |= (ppuAddress >> 4 & 0x38) | (ppuAddress >> 2 & 0b0111);
+
+					attributeLatch = pNametable[(ppuAddressBus >> 10) & 0b11][ppuAddressBus & 0x3FF];
 					attributeLatch >>= (((ppuAddress >> 1) & 1) | ((ppuAddress >> 5) & 0b10)) * 2;
 				}
 				else
 				{
+					ppuAddressBus = (ppuAddress & 0x0FFF) | 0x2000;
 					nametableA = pNametable[(ppuAddress >> 10) & 0b11][ppuAddress & 0x3FF];
 				}
 			break;
 
 			case 5: //low
-				bgAddress = (nametableA << 4) + (ppuAddress >> 12) | ((ppuCtrl & 0x10) << 8);
-				bgLowLatch = pPattern[(bgAddress >> 10) & 7][bgAddress & 0x3FF];
+				ppuAddressBus = (nametableA << 4) + (ppuAddress >> 12) | ((ppuCtrl & 0x10) << 8);
+				bgLowLatch = pPattern[(ppuAddressBus >> 10) & 7][ppuAddressBus & 0x3FF];
 			break;
 
 			case 7: //high
-				bgHighLatch = pPattern[(bgAddress >> 10) & 7][bgAddress + 8 & 0x3FF];
+				bgHighLatch = pPattern[(ppuAddressBus >> 10) & 7][ppuAddressBus + 8 & 0x3FF];
 			break;
 		}
 
@@ -415,12 +421,12 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 
 				if(!(ppuCtrl & 0b00100000))
 				{
-					bgAddress = ((ppuCtrl & 0b1000) << 9) | (oam2[spriteIndex * 4 + 1] << 4);
+					ppuAddressBus = ((ppuCtrl & 0b1000) << 9) | (oam2[spriteIndex * 4 + 1] << 4);
 				}
 				else //8x16 mode
 				{
-					bgAddress = (oam2[spriteIndex * 4 + 1] << 12) | (oam2[spriteIndex * 4 + 1] << 4);
-					bgAddress &= 0x1FE0;
+					ppuAddressBus = (oam2[spriteIndex * 4 + 1] << 12) | (oam2[spriteIndex * 4 + 1] << 4);
+					ppuAddressBus &= 0x1FE0;
 				}
 
 				{
@@ -429,14 +435,14 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 				{
 					yOffset = ~yOffset;
 				}
-				bgAddress |= yOffset & 0b0111;
+				ppuAddressBus |= yOffset & 0b0111;
 				if(ppuCtrl & 0b00100000)
 				{
-					bgAddress += (yOffset & 8) << 1;
+					ppuAddressBus += (yOffset & 8) << 1;
 				}
 				}
 
-				spriteBitmapLow[spriteIndex] = pPattern[(bgAddress >> 10) & 7][bgAddress & 0x3FF];
+				spriteBitmapLow[spriteIndex] = pPattern[(ppuAddressBus >> 10) & 7][ppuAddressBus & 0x3FF];
 				if(spriteAttribute[spriteIndex] & 0b01000000) //flip H
 				{
 					ReverseBits(spriteBitmapLow[spriteIndex]);
@@ -444,7 +450,7 @@ void Ppu::RenderFetches() //things done during visible and prerender scanlines
 			break;
 
 			case 7:
-				spriteBitmapHigh[spriteIndex] = pPattern[(bgAddress >> 10) & 7][(bgAddress | 8) & 0x3FF];
+				spriteBitmapHigh[spriteIndex] = pPattern[(ppuAddressBus >> 10) & 7][(ppuAddressBus | 8) & 0x3FF];
 				if(spriteAttribute[spriteIndex] & 0b01000000) //flip H
 				{
 					ReverseBits(spriteBitmapHigh[spriteIndex]);
@@ -558,7 +564,7 @@ void Ppu::YIncrement()
 {
 	if(ppuAddress < 0x7000)
 	{
-		ppuAddress += 0x1000;
+		ppuAddress += 0x1000; //increment fine Y
 	}
 	else
 	{
@@ -624,7 +630,7 @@ const uint16_t Ppu::GetScanlineV() const
 }
 
 
-void Ppu::SetNametableMirroring(const std::array<NametableOffset, 4> &offset)
+void Ppu::SetNametableArrangement(const std::array<NametableOffset, 4> &offset)
 {
 	for(int x = 0; x < 4; x++)
 	{
@@ -635,7 +641,7 @@ void Ppu::SetNametableMirroring(const std::array<NametableOffset, 4> &offset)
 
 void Ppu::SetPatternBanks1(const uint8_t bank, const uint16_t offset)
 {
-	pPattern[bank] = pattern.data() + (offset << 10);
+	pPattern[bank] = &pattern[offset << 10];
 }
 
 
@@ -679,4 +685,10 @@ void Ppu::SetPattern(std::vector<uint8_t> &chr) //better name for this function?
 void Ppu::SetChrType(bool type)
 {
 	isChrRam = type;
+}
+
+
+bool Ppu::GetA12()
+{
+	return ppuAddressBus & (1 << 12);
 }
