@@ -1307,12 +1307,7 @@ bool Nes::MMC3Interrupt()
 
 	if(mmc3.A12[0] && !(mmc3.A12[1] | mmc3.A12[2])) //clock irq via A12 0 -> 0 -> 1 change
 	{
-		if(mmc3.irqCounter == 0)
-		{
-			mmc3.irqCounter = mmc3.irqLatch;
-			mmc3.irqPending |= mmc3.irqEnable;
-		}
-		else if(mmc3.irqReload)
+		if(mmc3.irqReload || mmc3.irqCounter == 0)
 		{
 			mmc3.irqCounter = mmc3.irqLatch;
 			mmc3.irqReload = false;
@@ -1320,6 +1315,11 @@ bool Nes::MMC3Interrupt()
 		else
 		{
 			--mmc3.irqCounter;
+		}
+
+		if(mmc3.irqCounter == 0)
+		{
+			mmc3.irqPending |= mmc3.irqEnable;
 		}
 	}
 
