@@ -25,7 +25,8 @@ void Ppu::MaskWrite(uint8_t dataBus) //2001
 
 	grayscaleMask = (dataBus & 1) ? 0x30: 0xFF;
 
-	emphasisMask = 0xFFFFFFFF; //crude implementation of color desaturation, actually attenuates signal by ~25% or something
+	//crude implementation of color desaturation, actually attenuates signal by ~25% or something
+	emphasisMask = 0xFFFFFFFF;
 	if(dataBus & 0b00100000) emphasisMask &= 0xFFC0C0FF; //red
 	if(dataBus & 0b01000000) emphasisMask &= 0xFFC0FFC0; //green
 	if(dataBus & 0b10000000) emphasisMask &= 0xFFFFC0C0; //blue

@@ -50,8 +50,7 @@ int main(int argc, char* argv[])
 
 	Nes nes(infile);
 
-	GLuint vao;
-	Initialize(vao, nes.ppu.GetPixelPtr());
+	Initialize(nes.ppu.GetPixelPtr());
 	glfwSetKeyCallback(window, KeyCallback);
 
 	// init audio
@@ -71,7 +70,6 @@ int main(int argc, char* argv[])
 
 		glClear(GL_COLOR_BUFFER_BIT);
 		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texWidth, texHeight, GL_RGBA, GL_UNSIGNED_BYTE, scaledOutput.data());
-		glBindVertexArray(vao);
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, 0);
 
 		audio.StreamSource(); // framerate controlled by audio playback
@@ -98,8 +96,9 @@ int main(int argc, char* argv[])
 }
 
 
-void Initialize(GLuint &vao, const uint32_t *const pixelPtr)
+void Initialize(const uint32_t *const pixelPtr)
 {
+	GLuint vao;
 	glGenVertexArrays(1, &vao); //Use a Vertex Array Object
 	glBindVertexArray(vao);
 
@@ -143,7 +142,7 @@ void Initialize(GLuint &vao, const uint32_t *const pixelPtr)
 GLuint CreateProgram()
 {
 	const std::string vertex =
-	"#version 130\n"
+	"#version 330\n"
 	"in vec4 position; in vec2 textureCoord;"
 	"out vec2 textureCoord_from_vshader;"
 	"void main() {"
@@ -152,7 +151,7 @@ GLuint CreateProgram()
 	"}";
 
 	const std::string fragment =
-	"#version 130\n"
+	"#version 330\n"
 	"in vec2 textureCoord_from_vshader;"
 	"out vec4 out_color;"
 	"uniform sampler2D texture_sampler;"
@@ -246,7 +245,7 @@ void Scale(const uint32_t *const pixelPtr)
 			(*pOutput++) = (*pInput++);
 		}
 
-		memcpy(pOutput, pOutput - 256*3, 256*3*4);
+		memcpy(pOutput        , pOutput - 256*3, 256*3*4);
 		memcpy(pOutput + 256*3, pOutput - 256*3, 256*3*4);
 		pOutput += 256*3*2;
 	}
