@@ -1,5 +1,12 @@
-#include "gl_core_3_3.h"
+#include "gl_core/gl_core_3_3.h"
 #include <GLFW/glfw3.h>
+
+#ifdef ENABLE_IMGUI
+#include "imgui/imgui.h"
+#include "imgui/examples/imgui_impl_glfw.h"
+#include "imgui/examples/imgui_impl_opengl3.h"
+// #include <charconv>
+#endif
 
 #include <chrono>
 #include <iostream>
@@ -57,6 +64,17 @@ int main(int argc, char* argv[])
 	Audio audio(nes.apu.GetOutput(), false);
 	audio.StartAudio();
 
+    #ifdef ENABLE_IMGUI
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO();
+
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init();
+
+    ImGui::StyleColorsDark();
+    ImVec4 clear_color = ImVec4(0.1f, 0.1f, 0.1f, 1.0f);
+    #endif
+
 	// uint32_t frameTime = 0;
 	// uint16_t frames = 0;
 
@@ -74,6 +92,12 @@ int main(int argc, char* argv[])
 
 		audio.StreamSource(); // framerate controlled by audio playback
 		nes.apu.sampleCount = 0;
+
+		#ifdef ENABLE_IMGUI
+		ImguiStuff(window, io);
+		ImGui::Render();
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		#endif
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -250,3 +274,20 @@ void Scale(const uint32_t *const pixelPtr)
 		pOutput += 256*3*2;
 	}
 }
+
+
+#ifdef ENABLE_IMGUI
+void ImguiStuff(GLFWwindow* &window, ImGuiIO &io)
+{
+    if(ImGui::IsKeyPressed(io.KeyMap[ImGuiKey_Escape])) 
+    {
+        glfwSetWindowShouldClose(window, GL_TRUE);
+    }
+
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    ImGui::ShowDemoWindow();
+}
+#endif

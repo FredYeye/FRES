@@ -8,6 +8,10 @@ static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, i
 
 void Scale(const uint32_t *const pixelPtr);
 
+#ifdef ENABLE_IMGUI
+void ImguiStuff(GLFWwindow* &window, ImGuiIO &io);
+#endif
+
 uint8_t input = 0, input2 = 0;
 
 std::array<uint32_t, 256*3 * 240*3> scaledOutput;

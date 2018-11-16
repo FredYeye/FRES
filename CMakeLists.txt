@@ -13,7 +13,7 @@ set(source_files
 	src/cart.cpp
 	src/file.cpp
 	src/sha1.cpp
-	src/gl_core_3_3.c
+	src/gl_core/gl_core_3_3.c
 	)
 
 set(header_files
@@ -24,8 +24,21 @@ set(header_files
 	src/cart.hpp
 	src/file.hpp
 	src/sha1.hpp
-	src/gl_core_3_3.h
+	src/gl_core/gl_core_3_3.h
 	)
+
+option(ENABLE_IMGUI "Enable Imgui" OFF)
+if(ENABLE_IMGUI)
+	add_definitions(-DENABLE_IMGUI)
+	set(source_files ${source_files}
+		src/imgui/imgui.cpp
+		src/imgui/imgui_draw.cpp
+		src/imgui/imgui_demo.cpp
+		src/imgui/imgui_widgets.cpp
+		src/imgui/examples/imgui_impl_glfw.cpp
+		src/imgui/examples/imgui_impl_opengl3.cpp
+	)
+endif()
 
 if(WIN32)
 	message("bad choice")
@@ -49,7 +62,6 @@ if(WIN32)
 	add_executable(${project_name} ${header_files} ${source_files})
 	target_link_libraries(nes ${GLFW_LIBRARY} opengl32 ole32 ksuser)
 endif(WIN32)
-
 
 if(UNIX)
 	message("lucky! cha cha cha!")
