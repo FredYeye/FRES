@@ -832,6 +832,28 @@ void Nes::CpuRead(const uint16_t address)
 	}
 
 	CpuTick();
+
+	if(apu.dmcDma && !dmcDmaActive) //check for dmc dma after read is finished (writes block this)
+	{
+		dmcDmaActive = true;
+
+		const uint16_t tempAddr = addressBus;
+
+		if(!dmaPending)
+		{
+			if(rw == 1)
+			{
+				CpuRead(addressBus);
+			}
+			CpuRead(addressBus);
+		}
+
+		CpuRead(apu.GetDmcAddr()); //dma fetch
+		apu.DmcDma(dataBus);
+		CpuRead(tempAddr); //resume
+
+		dmcDmaActive = false;
+	}
 }
 
 
@@ -914,28 +936,6 @@ void Nes::CpuWrite(const uint16_t address, const uint8_t data)
 
 void Nes::CpuTick()
 {
-	if(apu.dmcDma && !dmcDmaActive)
-	{
-		dmcDmaActive = true;
-
-		const uint16_t tempAddr = addressBus;
-
-		if(!dmaPending)
-		{
-			if(rw == 1)
-			{
-				CpuRead(addressBus);
-			}
-			CpuRead(addressBus);
-		}
-
-		CpuRead(apu.GetDmcAddr()); //dma fetch
-		apu.DmcDma(dataBus);
-		CpuRead(tempAddr); //resume
-
-		dmcDmaActive = false;
-	}
-
 	ppu.Tick();
 	PollInterrupts();
 	ppu.Tick();

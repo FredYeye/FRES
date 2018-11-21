@@ -68,7 +68,7 @@ int main(int argc, char* argv[])
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
 
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplGlfw_InitForOpenGL(window, false);
     ImGui_ImplOpenGL3_Init();
 
     ImGui::StyleColorsDark();
