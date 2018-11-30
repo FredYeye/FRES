@@ -15,7 +15,6 @@
 #include <vector>
 
 #include "main.hpp"
-#include "nes.hpp"
 
 #ifdef WINDOWS
 	#include "wasapi.hpp"
@@ -82,25 +81,35 @@ int main(int argc, char* argv[])
 	{
 		// std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
-		nes.AdvanceFrame(input, input2);
-
-		Scale(nes.ppu.GetPixelPtr());
+		if(!pauseEmu)
+		{
+			nes.AdvanceFrame(input, input2);
+			Scale3x(nes.ppu.GetPixelPtr());
+		}
 
 		glClear(GL_COLOR_BUFFER_BIT);
 		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texWidth, texHeight, GL_RGBA, GL_UNSIGNED_BYTE, scaledOutput.data());
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, 0);
 
-		audio.StreamSource(); // framerate controlled by audio playback
-		nes.apu.sampleCount = 0;
-
 		#ifdef ENABLE_IMGUI
-		ImguiStuff(window, io);
+		ImguiStuff(nes);
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 		#endif
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
+
+		if(!pauseEmu)
+		{
+			audio.StreamSource(); // framerate controlled by audio playback
+			nes.apu.sampleCount = 0;
+		}
+		else
+		{
+			using namespace std::chrono_literals;
+			std::this_thread::sleep_for(20ms);
+		}
 
 		// std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
 		// frameTime += std::chrono::duration_cast<std::chrono::microseconds>(t2-t1).count();
@@ -122,7 +131,7 @@ int main(int argc, char* argv[])
 
 void Initialize(const uint32_t *const pixelPtr)
 {
-	GLuint vao;
+	GLuint vao, vbo, eab, texture;
 	glGenVertexArrays(1, &vao); //Use a Vertex Array Object
 	glBindVertexArray(vao);
 
@@ -130,21 +139,18 @@ void Initialize(const uint32_t *const pixelPtr)
 	const uint8_t textureCoord[8] = {0,0, 1,0, 1,1, 0,1};
 	const uint8_t indices[6] = {0,1,2, 2,3,0};
 
-	GLuint vbo; //Create a Vector Buffer Object that will store the vertices on video memory
-	glGenBuffers(1, &vbo);
+	glGenBuffers(1, &vbo); //Create a Vector Buffer Object that will store the vertices on video memory
 	glBindBuffer(GL_ARRAY_BUFFER, vbo); //Allocate space for vertex positions and texture coordinates
 	glBufferData(GL_ARRAY_BUFFER, sizeof(verticesPosition) + sizeof(textureCoord), 0, GL_STATIC_DRAW);
 
 	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(verticesPosition), verticesPosition); //Transfer the vertex positions
 	glBufferSubData(GL_ARRAY_BUFFER, sizeof(verticesPosition), sizeof(textureCoord), textureCoord); //Transfer the texture coordinates
 
-	GLuint eab; //Create an Element Array Buffer that will store the indices array
-	glGenBuffers(1, &eab);
+	glGenBuffers(1, &eab); //Create an Element Array Buffer that will store the indices array
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, eab); //Transfer the data from indices to eab
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
-	GLuint texture; //Create a texture
-	glGenTextures(1, &texture);
+	glGenTextures(1, &texture); //Create a texture
 	glBindTexture(GL_TEXTURE_2D, texture); //Specify that we work with a 2D texture
 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, texWidth, texHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, scaledOutput.data());
@@ -255,7 +261,7 @@ static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, i
 }
 
 
-void Scale(const uint32_t *const pixelPtr)
+void Scale3x(const uint32_t *const pixelPtr)
 {
 	auto *pOutput = scaledOutput.data();
 	auto *pInput = pixelPtr;
@@ -277,17 +283,29 @@ void Scale(const uint32_t *const pixelPtr)
 
 
 #ifdef ENABLE_IMGUI
-void ImguiStuff(GLFWwindow* &window, ImGuiIO &io)
+void ImguiStuff(const Nes &nes)
 {
-    if(ImGui::IsKeyPressed(io.KeyMap[ImGuiKey_Escape])) 
-    {
-        glfwSetWindowShouldClose(window, GL_TRUE);
-    }
-
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+    // ImGui::ShowDemoWindow();
 
-    ImGui::ShowDemoWindow();
+    bool showBox = true;
+    ImGui::Begin("Nes", &showBox);
+
+	const NesInfo info = nes.GetInfo();
+	ImGui::Text("A:%2X\nX:%2X\nY:%2X\nS:%2X", info.rA, info.rX, info.rY, info.rS);
+
+	pauseEmu |= frameAdvance;
+	frameAdvance = false;
+	ImGui::Checkbox("Pause", &pauseEmu);
+
+	if(ImGui::Button("Frame advance"))
+	{
+		frameAdvance = true;
+		pauseEmu = false;
+	}
+
+    ImGui::End();
 }
 #endif

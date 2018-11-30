@@ -8,6 +8,10 @@
 #include "ppu.hpp"
 #include "cart.hpp"
 
+struct NesInfo
+{
+    uint8_t rA, rX, rY, rS;
+};
 
 struct VRC4
 {
@@ -47,6 +51,8 @@ class Nes
 	public:
 		Nes(std::string inFile);
 		void AdvanceFrame(uint8_t input, uint8_t input2);
+
+		const NesInfo GetInfo() const;
 
 		Ppu ppu;
 		Apu apu;

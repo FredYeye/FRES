@@ -45,6 +45,12 @@ void Nes::AdvanceFrame(uint8_t input, uint8_t input2)
 }
 
 
+const NesInfo Nes::GetInfo() const
+{
+	return {rA, rX, rY, rS};
+}
+
+
 void Nes::Reset()
 {
 	apu.Reset();
