@@ -38,9 +38,9 @@ void Nes::AdvanceFrame(uint8_t input, uint8_t input2)
 	}
 	ppu.renderFrame = false;
 
-	if(input2 & 1)
+	if(input2 & 0b10) //H key, temp
 	{
-		Reset(); //G key
+		Reset();
 	}
 }
 

@@ -100,7 +100,7 @@ int main(int argc, char* argv[])
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 
-		if(!pauseEmu)
+		if(!pauseEmu || frameAdvance)
 		{
 			audio.StreamSource(); // framerate controlled by audio playback
 			nes.apu.sampleCount = 0;
@@ -108,7 +108,7 @@ int main(int argc, char* argv[])
 		else
 		{
 			using namespace std::chrono_literals;
-			std::this_thread::sleep_for(20ms);
+			std::this_thread::sleep_for(20ms); //paused frame rate
 		}
 
 		// std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
@@ -253,10 +253,19 @@ static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, i
 		};
 		if(keys2.find(key) != keys2.end()) input2 ^= keys2.at(key);
 
-		if(key == GLFW_KEY_ESCAPE)
+		if(action == GLFW_PRESS)
 		{
-			glfwSetWindowShouldClose(window, GL_TRUE);
+			switch(key)
+			{
+				case GLFW_KEY_ESCAPE: glfwSetWindowShouldClose(window, GL_TRUE); break;
+				case GLFW_KEY_F: frameAdvance = true; pauseEmu = false; break;
+				case GLFW_KEY_G: pauseEmu = !pauseEmu; break;
+			}
 		}
+		// if(key == GLFW_KEY_ESCAPE)
+		// {
+		// 	glfwSetWindowShouldClose(window, GL_TRUE);
+		// }
 	}
 }
 
@@ -294,7 +303,7 @@ void ImguiStuff(const Nes &nes)
     ImGui::Begin("Nes", &showBox);
 
 	const NesInfo info = nes.GetInfo();
-	ImGui::Text("A:%2X\nX:%2X\nY:%2X\nS:%2X", info.rA, info.rX, info.rY, info.rS);
+	ImGui::Text("A:%02X\nX:%02X\nY:%02X\nS:%02X", info.rA, info.rX, info.rY, info.rS);
 
 	pauseEmu |= frameAdvance;
 	frameAdvance = false;
